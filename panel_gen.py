@@ -37,6 +37,8 @@ class Line():
 
     def tick(self):
         # Decrement timers by 1 every second until it reaches 0
+        # Also check status and call or hangup as necessary.
+
         self.timer -= 1
         if self.timer == 0:
             if self.status == 0:
@@ -52,24 +54,32 @@ class Line():
         return term
 
     def call(self):
-        self.timer= random.randint(18,55)                               # Reset the timer for the next go-around.
+        # Dialing takes ~12.6 seconds. This should be somewhat consistent value because its done
+        # by Asterisk / DAHDI. We're going to set a timer for call duration here, and then a few lines down,
+        # we're gonna tell Asterisk to set its own wait timer to the same value - 10. This should give us a reasonable
+        # buffer between the program's counter and whatever Asterisk is doing.
+
+        self.timer= random.randint(20,60)                               # Reset the timer for the next go-around.
 
         c = Call('DAHDI/r6/wwwww%s' % self.term)                        # Call DAHDI, Group 6. Wait a second before dialing.
-        a = Application('Wait', str(self.timer - 2))                    # Make Asterisk wait once the call is connected.
+        a = Application('Wait', str(self.timer - 10))                   # Make Asterisk wait once the call is connected.
         cf = CallFile(c,a, user='asterisk', archive = True)             # Make the call file
         cf.spool()                                                      # and throw it in the spool
 
         self.status = 1                                                 # Set the status of the call to 1 (active)
 
     def hangup(self):
-        self.timer = random.randint(18,55)                              # This isn't doing that much, since Asterisk is managing the hangup.
-        # Kill an active call.                                          # Really, it's not timed very well, since its just for show. 
-        self.status = 0                                                 # I'll have to come back to this and figure it out.
-        self.term = self.p_term()                                       # At least it puts the called line back into lines_loaded tho.
+         # This isn't doing that much, since Asterisk is managing the hangup.
+         # Really, it's not timed very well, since its just for show.
+         # I'll have to come back to this and figure it out.
+
+        self.timer = random.randint(10,45)                              # Set a timer to wait before another call starts.
+        self.status = 0                                                 # Set the status of this call to 0.
+        self.term = self.p_term()                                       # Pick a new termingating line. 
 #        lines_loaded.insert(0,self.orig)
 #        self.orig = lines_loaded.pop()
-        if Path("/var/spool/asterisk/outgoing/" + str(self.term) + ".call").is_file():
-            os.remove("/var/spool/asterisk/outgoing/" + str(self.term) + ".call")
+        if Path("/var/spool/asterisk/outgoing/" + str(self.term) + ".call").is_file():  # Delete the call file if there is one.
+            os.remove("/var/spool/asterisk/outgoing/" + str(self.term) + ".call")       # Yep
         else:
             return
 
@@ -94,18 +104,18 @@ class Switch():                                                 # Lets make a sw
 def main():
 
     try:
-#       global lines_loaded
-        global panel
+#       global lines_loaded                         # Not used here. Unnecessary.
+        global panel                                # Create a variable. Has to be global for some reason.
         
 #       with open('./lines.txt') as f:               # Open text file containing calling lines.
 #           lines_loaded = f.read().splitlines()     # and write it to lines_available
 
         panel = Switch()                             # Create a switch and call it panel.
 
-        line = [Line(n) for n in range (panel.max_calls)]
-        while True:
-            for n in line: 
-                n.tick()
+        line = [Line(n) for n in range (panel.max_calls)]       # Make lines.
+        while True:                                             # While always
+            for n in line:                                      # For as many lines as there are.
+                n.tick()                                        # Tick the timer, and do the things.
     
             # Output handling. Clear screen, draw table, sleep 1, repeat ... 
             os.system('clear')
