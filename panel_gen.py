@@ -15,6 +15,7 @@
 import time
 import os 
 import sys
+import subprocess
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
@@ -25,7 +26,7 @@ from pycall import CallFile, Call, Application
 class Line():
     def __init__(self, ident):
         self.status = 0
-        self.orig = lines_loaded.pop() 
+#        self.orig = lines_loaded.pop() 
         self.term = self.p_term()
         self.timer = random.randint(4,20)
         self.ident = ident
@@ -52,7 +53,7 @@ class Line():
 
     def call(self):
         self.timer= random.randint(18,55)                               # Reset the timer for the next go-around.
-            
+
         c = Call('DAHDI/r6/wwwww%s' % self.term)                        # Call DAHDI, Group 6. Wait a second before dialing.
         a = Application('Wait', str(self.timer - 2))                    # Make Asterisk wait once the call is connected.
         cf = CallFile(c,a, user='asterisk', archive = True)             # Make the call file
@@ -65,8 +66,8 @@ class Line():
         # Kill an active call.                                          # Really, it's not timed very well, since its just for show. 
         self.status = 0                                                 # I'll have to come back to this and figure it out.
         self.term = self.p_term()                                       # At least it puts the called line back into lines_loaded tho.
-        lines_loaded.insert(0,self.orig)
-        self.orig = lines_loaded.pop()
+#        lines_loaded.insert(0,self.orig)
+#        self.orig = lines_loaded.pop()
         if Path("/var/spool/asterisk/outgoing/" + str(self.term) + ".call").is_file():
             os.remove("/var/spool/asterisk/outgoing/" + str(self.term) + ".call")
         else:
@@ -91,12 +92,13 @@ class Switch():                                                 # Lets make a sw
 
 # MAIN LOOP I GUESS
 def main():
+
     try:
-        global lines_loaded
+#       global lines_loaded
         global panel
         
-        with open('./lines.txt') as f:               # Open text file containing calling lines.
-            lines_loaded = f.read().splitlines()     # and write it to lines_available
+#       with open('./lines.txt') as f:               # Open text file containing calling lines.
+#           lines_loaded = f.read().splitlines()     # and write it to lines_available
 
         panel = Switch()                             # Create a switch and call it panel.
 
@@ -107,8 +109,16 @@ def main():
     
             # Output handling. Clear screen, draw table, sleep 1, repeat ... 
             os.system('clear')
-            table = [[n.ident, n.orig, n.term, n.timer, n.status] for n in line]
-            print tabulate(table, headers=["ident", "orig", "term", "tick", "status"], tablefmt="pipe") 
+            table = [[n.ident, n.term, n.timer, n.status] for n in line]
+            print " ------------------------------------------"
+            print "|                                          |"
+            print "|  Rainier Full Mechanical Call Simulator  |"
+            print "|__________________________________________|\n\n"
+            print tabulate(table, headers=["ident", "term", "tick", "status"], tablefmt="pipe") 
+
+            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
+            print "\n\n" + ast_out
+
             time.sleep(1)
 
     # The below is here in an attempt to gracefully handle keyboard interrupts. 
