@@ -28,11 +28,11 @@ class Line():
         self.status = 0
 #        self.orig = lines_loaded.pop() 
         self.term = self.p_term()
-        self.timer = random.randint(4,20)
+        self.timer = int(round(random.gamma(4,4)))
         self.ident = ident
 
     def set_timer(self):
-        self.timer = random.randint(15,55)
+        self.timer = int(round(random.gamma(4,14)))
         return self.timer
 
     def tick(self):
@@ -59,7 +59,7 @@ class Line():
         # we're gonna tell Asterisk to set its own wait timer to the same value - 10. This should give us a reasonable
         # buffer between the program's counter and whatever Asterisk is doing.
 
-        self.timer= random.randint(20,60)                               # Reset the timer for the next go-around.
+        self.timer= int(round(random.gamma(4,14)))                               # Reset the timer for the next go-around.
 
         c = Call('DAHDI/r6/wwwww%s' % self.term)                        # Call DAHDI, Group 6. Wait a second before dialing.
         a = Application('Wait', str(self.timer - 10))                   # Make Asterisk wait once the call is connected.
@@ -73,7 +73,7 @@ class Line():
          # Really, it's not timed very well, since its just for show.
          # I'll have to come back to this and figure it out.
 
-        self.timer = random.randint(10,45)                              # Set a timer to wait before another call starts.
+        self.timer = int(round(random.gamma(4,14)))                     # Set a timer to wait before another call starts.
         self.status = 0                                                 # Set the status of this call to 0.
         self.term = self.p_term()                                       # Pick a new termingating line. 
 #        lines_loaded.insert(0,self.orig)
@@ -138,9 +138,9 @@ def main():
             print ""
             print "Shutdown requested...cleaning up Asterisk spool"
             os.system("rm /var/spool/asterisk/outgoing/*.call")
-    except Exception:
-           traceback.print_exc(file=sys.stdout)
-           sys.exit(0)
+#    except Exception:
+#           traceback.print_exc(file=sys.stdout)
+#           sys.exit(0)
 
 if __name__ == "__main__":
     main()
