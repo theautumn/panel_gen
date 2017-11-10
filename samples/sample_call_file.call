@@ -1,0 +1,6 @@
+Channel: DAHDI/r6/wwwww3655078
+Application: Wait
+Data: 13
+Archive: yes
+StartRetry: 31838 1 (1510198783)
+Status: Completed
