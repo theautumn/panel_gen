@@ -47,7 +47,7 @@ class Line():
         return self.timer
 
     def p_term(self):
-        term_office = random.choice(switch.nxx, p=switch.trunk_load)      # Using weight, pick an office to call.
+        term_office = random.choice(switch.nxx, p=switch.trunk_load)    # Using weight, pick an office to call.
         term_station = random.randint(5000,5999)                        # Pick a random station that appears on our final frame.
         term = int(str(term_office) + str(term_station))                # And put it together.
         return term
@@ -58,7 +58,7 @@ class Line():
         # we're gonna tell Asterisk to set its own wait timer to the same value - 10. This should give us a reasonable
         # buffer between the program's counter and whatever Asterisk is doing.
 
-        self.timer = switch.newtimer()                                      # Reset the timer for the next go-around.
+        self.timer = switch.newtimer()                                  # Reset the timer for the next go-around.
         c = Call('DAHDI/r6/wwwww%s' % self.term)                        # Call DAHDI, Group 6. Wait a second before dialing.
         a = Application('Wait', str(self.timer - 10))                   # Make Asterisk wait once the call is connected.
         cf = CallFile(c,a, user='asterisk', archive = True)             # Make the call file
@@ -71,28 +71,28 @@ class Line():
          # Really, it's not timed very well, since its just for show.
          # I'll have to come back to this and figure it out.
 
-        self.timer = switch.newtimer()                                      # Set a timer to wait before another call starts.
+        self.timer = switch.newtimer()                                  # Set a timer to wait before another call starts.
         self.status = 0                                                 # Set the status of this call to 0.
-        self.term = self.p_term()                                       # Pick a new termingating line. 
-#        lines_loaded.insert(0,self.orig)
-#        self.orig = lines_loaded.pop()
+        self.term = self.p_term()                                       # Pick a new terminating line. 
+
         if Path("/var/spool/asterisk/outgoing/" + str(self.term) + ".call").is_file():  # Delete the call file if there is one.
             os.remove("/var/spool/asterisk/outgoing/" + str(self.term) + ".call")       # Yep
         else:
             return
 
-class panel():                                                 # Lets make a switch!
+class panel():                                                  # Lets make a switch!
     def __init__(self):
         self.kind = "panel"
-        self.dcurve = int(round(random.gamma(4,14)))
+# MT        self.dcurve = int(round(random.gamma(4,14)))
+        self.dcurve = int(round(random.gamma(20,8)))
         self.max_dialing = 6                                    # We are limited by the number of senders we have.
-        self.max_calls = 5                                      # Max number of calls that can be in progres, dialing or not. Lower is safer.
-        self.max_office = .2                                    # Load for panel intraoffice trunks...
-        self.max_district = .8                                  # ....needs to equal 1 or numpy gets mad.
-        self.max_5xb = .0                                       # Max trunks to 5XB. Currently not used.       
+        self.max_calls = 5                                      # Max number of calls that can be in progress. Lower is safer.
+        self.max_office = .1                                    # Load for panel office frame.
+        self.max_district = .7                                  # Load for panel district frame.
+        self.max_5xb = .2                                       # Max trunks to 5XB. Currently not used.       
         self.max_1xb = .0                                       # Max trunks to 1XB. Currently not used.
-        self.nxx = [722, 365]                                   # Office codes that can be dialed.
-        self.trunk_load = [self.max_district, self.max_office]  # And put the trunk load together.
+        self.nxx = [722, 365, 232]                                   # Office codes that can be dialed.
+        self.trunk_load = [self.max_district, self.max_office, self.max_5xb]  # And put the trunk load together.
 
     def newtimer(self):
         t = int(round(random.gamma(4,14)))
@@ -102,10 +102,10 @@ class xb5():
     def __init__(self):
         self.kind = "5xb"
         self.dcurve = int(round(random.gamma(3,10)))
-        self.max_dialing = 7                                    # We are limited by the number of senders we have.
-        self.max_calls = 10                                     # Max number of calls that can be in progres, dialing or not. Lower is safer.
-        self.max_office = .2                                    # Load for panel intraoffice trunks...
-        self.max_district = .8                                  # ....needs to equal 1 or numpy gets mad.
+        self.max_dialing = 7                                    # We are limited by the number of ORs we have.
+        self.max_calls = 10                                     # Max number of calls that can be in progress. Lower is safer.
+        self.max_office = .2                                    # Load for 5XB interoffice trunks.
+        self.max_district = .8                                  # Load for 5XB local trunks.
         self.max_5xb = .0                                       # Max trunks to 5XB. Currently not used.       
         self.max_1xb = .0                                       # Max trunks to 1XB. Currently not used.
         self.nxx = [232, 832]                                   # Office codes that can be dialed.
@@ -119,6 +119,10 @@ class xb5():
 def main():
 
     global switch
+
+    # Change this to edit the behavior of the program to be suitable for whichever switch you'd like to use it on.
+    # This gives us the ability to "port" the program to control calls through the different machines at the museum.
+    # Can be any of switch class: panel, xb5, xb1, step, cx100
     switch = panel()
 #    switch = xb5()
 
@@ -148,7 +152,8 @@ def main():
     except KeyboardInterrupt:
             print ""
             print "Shutdown requested...cleaning up Asterisk spool"
-            os.system("rm /var/spool/asterisk/outgoing/*.call")
+            os.system("asterisk -rx \"channel request hangup all\"")
+#            os.system("rm /var/spool/asterisk/outgoing/*.call")
 #    except Exception:
 #           traceback.print_exc(file=sys.stdout)
 #           sys.exit(0)
