@@ -15,7 +15,7 @@ This project assumes you have the following:
 * a T1 card
 * a channel bank of some sort containing FXO cards
 
-The Panel switch requires the FXO cards in the channel bank to be configured with fxs_ls signalling. The DAHDI configs are part of this repo in the <code>etc</code> directory. The channel bank configs from the Adit 600 will be added to the repo once I can connect to it again to download them.
+The Panel switch requires the FXO cards in the channel bank to be configured with fxs_ls signalling. The DAHDI configs are part of this repo in the <code>etc</code> directory, and the Adit configs are part of this repository also. Please note that your hardware and software may vary from what I used, but the configs should be a good starting place nonetheless.
 
 Setup
 -----

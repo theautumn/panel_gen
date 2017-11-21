@@ -83,16 +83,17 @@ class Line():
 class panel():                                                  # Lets make a switch!
     def __init__(self):
         self.kind = "panel"
-# MT        self.dcurve = int(round(random.gamma(4,14)))
-        self.dcurve = int(round(random.gamma(20,8)))
+#        self.dcurve = int(round(random.gamma(4,14)))           # Medium/High Traffic
+        self.dcurve = int(round(random.gamma(20,8)))            # Low Traffic
         self.max_dialing = 6                                    # We are limited by the number of senders we have.
-        self.max_calls = 5                                      # Max number of calls that can be in progress. Lower is safer.
-        self.max_office = .1                                    # Load for panel office frame.
-        self.max_district = .7                                  # Load for panel district frame.
+        self.max_calls = 3                                      # Max number of calls that can be in progress. Lower is safer.
+        self.max_office = .2                                    # Load for panel office frame.
+        self.max_district = .5                                  # Load for panel district frame.
         self.max_5xb = .2                                       # Max trunks to 5XB. Currently not used.       
         self.max_1xb = .0                                       # Max trunks to 1XB. Currently not used.
-        self.nxx = [722, 365, 232]                                   # Office codes that can be dialed.
-        self.trunk_load = [self.max_district, self.max_office, self.max_5xb]  # And put the trunk load together.
+        self.max_time = .1
+        self.nxx = [722, 365, 232, 844]                         # Office codes that can be dialed.
+        self.trunk_load = [self.max_district, self.max_office, self.max_5xb, self.max_time]  # And put the trunk load together.
 
     def newtimer(self):
         t = int(round(random.gamma(4,14)))
@@ -135,7 +136,7 @@ def main():
             # Output handling. Clear screen, draw table, sleep 1, repeat ... 
             os.system('clear')
             table = [[n.ident, n.term, n.timer, n.status] for n in line]
-            print " ------------------------------------------"
+            print " __________________________________________" 
             print "|                                          |"
             print "|  Rainier Full Mechanical Call Simulator  |"
             print "|__________________________________________|\n\n"
