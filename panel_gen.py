@@ -80,37 +80,63 @@ class Line():
         else:
             return
 
-class panel():                                                  # Lets make a switch!
+class panel():                                              
+# This class is parameters and methods for the panel switch.  It should not normally need to be edited.
+# If you wish to change the office codes, or trunk weight, this is where you do it.
+    
     def __init__(self):
         self.kind = "panel"
-#        self.dcurve = int(round(random.gamma(4,14)))           # Medium/High Traffic
-        self.dcurve = int(round(random.gamma(20,8)))            # Low Traffic
+        self.dcurve = int(round(random.gamma(4,14)))            # Medium/High Traffic
+       # self.dcurve = int(round(random.gamma(20,8)))           # Low Traffic
         self.max_dialing = 6                                    # We are limited by the number of senders we have.
         self.max_calls = 3                                      # Max number of calls that can be in progress. Lower is safer.
-        self.max_office = .2                                    # Load for panel office frame.
-        self.max_district = .5                                  # Load for panel district frame.
-        self.max_5xb = .2                                       # Max trunks to 5XB. Currently not used.       
-        self.max_1xb = .0                                       # Max trunks to 1XB. Currently not used.
-        self.max_time = .1
-        self.nxx = [722, 365, 232, 844]                         # Office codes that can be dialed.
-        self.trunk_load = [self.max_district, self.max_office, self.max_5xb, self.max_time]  # And put the trunk load together.
+        self.max_nxx1 = .2                                      # Load for office 1 in self.trunk_load
+        self.max_nxx2 = .6                                      # Load for office 2 in self.trunk_load
+        self.max_nxx3 = .2                                      # Load for office 3 in self.trunk_load
+        self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
+        self.max_nxx5 = .0                                      # Load for office 5 in self.trunk_load
+        self.nxx = [722, 365, 232]                              # Office codes that can be dialed.
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  # And put the trunk load together.
+
+    def newtimer(self):
+        t = int(round(random.gamma(4,14)))
+        return t
+
+class test():
+# This class will be set up to test specific switch functions. It can be edited at will to create any kind of call environment
+# that's needed without impacting the performace of the other classes. Call it from the main loop below.
+
+    def __init__(self):
+        self.kind = "panel"
+        self.dcurve = int(round(random.gamma(4,12)))           # Medium/High Traffic
+        self.max_dialing = 6                                   # We are limited by the number of senders we have.
+        self.max_calls = 1                                     # Max number of calls that can be in progress. Lower is safer.
+        self.max_nxx1 = .2                                     # Load for office 1 in self.trunk_load
+        self.max_nxx2 = .6                                     # Load for office 2 in self.trunk_load
+        self.max_nxx3 = .2                                     # Load for office 3 in self.trunk_load
+        self.max_nxx4 = 0                                      # Load for office 4 in self.trunk_load
+        self.max_nxx5 = .0                                     # Load for office 5 in self.trunk_load
+        self.nxx = [232]                                       # Office codes that can be dialed.
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  # And put the trunk load together.
 
     def newtimer(self):
         t = int(round(random.gamma(4,14)))
         return t
 
 class xb5():
+# This class is for the No. 5 Crossbar. Same as panel, above, but with different parameters.
+
     def __init__(self):
         self.kind = "5xb"
         self.dcurve = int(round(random.gamma(3,10)))
         self.max_dialing = 7                                    # We are limited by the number of ORs we have.
-        self.max_calls = 10                                     # Max number of calls that can be in progress. Lower is safer.
-        self.max_office = .2                                    # Load for 5XB interoffice trunks.
-        self.max_district = .8                                  # Load for 5XB local trunks.
-        self.max_5xb = .0                                       # Max trunks to 5XB. Currently not used.       
-        self.max_1xb = .0                                       # Max trunks to 1XB. Currently not used.
-        self.nxx = [232, 832]                                   # Office codes that can be dialed.
-        self.trunk_load = [self.max_district, self.max_office]  # And put the trunk load together.
+        self.max_nxx1 = .6                                      # Load for office 1 in self.trunk_load
+        self.max_nxx2 = .2                                      # Load for office 2 in self.trunk_load
+        self.max_nxx3 = .2                                      # Load for office 3 in self.trunk_load
+        self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
+        self.max_nxx5 = .0                                      # Load for office 5 in self.trunk_load
+        self.nxx = [232, 832, 722]                              # Office codes that can be dialed.
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  # And put the trunk load together.
 
     def newtimer(self):
         t = int(round(random.gamma(4,10)))
@@ -124,8 +150,10 @@ def main():
     # Change this to edit the behavior of the program to be suitable for whichever switch you'd like to use it on.
     # This gives us the ability to "port" the program to control calls through the different machines at the museum.
     # Can be any of switch class: panel, xb5, xb1, step, cx100
+    
     switch = panel()
-#    switch = xb5()
+#   switch = xb5()
+#   switch = test()
 
     try:
         line = [Line(n) for n in range (switch.max_calls)]      # Make lines.
