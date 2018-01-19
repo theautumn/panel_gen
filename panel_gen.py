@@ -1,16 +1,13 @@
-#-----------------------------------------------------------------------#
-#                                                                       #
-# A call generator thing for the Rainier Panel switch at the            #
-# Connections Museum, Seattle WA.                                       #
-#                                                                       #
-# Written by Sarah Autumn, 2017                                         #
-# I have no idea what I'm even doing.                                   #
-# This program assumes the following:                                   #
-#       - You are at the museum.                                        #
-#       - You have access to the Panel switch                           #
-#       - Your name is Sarah Autumn                                     #
-#                                                                       #
-#-----------------------------------------------------------------------#
+#---------------------------------------------------------------------#
+#                                                                     #
+#  A call generator thing for the Rainier Panel switch at the         #
+#  Connections Museum, Seattle WA.                                    #
+#                                                                     #
+#  Written by Sarah Autumn, 2017                                      #
+#  sarah@connectionsmuseum.org                                        #
+#  github.com/the_autumn/panel_gen                                    #
+#                                                                     #
+#---------------------------------------------------------------------#
 
 import time
 import os 
@@ -89,10 +86,10 @@ class panel():
         self.dcurve = int(round(random.gamma(4,14)))            # Medium/High Traffic
        # self.dcurve = int(round(random.gamma(20,8)))           # Low Traffic
         self.max_dialing = 6                                    # We are limited by the number of senders we have.
-        self.max_calls = 3                                      # Max number of calls that can be in progress. Lower is safer.
-        self.max_nxx1 = .2                                      # Load for office 1 in self.trunk_load
-        self.max_nxx2 = .6                                      # Load for office 2 in self.trunk_load
-        self.max_nxx3 = .2                                      # Load for office 3 in self.trunk_load
+        self.max_calls = 4                                      # Max number of calls that can be in progress. Lower is safer.
+        self.max_nxx1 = .5                                      # Load for office 1 in self.trunk_load
+        self.max_nxx2 = .2                                      # Load for office 2 in self.trunk_load
+        self.max_nxx3 = .3                                      # Load for office 3 in self.trunk_load
         self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
         self.max_nxx5 = .0                                      # Load for office 5 in self.trunk_load
         self.nxx = [722, 365, 232]                              # Office codes that can be dialed.
@@ -170,19 +167,18 @@ def main():
             print "|__________________________________________|\n\n"
             print tabulate(table, headers=["ident", "term", "tick", "status"], tablefmt="pipe") 
 
+            # Print asterisk channels below the table so we can see what its actually doing.
             ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
             print "\n\n" + ast_out
 
             time.sleep(1)
 
     # The below is here in an attempt to gracefully handle keyboard interrupts. 
-    # At least let it down easy.
-
     except KeyboardInterrupt:
             print ""
             print "Shutdown requested...cleaning up Asterisk spool"
             os.system("asterisk -rx \"channel request hangup all\"")
-#            os.system("rm /var/spool/asterisk/outgoing/*.call")
+            os.system("rm /var/spool/asterisk/outgoing/*.call")
 #    except Exception:
 #           traceback.print_exc(file=sys.stdout)
 #           sys.exit(0)
