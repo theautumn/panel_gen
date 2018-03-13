@@ -23,8 +23,8 @@ class Line():
 # Main class for calling lines. Contains all the essential vitamins and minerals.
 # It's an important part of a balanced breakfast.
 
-    def __init__(self, ident, switchy):
-        self.switch = switchy
+    def __init__(self, ident, switch):
+        self.switch = switch
         self.kind = switch.kind
         self.status = 0                                             # Set status to on-hook.
         if args.l:                                                  # If user specified a line
@@ -131,21 +131,40 @@ class xb1():
 
     def __init__(self):
         self.kind = "1xb"
-        self.dcurve = int(round(random.gamma(4,12)))           # Medium/High Traffic
-        self.max_dialing = 3                                   # We are limited by the number of senders we have.
-        self.max_calls = 2                                     # Max number of calls that can be in progress. Lower is safer.
-        self.max_nxx1 = 1                                      # Load for office 1 in self.trunk_load
-        self.max_nxx2 = 0                                      # Load for office 2 in self.trunk_load
-        self.max_nxx3 = 0                                      # Load for office 3 in self.trunk_load
-        self.max_nxx4 = 0                                      # Load for office 4 in self.trunk_load
-        self.max_nxx5 = 0                                      # Load for office 5 in self.trunk_load
-        self.nxx = [832]                                       # Office codes that can be dialed.
+        self.max_dialing = 2                                    # We are limited by the number of senders we have.
+        self.dahdi_group = "r8"                                 # This tells Asterisk where the Adit is.
+
+        if args.v == 'light':
+            self.dcurve = int(round(random.gamma(20,8)))        # Low Traffic
+        elif args.v == 'normal':
+            self.dcurve = int(round(random.gamma(4,14)))        # Medium Traffic
+        elif args.v == 'heavy':
+            self.dcurve = int(round(random.gamma(5,2)))         # Heavy Traffic
+        
+        if args.d:                                              # If deterministic mode is set,
+            self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
+        else:
+            self.max_calls = args.a                             # Else, max is 3 by default.
+
+        self.max_nxx1 = .2                                      # Load for office 1 in self.trunk_load
+        self.max_nxx2 = .4                                      # Load for office 2 in self.trunk_load
+        self.max_nxx3 = .4                                      # Load for office 3 in self.trunk_load
+        self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
+        self.nxx = [722, 832, 232]                              # Office codes that can be dialed.
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  # And put the trunk load together.
-        self.dahdi_group = "r0"
 
     def newtimer(self):
-        t = int(round(random.gamma(4,14)))
+        if args.d:
+            t = 15                                          # Deterministic mode = 15 second timer
+        else:    
+            if args.v == 'light':
+                t = int(round(random.gamma(20,8)))          # Low Traffic
+            elif args.v == 'heavy':
+                t = int(round(random.gamma(5,2)))           # Heavy Traffic
+            else:
+                t = int(round(random.gamma(4,14)))          # Medium Traffic
         return t
+
 
 class xb5():
 # This class is for the No. 5 Crossbar. Same as panel, above, but with different parameters.
@@ -214,15 +233,15 @@ if __name__ == "__main__":
     global switches
     switches = []
 
-    if args.o == []:
+    if args.o == []:                  # If no args provided, just assume panel switch.
         args.o = ['panel']
 
     for o in args.o:
-        if o == 'panel':
+        if o == 'panel':                  # If panel, then panel.
             switches.append(panel())
-        elif o == '5xb':
+        elif o == '5xb':                  # If 5xb, then 5xb
             switches.append(xb5())
-        elif o == '1xb':
+        elif o == '1xb':                   # If 1xb then 1xb
             switches.append(xb1())
 
     try:
