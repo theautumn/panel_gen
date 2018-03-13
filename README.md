@@ -11,6 +11,7 @@ This project assumes you have the following:
 	* tabulate
 	* numpy
 	* pathlib
+	* argparse
 	* pycall
 * a T1 card
 * a channel bank of some sort containing FXO cards
@@ -19,9 +20,41 @@ The Panel switch requires the FXO cards in the channel bank to be configured wit
 
 Setup
 -----
-We have a PC with two TE110P T1 cards installed. One is for the museum's C*NET connection, and the other is used specifically for this project. Astrisk is installed along with DAHDI and libpri. You can find a reasonable primer on this here: http://www.asteriskdocs.org/en/3rd_Edition/asterisk-book-html-chunk/installing_how_to_install_it.html
+We have a PC with two TE110P T1 cards installed. One is for the museum's C\*NET connection, and the other is used specifically for this project. Astrisk is installed along with DAHDI and libpri. You can find a reasonable primer on this here: http://www.asteriskdocs.org/en/3rd_Edition/asterisk-book-html-chunk/installing_how_to_install_it.html
 
 The T1 card connects to an Adit 600 channel bank near the Panel switch. The Adit is configured with a bunch of cards, but the important ones for us are the FXO cards in slots 4 and 5. Each card supports 8 lines, so 2 cards supports a total of 16. These exit the Adit on a 25-pair cable and terminate on the IDF in the Panel switch. From the distributing frame, they are cabled to the Line Finder frame just like regular subscriber lines.
+
+
+Usage
+-----
+Setting up Asterisk and a channel bank is way beyond the scope of this readm so lets assume you've somehow managed to do that without losing all your marbles. It should be possible to run just <code>python panel_gen.py</code> and have everything work out fine, (although you may have to edit the DAHDI group (we use group 6 at the museum)). There are command line arguments that have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them. I'll paste them here for convenience.
+
+```
+usage: panel_gen.py [-h] [-a lines] [-d] [-l line] [-o [switch]] [-t switch]
+                    [-v volume]
+
+Generate calls to electromechanical switches. Defaults to originate a sane
+amount of calls from the panel switch if no args are given.
+
+optional arguments:
+  -h, --help   show this help message and exit
+  -a lines     Maximum number of active lines. Default is 3 for the panel
+               switch. Other switches will depend on stuff.
+  -d           Deterministic mode. Eliminate timing randomness so various
+               functions of the switch can be tested at-will. Will ignore -a
+               and -v options entirely.
+  -l line      Call only a particular line. Can be used with the -d option for
+               placing test calls to a number over and over again.
+  -o [switch]  Originate calls from a particular switch, 1xb, 5xb, panel, or
+               all. Default is panel.
+  -t switch    Terminate calls only on a particular switch, 1xb, 5xb, or
+               panel. Default is all.
+  -v volume    Call volume is a proprietary blend of frequency and randomness.
+               Can be light, normal, or heavy. Default is normal, which is
+               good for average load.
+```
+
+One other thing I suggest is making bash aliases for this if its something you're going to use often with the same configuration or set of args. That way, you just use your alias, and avoid a bunch of bash command line vomit.
 
 Caveats
 -------
