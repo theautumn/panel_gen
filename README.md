@@ -27,7 +27,7 @@ The T1 card connects to an Adit 600 channel bank near the Panel switch. The Adit
 
 Usage
 -----
-Setting up Asterisk and a channel bank is way beyond the scope of this readm so lets assume you've somehow managed to do that without losing all your marbles. It should be possible to run just <code>python panel_gen.py</code> and have everything work out fine, (although you may have to edit the DAHDI group (we use group 6 at the museum)). There are command line arguments that have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them. I'll paste them here for convenience.
+Setting up Asterisk and a channel bank is way beyond the scope of this readme so lets assume you've somehow managed to do that without losing all your marbles. It should be possible to run just <code>python panel_gen.py</code> and have everything work out fine, (although you may have to edit the DAHDI group (we use group 6 at the museum)). There are command line arguments that have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them. I'll paste them here for convenience.
 
 ```
 usage: panel_gen.py [-h] [-a lines] [-d] [-l line] [-o [switch]] [-t switch]
