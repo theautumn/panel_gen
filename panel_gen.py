@@ -54,9 +54,13 @@ class Line():
         return self.timer
 
     def p_term(self):
-        term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)  # Using weight, pick an office to call.
-        term_station = random.randint(5000,5999)                                # Pick a random station that appears on our final frame.
-        term = int(str(term_office) + str(term_station))                        # And put it together.
+        if args.t:
+            term_office = args.t
+        else:
+            term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)  # Using weight, pick an office to call.
+        
+        term_station = random.randint(5000,5999)             # Pick a random station that appears on our final frame.
+        term = int(str(term_office) + str(term_station))     # And put it together.
         return term
 
     def call(self):
@@ -218,10 +222,10 @@ if __name__ == "__main__":
     parser.add_argument('-d', action='store_true', help='Deterministic mode. Eliminate timing randomness so various functions of the switch can be tested at-will. Will ignore -a and -v options entirely.')
     parser.add_argument('-l', metavar='line', type=int, 
                         help='Call only a particular line. Can be used with the -d option for placing test calls to a number over and over again.')
-    parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],  choices=['1xb','5xb','panel','all'],
-                        help='Originate calls from a particular switch, 1xb, 5xb, panel, or all. Default is panel.')
-    parser.add_argument('-t', metavar='switch', type=str, default='all',
-                        help='Terminate calls only on a particular switch, 1xb, 5xb, or panel. Default is all.')
+    parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],  choices=['1xb','5xb','panel','all','722', '832', '232'],
+                        help='Originate calls from a particular switch. Takes either 3 digit NXX values or switch name.  1xb, 5xb, panel, or all. Default is panel.')
+    parser.add_argument('-t', metavar='switch', type=str, default=[], choices=['1xb','5xb','panel','all','722', '832', '232'],
+                        help='Terminate calls only on a particular switch. Takes either 3 digit NXX values or switch name. Defaults to sane options for whichever switch you are originating from.')
     parser.add_argument('-v', metavar='volume', type=str, default='normal',
                         help='Call volume is a proprietary blend of frequency and randomness. Can be light, normal, or heavy. Default is normal, which is good for average load.')
 
@@ -237,12 +241,14 @@ if __name__ == "__main__":
         args.o = ['panel']
 
     for o in args.o:
-        if o == 'panel':                  # If panel, then panel.
+        if o == 'panel' or o == '722':                  # If args provided then go with that..
             switches.append(panel())
-        elif o == '5xb':                  # If 5xb, then 5xb
+        elif o == '5xb' or o == '232':                  
             switches.append(xb5())
-        elif o == '1xb':                   # If 1xb then 1xb
+        elif o == '1xb' or o == '832':                   
             switches.append(xb1())
+        elif o == 'all':
+            switches.extend((xb1(), xb5(), panel()))
 
     try:
         line = [Line(n, switch) for switch in switches for n in range(switch.max_calls)]    # Make lines.
