@@ -40,11 +40,17 @@ optional arguments:
   -h, --help   show this help message and exit
   -a lines     Maximum number of active lines. Default is 3 for the panel
                switch. Other switches will depend on stuff.
-  -d           Deterministic mode. Eliminate timing randomness so various                                                                             functions of the switch can be tested at-will. Will ignore -a
+  -d           Deterministic mode. Eliminate timing randomness so various
+               functions of the switch can be tested at-will. Will ignore -a
                and -v options entirely.
-  -l line      Call only a particular line. Can be used with the -d option for                                                                        placing test calls to a number over and over again.
-  -o [switch]  Originate calls from a particular switch. Takes either 3 digit                                                                         NXX values or switch name. 1xb, 5xb, panel, or all. Default is
-               panel.                                                                                                                    -t switch    Terminate calls only on a particular switch. Takes either 3                                                                            digit NXX values or switch name. Defaults to sane options for                                                                          whichever switch you are originating from.
+  -l line      Call only a particular line. Can be used with the -d option for
+               placing test calls to a number over and over again.
+  -o [switch]  Originate calls from a particular switch. Takes either 3 digit
+               NXX values or switch name. 1xb, 5xb, panel, or all. Default is
+               panel.
+  -t switch    Terminate calls only on a particular switch. Takes either 3
+               digit NXX values or switch name. Defaults to sane options for
+               whichever switch you are originating from.
   -v volume    Call volume is a proprietary blend of frequency and randomness.
                Can be light, normal, or heavy. Default is normal, which is
                good for average load.
