@@ -31,10 +31,8 @@ class Line():
             self.term = args.l                                      # Set term line to user specified
         else:                                                       # Else,
             self.term = self.p_term()                               # Generate a term line randomly.
-        if args.d:                                                  # If deterministic mode,
-            self.timer = 15                                         # start the timer at 15 seconds.
-        else:
-            self.timer = int(round(random.gamma(4,4)))              # else use the normal start formula.
+
+        self.timer = int(round(random.gamma(4,4)))                  # else use the normal start formula.
         self.ident = ident                                          # Set an integer for identity.
 
     def set_timer(self):
@@ -54,11 +52,21 @@ class Line():
         return self.timer
 
     def p_term(self):
-        if args.t:
-            term_office = args.t
-        else:
+
+        global term_office
+        term_office = []
+
+        if args.t == []:   
             term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)  # Using weight, pick an office to call.
         
+        for t in args.t:
+            if t == 'panel' or t == '722':
+                term_office = 722
+            elif t == '5xb' or t == '232':
+                term_office = 232
+            elif t == '1xb' or t == '832':
+                term_office = 832
+
         term_station = random.randint(5000,5999)             # Pick a random station that appears on our final frame.
         term = int(str(term_office) + str(term_station))     # And put it together.
         return term
@@ -67,9 +75,17 @@ class Line():
         # Dialing takes ~10 to 12 seconds. This should be somewhat consistent value because its done
         # by Asterisk / DAHDI. We're going to set a timer for call duration here, and then a few lines down,
         # we're gonna tell Asterisk to set its own wait timer to the same value - 10. This should give us a reasonable
-        # buffer between the program's counter and whatever Asterisk is doing.
+        # buffer between the program's counter and Asterisk's wait timer (which itself begins when the call goes from 
+        # dialing to "UP").
 
-        self.timer = self.switch.newtimer()                                     # Reset the timer for the next go-around.
+        if args.d:                                                      # Are we in deterministic mode?
+            if args.z:                                                  # args.z is call duration
+                self.timer = args.z                                     # Set length of call to what user specified
+            else:
+                self.timer = 15                                         # If no args.z defined, use default value for -d mode.
+        else:                                                           # If we are in normal mode, then it's easy
+            self.timer = self.switch.newtimer()                         # Reset the timer for the next go-around.
+        
         c = Call('DAHDI/' + self.switch.dahdi_group + '/wwwww%s' % self.term)   # Call DAHDI, on the right group. Wait before dialing.
         a = Application('Wait', str(self.timer - 10))                           # Make Asterisk wait once the call is connected.
         cf = CallFile(c,a, user='asterisk', archive = True)                     # Make the call file
@@ -82,12 +98,20 @@ class Line():
         # The deal here is to set a new wait timer, set the status to 0 (on hook), and randomly pick a new term
         # line for the next go-around.
 
-        self.timer = self.switch.newtimer()                        # Set a timer to wait before another call starts.
-        self.status = 0                                            # Set the status of this call to 0.
-        if args.l:                                                 # If user specified a line
-            self.term = args.l                                     # Set term line to user specified
-        else:                                                      # Else,
-            self.term = self.p_term()                              # Pick a new terminating line. 
+        self.status = 0                                         # Set the status of this call to 0.
+
+        if args.d:                                              # Are we in deterministic mode?
+            if args.w:                                          # args.w is wait time between calls
+               self.timer = args.w                              # Set the length of the wait time before next call
+            else:
+                self.timer = 15                                 # If no args.w defined, use default value.
+        else:
+            self.timer = self.switch.newtimer()                 # <-- Normal call timer if args.d is not specified.
+
+        if args.l:                                              # If user specified a line
+            self.term = args.l                                  # Set term line to user specified
+        else:                                                   # Else,
+            self.term = self.p_term()                           # Pick a new terminating line. 
 
 
 class panel():                                              
@@ -98,36 +122,28 @@ class panel():
         self.kind = "panel"
         self.max_dialing = 6                                    # We are limited by the number of senders we have.
         self.dahdi_group = "r6"                                 # This tells Asterisk where the Adit is.
-
-        if args.v == 'light':
-            self.dcurve = int(round(random.gamma(20,8)))        # Low Traffic
-        elif args.v == 'normal':
-            self.dcurve = int(round(random.gamma(4,14)))        # Medium Traffic
-        elif args.v == 'heavy':
-            self.dcurve = int(round(random.gamma(5,2)))         # Heavy Traffic
+        
+        self.dcurve = self.newtimer()                           # Start a fresh new timer.
         
         if args.d:                                              # If deterministic mode is set,
             self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
         else:
             self.max_calls = args.a                             # Else, panel max is 3 by default.
 
-        self.max_nxx1 = .5                                      # Load for office 1 in self.trunk_load
+        self.max_nxx1 = .6                                      # Load for office 1 in self.trunk_load
         self.max_nxx2 = .2                                      # Load for office 2 in self.trunk_load
-        self.max_nxx3 = .3                                      # Load for office 3 in self.trunk_load
+        self.max_nxx3 = .2                                      # Load for office 3 in self.trunk_load
         self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
         self.nxx = [722, 365, 232]                              # Office codes that can be dialed.
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  # And put the trunk load together.
 
     def newtimer(self):
-        if args.d:
-            t = 15                                          # Deterministic mode = 15 second timer
-        else:    
-            if args.v == 'light':
-                t = int(round(random.gamma(20,8)))          # Low Traffic
-            elif args.v == 'heavy':
-                t = int(round(random.gamma(5,2)))           # Heavy Traffic
-            else:
-                t = int(round(random.gamma(4,14)))          # Medium Traffic
+        if args.v == 'light':
+            t = int(round(random.gamma(20,8)))          # Low Traffic
+        elif args.v == 'heavy':
+            t = int(round(random.gamma(5,2)))           # Heavy Traffic
+        else:
+            t = int(round(random.gamma(4,14)))          # Medium Traffic
         return t
 
 class xb1():
@@ -137,14 +153,9 @@ class xb1():
         self.kind = "1xb"
         self.max_dialing = 2                                    # We are limited by the number of senders we have.
         self.dahdi_group = "r8"                                 # This tells Asterisk where the Adit is.
-
-        if args.v == 'light':
-            self.dcurve = int(round(random.gamma(20,8)))        # Low Traffic
-        elif args.v == 'normal':
-            self.dcurve = int(round(random.gamma(4,14)))        # Medium Traffic
-        elif args.v == 'heavy':
-            self.dcurve = int(round(random.gamma(5,2)))         # Heavy Traffic
         
+        self.dcurve = self.newtimer()                           # Start a fresh new timer.
+
         if args.d:                                              # If deterministic mode is set,
             self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
         else:
@@ -158,15 +169,12 @@ class xb1():
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  # And put the trunk load together.
 
     def newtimer(self):
-        if args.d:
-            t = 15                                          # Deterministic mode = 15 second timer
-        else:    
-            if args.v == 'light':
-                t = int(round(random.gamma(20,8)))          # Low Traffic
-            elif args.v == 'heavy':
-                t = int(round(random.gamma(5,2)))           # Heavy Traffic
-            else:
-                t = int(round(random.gamma(4,14)))          # Medium Traffic
+        if args.v == 'light':
+            t = int(round(random.gamma(20,8)))          # Low Traffic
+        elif args.v == 'heavy':
+            t = int(round(random.gamma(5,2)))           # Heavy Traffic
+        else:
+            t = int(round(random.gamma(4,14)))          # Medium Traffic
         return t
 
 
@@ -178,13 +186,8 @@ class xb5():
         self.max_dialing = 7                                    # We are limited by the number of senders we have.
         self.dahdi_group = "r7"                                 # This tells Asterisk where the Adit is.
 
-        if args.v == 'light':
-            self.dcurve = int(round(random.gamma(20,8)))        # Low Traffic
-        elif args.v == 'normal':
-            self.dcurve = int(round(random.gamma(4,14)))        # Medium Traffic
-        elif args.v == 'heavy':
-            self.dcurve = int(round(random.gamma(5,2)))         # Heavy Traffic
-        
+        self.dcurve = self.newtimer()                           # Start a fresh new timer.
+
         if args.d:                                              # If deterministic mode is set,
             self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
         else:
@@ -198,15 +201,12 @@ class xb5():
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]  # And put the trunk load together.
 
     def newtimer(self):
-        if args.d:
-            t = 15                                          # Deterministic mode = 15 second timer
-        else:    
-            if args.v == 'light':
-                t = int(round(random.gamma(20,8)))          # Low Traffic
-            elif args.v == 'heavy':
-                t = int(round(random.gamma(5,2)))           # Heavy Traffic
-            else:
-                t = int(round(random.gamma(4,14)))          # Medium Traffic
+        if args.v == 'light':
+            t = int(round(random.gamma(20,8)))          # Low Traffic
+        elif args.v == 'heavy':
+            t = int(round(random.gamma(5,2)))           # Heavy Traffic
+        else:
+            t = int(round(random.gamma(4,14)))          # Medium Traffic
         return t
 
 # MAIN LOOP I GUESS
@@ -219,15 +219,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. Defaults to originate a sane amount of calls from the panel switch if no args are given.')
     parser.add_argument('-a', metavar='lines', type=int, default=3, choices=[1,2,3,4,5,6,7],
                         help='Maximum number of active lines. Default is 3 for the panel switch. Other switches will depend on stuff.')
-    parser.add_argument('-d', action='store_true', help='Deterministic mode. Eliminate timing randomness so various functions of the switch can be tested at-will. Will ignore -a and -v options entirely.')
+    parser.add_argument('-d', action='store_true', help='Deterministic mode. Eliminate timing randomness so various functions of the switch can be tested at-will. Places one call at a time. Will ignore -a and -v options entirely. Use with -l.')
     parser.add_argument('-l', metavar='line', type=int, 
                         help='Call only a particular line. Can be used with the -d option for placing test calls to a number over and over again.')
     parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],  choices=['1xb','5xb','panel','all','722', '832', '232'],
                         help='Originate calls from a particular switch. Takes either 3 digit NXX values or switch name.  1xb, 5xb, panel, or all. Default is panel.')
-    parser.add_argument('-t', metavar='switch', type=str, default=[], choices=['1xb','5xb','panel','all','722', '832', '232'],
+    parser.add_argument('-t', metavar='switch', type=str, nargs='?', action='append', default=[], choices=['1xb','5xb','panel', '722', '832', '232'],
                         help='Terminate calls only on a particular switch. Takes either 3 digit NXX values or switch name. Defaults to sane options for whichever switch you are originating from.')
     parser.add_argument('-v', metavar='volume', type=str, default='normal',
                         help='Call volume is a proprietary blend of frequency and randomness. Can be light, normal, or heavy. Default is normal, which is good for average load.')
+    parser.add_argument('-w', metavar='seconds', type=int, help='Use with -d option to specify wait time between calls.')
+    parser.add_argument('-z', metavar='seconds', type=int, help='Use with -d option to specify call duration.')
 
     args = parser.parse_args()
 
