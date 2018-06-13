@@ -66,6 +66,10 @@ class Line():
                 term_office = 232
             elif t == '1xb' or t == '832':
                 term_office = 832
+            elif t == 'office' or t == '365':
+                term_office = 365
+            else:
+                assert False
 
         term_station = random.randint(5000,5999)             # Pick a random station that appears on our final frame.
         term = int(str(term_office) + str(term_station))     # And put it together.
@@ -86,12 +90,12 @@ class Line():
         else:                                                           # If we are in normal mode, then it's easy
             self.timer = self.switch.newtimer()                         # Reset the timer for the next go-around.
         
-        c = Call('DAHDI/' + self.switch.dahdi_group + '/wwwww%s' % self.term)   # Call DAHDI, on the right group. Wait before dialing.
+        c = Call('DAHDI/' + self.switch.dahdi_group + '/www%s' % self.term)   # Call DAHDI, on the right group. Wait before dialing.
         a = Application('Wait', str(self.timer - 10))                           # Make Asterisk wait once the call is connected.
-        cf = CallFile(c,a, user='asterisk', archive = True)                     # Make the call file
-        cf.spool()                                                              # and throw it in the spool
+        cf = CallFile(c,a, user='asterisk')                             # Make the call file
+        cf.spool()                                                      # and throw it in the spool
 
-        self.status = 1                                                         # Set the status of the call to 1 (active)
+        self.status = 1                                                 # Set the status of the call to 1 (active)
 
     def hangup(self):
         # This is more for show than anything else. Asterisk manages the actual hangup of a call in progress.
@@ -152,17 +156,18 @@ class xb1():
     def __init__(self):
         self.kind = "1xb"
         self.max_dialing = 2                                    # We are limited by the number of senders we have.
-        self.dahdi_group = "r8"                                 # This tells Asterisk where the Adit is.
+        self.dahdi_group = "r11"                                 # This tells Asterisk where the Adit is.
         
         self.dcurve = self.newtimer()                           # Start a fresh new timer.
 
         if args.d:                                              # If deterministic mode is set,
             self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
         else:
-            self.max_calls = args.a                             # Else, max is 3 by default.
+           # self.max_calls = args.a                             # Else, max is 3 by default.
+            self.max_calls = 2
 
-        self.max_nxx1 = .2                                      # Load for office 1 in self.trunk_load
-        self.max_nxx2 = .4                                      # Load for office 2 in self.trunk_load
+        self.max_nxx1 = .3                                      # Load for office 1 in self.trunk_load
+        self.max_nxx2 = .3                                      # Load for office 2 in self.trunk_load
         self.max_nxx3 = .4                                      # Load for office 3 in self.trunk_load
         self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
         self.nxx = [722, 832, 232]                              # Office codes that can be dialed.
@@ -172,7 +177,7 @@ class xb1():
         if args.v == 'light':
             t = int(round(random.gamma(20,8)))          # Low Traffic
         elif args.v == 'heavy':
-            t = int(round(random.gamma(5,2)))           # Heavy Traffic
+            t = int(round(random.gamma(5,9)))           # Heavy Traffic
         else:
             t = int(round(random.gamma(4,14)))          # Medium Traffic
         return t
@@ -224,7 +229,7 @@ if __name__ == "__main__":
                         help='Call only a particular line. Can be used with the -d option for placing test calls to a number over and over again.')
     parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],  choices=['1xb','5xb','panel','all','722', '832', '232'],
                         help='Originate calls from a particular switch. Takes either 3 digit NXX values or switch name.  1xb, 5xb, panel, or all. Default is panel.')
-    parser.add_argument('-t', metavar='switch', type=str, nargs='?', action='append', default=[], choices=['1xb','5xb','panel', '722', '832', '232'],
+    parser.add_argument('-t', metavar='switch', type=str, nargs='?', action='append', default=[], choices=['1xb','5xb','panel', 'office', '722', '832', '232', '365'],
                         help='Terminate calls only on a particular switch. Takes either 3 digit NXX values or switch name. Defaults to sane options for whichever switch you are originating from.')
     parser.add_argument('-v', metavar='volume', type=str, default='normal',
                         help='Call volume is a proprietary blend of frequency and randomness. Can be light, normal, or heavy. Default is normal, which is good for average load.')
