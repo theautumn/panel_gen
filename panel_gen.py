@@ -14,6 +14,7 @@ import os
 import sys
 import subprocess
 import argparse
+import logging
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
@@ -30,12 +31,13 @@ class Line():
         if args.l:                                                  # If user specified a line
             self.term = args.l                                      # Set term line to user specified
         else:                                                       # Else,
-            self.term = self.p_term()                               # Generate a term line randomly.
+            self.term = self.p_term(term_choices)                   # Generate a term line randomly.
 
         self.timer = int(round(random.gamma(4,4)))                  # else use the normal start formula.
         self.ident = ident                                          # Set an integer for identity.
 
     def set_timer(self):
+        
         self.timer = switch.newtimer
         return self.timer
 
@@ -51,28 +53,34 @@ class Line():
                 self.hangup()
         return self.timer
 
-    def p_term(self):
+    def p_term(self, term_choices):
+        # If a terminating office wasn't givent at runtime, then just default to a random choice
+        # as defined by the class of the switch we're calling from. Else, pick a random from the
+        # args that the user gave with the -t switch.
 
-        global term_office
-        term_office = []
+        if term_choices == []:   
+            term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)
+        else:
+            term_office = random.choice(term_choices)
 
-        if args.t == []:   
-            term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)  # Using weight, pick an office to call.
-        
-        for t in args.t:
-            if t == 'panel' or t == '722':
-                term_office = 722
-            elif t == '5xb' or t == '232':
-                term_office = 232
-            elif t == '1xb' or t == '832':
-                term_office = 832
-            elif t == 'office' or t == '365':
-                term_office = 365
-            else:
-                assert False
+        # Choose a sane number that appears on the line link or final frame of the switches
+        # that we're actually calling. If something's wrong, then assert false so it will get caught.
 
-        term_station = random.randint(5000,5999)             # Pick a random station that appears on our final frame.
-        term = int(str(term_office) + str(term_station))     # And put it together.
+        if term_office == 722 or term_office == 365:
+            term_station = random.randint(5000,5999)
+        elif term_office == 832:
+            term_station = "%04d" % random.randint(100,200)
+        elif term_office == 232:
+            term_station = "%04d" % random.randint(100,999)
+        elif term_office == 275:
+            term_station = random.randint(4100,4199)
+        else:
+            print "No terminating line available for the office you specified. Check your p_term function!"
+            logging.info("No terminating line available for this office. Did you forget to add it to p_term?")
+            assert False
+
+        term = int(str(term_office) + str(term_station))        # And put it together.
+        logging.debug('Terminating line selected: %s', term)
         return term
 
     def call(self):
@@ -89,13 +97,16 @@ class Line():
                 self.timer = 15                                         # If no args.z defined, use default value for -d mode.
         else:                                                           # If we are in normal mode, then it's easy
             self.timer = self.switch.newtimer()                         # Reset the timer for the next go-around.
-        
-        c = Call('DAHDI/' + self.switch.dahdi_group + '/www%s' % self.term)   # Call DAHDI, on the right group. Wait before dialing.
-        a = Application('Wait', str(self.timer - 10))                           # Make Asterisk wait once the call is connected.
-        cf = CallFile(c,a, user='asterisk')                             # Make the call file
-        cf.spool()                                                      # and throw it in the spool
 
-        self.status = 1                                                 # Set the status of the call to 1 (active)
+        # Make the .call file amd throw it into the asterisk spool.
+        c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term)
+        a = Application('Wait', str(self.timer - 10))
+        cf = CallFile(c,a, user='asterisk')
+        cf.spool()
+
+        # Set the status of the call to 1 (active) and write to log file.
+        self.status = 1
+        logging.info('Calling %s on DAHDI/%s from %s', self.term, self.switch.dahdi_group, self.switch.kind)
 
     def hangup(self):
         # This is more for show than anything else. Asterisk manages the actual hangup of a call in progress.
@@ -116,6 +127,8 @@ class Line():
             self.term = args.l                                  # Set term line to user specified
         else:                                                   # Else,
             self.term = self.p_term()                           # Pick a new terminating line. 
+        
+        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.switch.dahdi_group, self.switch.kind)
 
 
 class panel():                                              
@@ -139,15 +152,16 @@ class panel():
         self.max_nxx3 = .2                                      # Load for office 3 in self.trunk_load
         self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
         self.nxx = [722, 365, 232]                              # Office codes that can be dialed.
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  # And put the trunk load together.
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  
+
 
     def newtimer(self):
         if args.v == 'light':
-            t = int(round(random.gamma(20,8)))          # Low Traffic
+            t = int(round(random.gamma(20,8)))                  # Low Traffic
         elif args.v == 'heavy':
-            t = int(round(random.gamma(5,2)))           # Heavy Traffic
+            t = int(round(random.gamma(5,2)))                   # Heavy Traffic
         else:
-            t = int(round(random.gamma(4,14)))          # Medium Traffic
+            t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
 
 class xb1():
@@ -156,30 +170,33 @@ class xb1():
     def __init__(self):
         self.kind = "1xb"
         self.max_dialing = 2                                    # We are limited by the number of senders we have.
-        self.dahdi_group = "r11"                                 # This tells Asterisk where the Adit is.
+        self.dahdi_group = "r11"                                # This tells Asterisk where the Adit is.
         
         self.dcurve = self.newtimer()                           # Start a fresh new timer.
 
         if args.d:                                              # If deterministic mode is set,
             self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
         else:
-           # self.max_calls = args.a                             # Else, max is 3 by default.
+           # self.max_calls = args.a                            # Else, max is 3 by default.
             self.max_calls = 2
+            logging.info('1XB max calls limited to 2 in the actual class')
 
-        self.max_nxx1 = .3                                      # Load for office 1 in self.trunk_load
-        self.max_nxx2 = .3                                      # Load for office 2 in self.trunk_load
-        self.max_nxx3 = .4                                      # Load for office 3 in self.trunk_load
+        self.max_nxx1 = .5                                      # Load for office 1 in self.trunk_load
+        self.max_nxx2 = .5                                      # Load for office 2 in self.trunk_load
+        self.max_nxx3 = 0                                       # Load for office 3 in self.trunk_load
         self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
-        self.nxx = [722, 832, 232]                              # Office codes that can be dialed.
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  # And put the trunk load together.
+      #  self.nxx = [722, 832, 232]                             # Office codes that can be dialed.
+        self.nxx = [832,232]
+      #  self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  
+        self.trunk_load = [self.max_nxx1, self.max_nxx2]
 
     def newtimer(self):
         if args.v == 'light':
-            t = int(round(random.gamma(20,8)))          # Low Traffic
+            t = int(round(random.gamma(20,8)))                  # Low Traffic
         elif args.v == 'heavy':
-            t = int(round(random.gamma(5,9)))           # Heavy Traffic
+            t = int(round(random.gamma(5,9)))                   # Heavy Traffic
         else:
-            t = int(round(random.gamma(4,14)))          # Medium Traffic
+            t = int(round(random.gamma(5,10)))                  # Medium Traffic
         return t
 
 
@@ -203,15 +220,15 @@ class xb5():
         self.max_nxx3 = .4                                      # Load for office 3 in self.trunk_load
         self.max_nxx4 = .2                                      # Load for office 4 in self.trunk_load
         self.nxx = [722, 832, 232, 275]                         # Office codes that can be dialed.
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]  # And put the trunk load together.
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4] 
 
     def newtimer(self):
         if args.v == 'light':
-            t = int(round(random.gamma(20,8)))          # Low Traffic
+            t = int(round(random.gamma(20,8)))                  # Low Traffic
         elif args.v == 'heavy':
-            t = int(round(random.gamma(5,2)))           # Heavy Traffic
+            t = int(round(random.gamma(5,2)))                   # Heavy Traffic
         else:
-            t = int(round(random.gamma(4,14)))          # Medium Traffic
+            t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
 
 # MAIN LOOP I GUESS
@@ -238,13 +255,16 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    logging.basicConfig(format='%(asctime)s %(message)s', filename='/home/sarah/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+    logging.info('--- Started panel_gen ---')
+    
     # Before we do anything else, the program needs to know which switch it will be originating calls from.
     # Can be any of switch class: panel, xb5, xb1, all
     
     global switches
     switches = []
 
-    if args.o == []:                  # If no args provided, just assume panel switch.
+    if args.o == []:                                    # If no args provided, just assume panel switch.
         args.o = ['panel']
 
     for o in args.o:
@@ -256,6 +276,23 @@ if __name__ == "__main__":
             switches.append(xb1())
         elif o == 'all':
             switches.extend((xb1(), xb5(), panel()))
+
+    global term_choices
+    term_choices = []
+
+    for t in args.t:
+        if t == 'panel' or t == '722':
+            term_choices.append(722)
+        elif t == '5xb' or t == '232':
+            term_choices.append(232)
+        elif t == '1xb' or t == '832':
+            term_choices.append(832)
+        elif t == 'office' or t == '365':
+            term_choices.append(365)
+
+    logging.info('Originating calls on %s', args.o)
+    if args.t != []:
+        logging.info('Terminating calls on %s', term_choices)
 
     try:
         line = [Line(n, switch) for switch in switches for n in range(switch.max_calls)]    # Make lines.
@@ -285,4 +322,4 @@ if __name__ == "__main__":
             print "Shutdown requested. Cleaning up Asterisk and /var/spool/"
             os.system("asterisk -rx \"channel request hangup all\"")
             os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-
+            logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
