@@ -65,22 +65,30 @@ class Line():
 
         # Choose a sane number that appears on the line link or final frame of the switches
         # that we're actually calling. If something's wrong, then assert false so it will get caught.
+        # Perhaps later, this should go into the switch class itself?
+
+       # if term_office == 275:
+       #     term_station = random.randint(4100,4199)
+       # else:
+       #     term_station = random.randint(self.switch.linerange[0], self.switch.linerange[1])
+
 
         if term_office == 722 or term_office == 365:
             term_station = random.randint(5000,5999)
         elif term_office == 832:
             term_station = "%04d" % random.randint(100,200)
         elif term_office == 232:
-            term_station = "%04d" % random.randint(100,999)
+            term_station = random.randint(9100,9999)
         elif term_office == 275:
             term_station = random.randint(4100,4199)
         else:
             print "No terminating line available for the office you specified. Check your p_term function!"
-            logging.info("No terminating line available for this office. Did you forget to add it to p_term?")
+            logging.error("No terminating line available for this office. Did you forget to add it to p_term?")
             assert False
 
+
         term = int(str(term_office) + str(term_station))        # And put it together.
-        logging.debug('Terminating line selected: %s', term)
+        logging.info('Terminating line selected: %s', term)
         return term
 
     def call(self):
@@ -153,7 +161,7 @@ class panel():
         self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
         self.nxx = [722, 365, 232]                              # Office codes that can be dialed.
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  
-
+        self.linerange = [5000,5999]
 
     def newtimer(self):
         if args.v == 'light':
@@ -189,6 +197,8 @@ class xb1():
         self.nxx = [832,232]
       #  self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  
         self.trunk_load = [self.max_nxx1, self.max_nxx2]
+        r
+        self.linerange = "%04d" % [100,200]
 
     def newtimer(self):
         if args.v == 'light':
@@ -221,6 +231,7 @@ class xb5():
         self.max_nxx4 = .2                                      # Load for office 4 in self.trunk_load
         self.nxx = [722, 832, 232, 275]                         # Office codes that can be dialed.
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4] 
+        self.linerange = "%04d" % random.randint(100,999)
 
     def newtimer(self):
         if args.v == 'light':
@@ -255,7 +266,13 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    logging.basicConfig(format='%(asctime)s %(message)s', filename='/home/sarah/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+    # If logfile does not exist, create it so logging can write to it.
+    try:
+        with open('calls.log') as file:
+            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', filename='/home/sarah/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+    except IOError as e:
+        print "Unable to open log file. Create it in this directory with touch calls.log and chmod 777."
+
     logging.info('--- Started panel_gen ---')
     
     # Before we do anything else, the program needs to know which switch it will be originating calls from.
@@ -319,7 +336,13 @@ if __name__ == "__main__":
     # Gracefully handle keyboard interrupts. 
     except KeyboardInterrupt:
             print ""
-            print "Shutdown requested. Cleaning up Asterisk and /var/spool/"
+            print "Shutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
             os.system("asterisk -rx \"channel request hangup all\"")
             os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
             logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
+
+    except OSError as err:
+        print("\nOS error {0}".format(err))
+        print "\n\nERROR: This program needs to be run as root, so it can talk to Asterisk. If you're running as root and you still see this error,"
+        print "it's possible you don't have Asterisk installed properly. Try running ' sudo asterisk -rv ' and see if that works.\n\n"
+        logging.error('****This program must be run as root.****')
