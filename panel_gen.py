@@ -134,7 +134,7 @@ class Line():
         if args.l:                                              # If user specified a line
             self.term = args.l                                  # Set term line to user specified
         else:                                                   # Else,
-            self.term = self.p_term()                           # Pick a new terminating line. 
+            self.term = self.p_term(term_choices)               # Pick a new terminating line. 
         
         logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.switch.dahdi_group, self.switch.kind)
 
@@ -144,16 +144,18 @@ class panel():
 # If you wish to change the office codes, or trunk weight, this is where you do it.
     
     def __init__(self):
-        self.kind = "panel"
+        self.kind = "panel"                                     # The kind of switch we're calling from.
         self.max_dialing = 6                                    # We are limited by the number of senders we have.
-        self.dahdi_group = "r6"                                 # This tells Asterisk where the Adit is.
+        self.dahdi_group = "r6"                                 # This tells Asterisk which DAHDI group to originate from.
         
-        self.dcurve = self.newtimer()                           # Start a fresh new timer.
+        self.dcurve = self.newtimer()                           # Start a fresh new timer when the switch is instantiated.
         
         if args.d:                                              # If deterministic mode is set,
             self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
-        else:
-            self.max_calls = args.a                             # Else, panel max is 3 by default.
+        elif args.a:
+            self.max_calls = args.a                             # Else, use the value given with -a
+        else: 
+            self.max_calls = 3                                  # Finally, if no args are given, use this default.
 
         self.max_nxx1 = .6                                      # Load for office 1 in self.trunk_load
         self.max_nxx2 = .2                                      # Load for office 2 in self.trunk_load
@@ -161,7 +163,7 @@ class panel():
         self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
         self.nxx = [722, 365, 232]                              # Office codes that can be dialed.
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  
-        self.linerange = [5000,5999]
+        self.linerange = [5000,5999]                            # Range of lines that can be chosen. For future use.
 
     def newtimer(self):
         if args.v == 'light':
@@ -174,31 +176,32 @@ class panel():
 
 class xb1():
 # This class is for the No. 1 Crossbar. Same as panel, above, but with different parameters.
+# For a description of each of these lines, see the panel class above.
 
     def __init__(self):
         self.kind = "1xb"
-        self.max_dialing = 2                                    # We are limited by the number of senders we have.
-        self.dahdi_group = "r11"                                # This tells Asterisk where the Adit is.
+        self.max_dialing = 2
+        self.dahdi_group = "r11"
         
-        self.dcurve = self.newtimer()                           # Start a fresh new timer.
+        self.dcurve = self.newtimer()
 
-        if args.d:                                              # If deterministic mode is set,
-            self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
+        if args.d:
+            self.max_calls = 1
+        elif args.a:
+            self.max_calls = args.a
         else:
-           # self.max_calls = args.a                            # Else, max is 3 by default.
             self.max_calls = 2
-            logging.info('1XB max calls limited to 2 in the actual class')
+            logging.info('1XB max calls limited to 2 in the switch class')
 
-        self.max_nxx1 = .5                                      # Load for office 1 in self.trunk_load
-        self.max_nxx2 = .5                                      # Load for office 2 in self.trunk_load
-        self.max_nxx3 = 0                                       # Load for office 3 in self.trunk_load
-        self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
+        self.max_nxx1 = .5
+        self.max_nxx2 = .5
+        self.max_nxx3 = 0
+        self.max_nxx4 = 0
       #  self.nxx = [722, 832, 232]                             # Office codes that can be dialed.
         self.nxx = [832,232]
       #  self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  
         self.trunk_load = [self.max_nxx1, self.max_nxx2]
-        r
-        self.linerange = "%04d" % [100,200]
+        self.linerange = ["%04d" % 100, "%04d" % 200]
 
     def newtimer(self):
         if args.v == 'light':
@@ -212,23 +215,26 @@ class xb1():
 
 class xb5():
 # This class is for the No. 5 Crossbar. Same as panel, above, but with different parameters.
+# For a description of these, see the panel class, up there ^
 
     def __init__(self):
         self.kind = "5XB"
-        self.max_dialing = 7                                    # We are limited by the number of senders we have.
-        self.dahdi_group = "r7"                                 # This tells Asterisk where the Adit is.
+        self.max_dialing = 7
+        self.dahdi_group = "r5"
 
-        self.dcurve = self.newtimer()                           # Start a fresh new timer.
+        self.dcurve = self.newtimer()
 
-        if args.d:                                              # If deterministic mode is set,
-            self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
+        if args.d:
+            self.max_calls = 1
+        elif args.a:
+            self.max_calls = args.a
         else:
-            self.max_calls = args.a                             # Else, panel max is 3 by default.
+            self.max_calls = 4
 
-        self.max_nxx1 = .2                                      # Load for office 1 in self.trunk_load
-        self.max_nxx2 = .2                                      # Load for office 2 in self.trunk_load
-        self.max_nxx3 = .4                                      # Load for office 3 in self.trunk_load
-        self.max_nxx4 = .2                                      # Load for office 4 in self.trunk_load
+        self.max_nxx1 = .2
+        self.max_nxx2 = .2
+        self.max_nxx3 = .4
+        self.max_nxx4 = .2
         self.nxx = [722, 832, 232, 275]                         # Office codes that can be dialed.
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4] 
         self.linerange = "%04d" % random.randint(100,999)
@@ -250,7 +256,7 @@ if __name__ == "__main__":
     # mostly sane options.
 
     parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. Defaults to originate a sane amount of calls from the panel switch if no args are given.')
-    parser.add_argument('-a', metavar='lines', type=int, default=3, choices=[1,2,3,4,5,6,7],
+    parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7],
                         help='Maximum number of active lines. Default is 3 for the panel switch. Other switches will depend on stuff.')
     parser.add_argument('-d', action='store_true', help='Deterministic mode. Eliminate timing randomness so various functions of the switch can be tested at-will. Places one call at a time. Will ignore -a and -v options entirely. Use with -l.')
     parser.add_argument('-l', metavar='line', type=int, 
@@ -278,21 +284,21 @@ if __name__ == "__main__":
     # Before we do anything else, the program needs to know which switch it will be originating calls from.
     # Can be any of switch class: panel, xb5, xb1, all
     
-    global switches
-    switches = []
+    global orig_switch
+    orig_switch = []
 
     if args.o == []:                                    # If no args provided, just assume panel switch.
         args.o = ['panel']
 
     for o in args.o:
-        if o == 'panel' or o == '722':                  # If args provided then go with that..
-            switches.append(panel())
+        if o == 'panel' or o == '722':
+            orig_switch.append(panel())
         elif o == '5xb' or o == '232':                  
-            switches.append(xb5())
+            orig_switch.append(xb5())
         elif o == '1xb' or o == '832':                   
-            switches.append(xb1())
+            orig_switch.append(xb1())
         elif o == 'all':
-            switches.extend((xb1(), xb5(), panel()))
+            orig_switch.extend((xb1(), xb5(), panel()))
 
     global term_choices
     term_choices = []
@@ -312,7 +318,7 @@ if __name__ == "__main__":
         logging.info('Terminating calls on %s', term_choices)
 
     try:
-        line = [Line(n, switch) for switch in switches for n in range(switch.max_calls)]    # Make lines.
+        line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]    # Make lines.
         while True:                                                                         # While always
             for n in line:                                                                  # For as many lines as there are.
                 n.tick()                                                                    # Tick the timer, and do the things.
@@ -335,8 +341,7 @@ if __name__ == "__main__":
             
     # Gracefully handle keyboard interrupts. 
     except KeyboardInterrupt:
-            print ""
-            print "Shutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
+            print "\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
             os.system("asterisk -rx \"channel request hangup all\"")
             os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
             logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
