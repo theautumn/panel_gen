@@ -78,7 +78,7 @@ class Line():
         elif term_office == 832:
             term_station = "%04d" % random.randint(100,200)
         elif term_office == 232:
-            term_station = random.randint(9100,9999)
+            term_station = random.randint(5000,5099)
         elif term_office == 275:
             term_station = random.randint(4100,4199)
         else:
@@ -274,11 +274,12 @@ if __name__ == "__main__":
 
     # If logfile does not exist, create it so logging can write to it.
     try:
-        with open('calls.log') as file:
-            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', filename='/home/sarah/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
-    except IOError as e:
-        print "Unable to open log file. Create it in this directory with touch calls.log and chmod 777."
-
+        with open('/var/log/panel_gen/calls.log', 'a') as file:
+            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+    except IOError:
+        with open('/var/log/panel_gen/calls.log', 'w') as file:
+            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+        
     logging.info('--- Started panel_gen ---')
     
     # Before we do anything else, the program needs to know which switch it will be originating calls from.
