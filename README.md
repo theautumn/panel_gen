@@ -21,10 +21,8 @@ This project assumes you have the following:
 The Panel switch requires the FXO cards in the channel bank to be configured with fxs_ls signalling. The DAHDI configs are part of this repo in the <code>etc</code> directory, and the Adit configs are part of this repository also. Please note that your hardware and software may vary from what I used, but the configs should be a good starting place nonetheless.
 
 This program must be run as user 'asterisk', or at least be able to write to the following directories:
-<code>
-/var/spool/asterisk  
-/var/log/panel_gen  
-</code>
+<code>/var/spool/asterisk</code> and <code>/var/log/panel_gen</code><br />
+
 If /var/log/panel_gen doesn't exist, it will need to be created. There's currently no installer to do it for you automatically.
 
 Setup
