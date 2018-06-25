@@ -349,6 +349,6 @@ if __name__ == "__main__":
 
     except OSError as err:
         print("\nOS error {0}".format(err))
-        print "\n\nERROR: This program needs to be run as root, so it can talk to Asterisk. If you're running as root and you still see this error,"
+        print "\n\nERROR: This program needs to be run as user 'asterisk', so it can talk to Asterisk. If you're running as 'asterisk'  and you still see this error,"
         print "it's possible you don't have Asterisk installed properly. Try running ' sudo asterisk -rv ' and see if that works.\n\n"
-        logging.error('****This program must be run as root.****')
+        logging.error('****This program must be run as user \'asterisk\'.****')
