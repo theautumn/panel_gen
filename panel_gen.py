@@ -33,7 +33,7 @@ class Line():
         else:                                                       # Else,
             self.term = self.p_term(term_choices)                   # Generate a term line randomly.
 
-        self.timer = int(round(random.gamma(4,4)))                  # else use the normal start formula.
+        self.timer = int(round(random.gamma(4,4)))                  # Set a start timer because i said so.
         self.ident = ident                                          # Set an integer for identity.
 
     def set_timer(self):
@@ -75,10 +75,10 @@ class Line():
 
         if term_office == 722 or term_office == 365:
             term_station = random.randint(5000,5999)
-        elif term_office == 832:
-            term_station = "%04d" % random.randint(100,200)
-        elif term_office == 232:
-            term_station = random.randint(5000,5099)
+        elif term_office == 832:                                # 832:
+            term_station = "%04d" % random.randint(100,199)     # 0100-0199
+        elif term_office == 232:                                # 232:
+            term_station = "%04d" % random.randint(1,80)        # 0001-0080
         elif term_office == 275:
             term_station = random.randint(4100,4199)
         else:
@@ -123,6 +123,8 @@ class Line():
 
         self.status = 0                                         # Set the status of this call to 0.
 
+        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.switch.dahdi_group, self.switch.kind)
+
         if args.d:                                              # Are we in deterministic mode?
             if args.w:                                          # args.w is wait time between calls
                self.timer = args.w                              # Set the length of the wait time before next call
@@ -136,8 +138,6 @@ class Line():
         else:                                                   # Else,
             self.term = self.p_term(term_choices)               # Pick a new terminating line. 
         
-        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.switch.dahdi_group, self.switch.kind)
-
 
 class panel():                                              
 # This class is parameters and methods for the panel switch.  It should not normally need to be edited.
@@ -157,6 +157,8 @@ class panel():
         else: 
             self.max_calls = 3                                  # Finally, if no args are given, use this default.
 
+        logging.info('Concurrent lines: %s', self.max_calls)
+
         self.max_nxx1 = .6                                      # Load for office 1 in self.trunk_load
         self.max_nxx2 = .2                                      # Load for office 2 in self.trunk_load
         self.max_nxx3 = .2                                      # Load for office 3 in self.trunk_load
@@ -169,7 +171,7 @@ class panel():
         if args.v == 'light':
             t = int(round(random.gamma(20,8)))                  # Low Traffic
         elif args.v == 'heavy':
-            t = int(round(random.gamma(5,2)))                   # Heavy Traffic
+            t = int(round(random.gamma(5,7)))                   # Heavy Traffic
         else:
             t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
@@ -191,7 +193,9 @@ class xb1():
             self.max_calls = args.a
         else:
             self.max_calls = 2
-            logging.info('1XB max calls limited to 2 in the switch class')
+            logging.info('**1XB max concurrent lines limited to 2 in the switch class**')
+
+        logging.info('Concurrent lines: %s', self.max_calls)
 
         self.max_nxx1 = .5
         self.max_nxx2 = .5
@@ -231,19 +235,20 @@ class xb5():
         else:
             self.max_calls = 4
 
+        logging.info('Concurrent lines: %s', self.max_calls)
+
         self.max_nxx1 = .2
         self.max_nxx2 = .2
         self.max_nxx3 = .4
         self.max_nxx4 = .2
         self.nxx = [722, 832, 232, 275]                         # Office codes that can be dialed.
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4] 
-        self.linerange = "%04d" % random.randint(100,999)
 
     def newtimer(self):
         if args.v == 'light':
             t = int(round(random.gamma(20,8)))                  # Low Traffic
         elif args.v == 'heavy':
-            t = int(round(random.gamma(5,2)))                   # Heavy Traffic
+            t = int(round(random.gamma(5,7)))                   # Heavy Traffic
         else:
             t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
@@ -263,12 +268,13 @@ if __name__ == "__main__":
                         help='Call only a particular line. Can be used with the -d option for placing test calls to a number over and over again.')
     parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],  choices=['1xb','5xb','panel','all','722', '832', '232'],
                         help='Originate calls from a particular switch. Takes either 3 digit NXX values or switch name.  1xb, 5xb, panel, or all. Default is panel.')
-    parser.add_argument('-t', metavar='switch', type=str, nargs='?', action='append', default=[], choices=['1xb','5xb','panel', 'office', '722', '832', '232', '365'],
+    parser.add_argument('-t', metavar='switch', type=str, nargs='?', action='append', default=[], choices=['1xb','5xb','panel','office','step', '722', '832', '232', '365', '275'],
                         help='Terminate calls only on a particular switch. Takes either 3 digit NXX values or switch name. Defaults to sane options for whichever switch you are originating from.')
     parser.add_argument('-v', metavar='volume', type=str, default='normal',
                         help='Call volume is a proprietary blend of frequency and randomness. Can be light, normal, or heavy. Default is normal, which is good for average load.')
     parser.add_argument('-w', metavar='seconds', type=int, help='Use with -d option to specify wait time between calls.')
     parser.add_argument('-z', metavar='seconds', type=int, help='Use with -d option to specify call duration.')
+    parser.add_argument('-log', metavar='loglevel', type=str, default='INFO', help='Set log level to WARNING, INFO, DEBUG.')
 
     args = parser.parse_args()
 
@@ -317,6 +323,9 @@ if __name__ == "__main__":
     logging.info('Originating calls on %s', args.o)
     if args.t != []:
         logging.info('Terminating calls on %s', term_choices)
+    if args.d == True:
+        logging.info('Deterministic Mode set!')
+    logging.info('Call volume set to %s', args.v)
 
     try:
         line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]    # Make lines.
