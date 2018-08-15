@@ -31,6 +31,15 @@ We have a PC with two TE110P T1 cards installed. One is for the museum's C\*NET 
 
 The T1 card connects to an Adit 600 channel bank near the Panel switch. The Adit is configured with a bunch of cards, but the important ones for us are the FXO cards in slots 4, 5, and 6. Each card supports 8 lines, so 3 cards supports a total of 24. These exit the Adit on a 25-pair cable and terminate on the IDF in the Panel switch. From the distributing frame, they are cabled to the Line Finder frame just like regular subscriber lines. (Please note that there has been some talk of the fact that hooking up a modern channel bank to an electromechanical switch can, over time, damage the delicate circuitry in the FXO cards. You may want to add some voltage spike protection. If you have questions, ask around on the C\*NET list @ http://www.ckts.info
 
+This application also requires a context in your dialplan to pass calls into. The simple context I use is below
+
+```
+[sarah_callsim]
+
+        exten => s,1,Set(TALK_DETECT(set)=)
+        exten => s,n,Wait(${waittime})
+        exten => s,n,Hangup()
+```
 
 Usage
 -----

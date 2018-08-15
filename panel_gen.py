@@ -18,7 +18,7 @@ import logging
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
-from pycall import CallFile, Call, Application
+from pycall import CallFile, Call, Application, Context
 
 class Line():
 # Main class for calling lines. Contains all the essential vitamins and minerals.
@@ -78,7 +78,8 @@ class Line():
         elif term_office == 832:                                # 832:
             term_station = "%04d" % random.randint(100,199)     # 0100-0199
         elif term_office == 232:                                # 232:
-            term_station = "%04d" % random.randint(1,80)        # 0001-0080
+             term_station = random.randint(5000,5999)           # 5000-5999
+           #term_station = "%04d" % random.randint(1,80)        # 0001-0080
         elif term_office == 275:
             term_station = random.randint(4100,4199)
         else:
@@ -96,7 +97,8 @@ class Line():
         # by Asterisk / DAHDI. We're going to set a timer for call duration here, and then a few lines down,
         # we're gonna tell Asterisk to set its own wait timer to the same value - 10. This should give us a reasonable
         # buffer between the program's counter and Asterisk's wait timer (which itself begins when the call goes from 
-        # dialing to "UP").
+        # dialing to "UP"). New behavior 8-15-18 is to pass control of the call to the sarah_callsim context in 
+        # the dialplan. Hopefully, this will allow me to better interact with Asterisk from here. 
 
         if args.d:                                                      # Are we in deterministic mode?
             if args.z:                                                  # args.z is call duration
@@ -106,10 +108,14 @@ class Line():
         else:                                                           # If we are in normal mode, then it's easy
             self.timer = self.switch.newtimer()                         # Reset the timer for the next go-around.
 
+        wait = str(self.timer - 10)                                     # Wait value to pass to Asterisk dialplan
+        vars = {'waittime': wait}                                       # Set the vars to actually pass over
+
         # Make the .call file amd throw it into the asterisk spool.
-        c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term)
-        a = Application('Wait', str(self.timer - 10))
-        cf = CallFile(c,a, user='asterisk')
+        c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term, variables=vars)
+        con = Context('sarah_callsim','s','1')
+        #a = Application('Wait', str(self.timer - 10))                  # Deprecated. Leaving around just in case.
+        cf = CallFile(c, con, user='asterisk')
         cf.spool()
 
         # Set the status of the call to 1 (active) and write to log file.
