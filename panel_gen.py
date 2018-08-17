@@ -15,10 +15,12 @@ import sys
 import subprocess
 import argparse
 import logging
+import curses
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
 from pycall import CallFile, Call, Application, Context
+
 
 class Line():
 # Main class for calling lines. Contains all the essential vitamins and minerals.
@@ -112,10 +114,10 @@ class Line():
         vars = {'waittime': wait}                                       # Set the vars to actually pass over
 
         # Make the .call file amd throw it into the asterisk spool.
-        c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term, variables=vars)
+        c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term, variables=vars) 
         con = Context('sarah_callsim','s','1')
         #a = Application('Wait', str(self.timer - 10))                  # Deprecated. Leaving around just in case.
-        cf = CallFile(c, con, user='asterisk')
+        cf = CallFile(c, con, user='asterisk',)
         cf.spool()
 
         # Set the status of the call to 1 (active) and write to log file.
@@ -144,6 +146,7 @@ class Line():
         else:                                                   # Else,
             self.term = self.p_term(term_choices)               # Pick a new terminating line. 
         
+        stdscr.clear()                                          # Clear window to prevent overdraw.
 
 class panel():                                              
 # This class is parameters and methods for the panel switch.  It should not normally need to be edited.
@@ -243,7 +246,7 @@ class xb5():
 
         logging.info('Concurrent lines: %s', self.max_calls)
 
-        self.max_nxx1 = .2
+        self.max_nxx1 = .2 
         self.max_nxx2 = .2
         self.max_nxx3 = .4
         self.max_nxx4 = .2
@@ -259,9 +262,9 @@ class xb5():
             t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
 
-# MAIN LOOP I GUESS
-if __name__ == "__main__":
 
+def parse_args():   
+    
     # Stuff for command line arguments, so we can configure some options at runtime.
     # If no arguments are presented, the program will run with default
     # mostly sane options.
@@ -283,6 +286,13 @@ if __name__ == "__main__":
     parser.add_argument('-log', metavar='loglevel', type=str, default='INFO', help='Set log level to WARNING, INFO, DEBUG.')
 
     args = parser.parse_args()
+    return args
+
+
+# MAIN LOOP I GUESS
+if __name__ == "__main__":
+
+    args = parse_args()
 
     # If logfile does not exist, create it so logging can write to it.
     try:
@@ -291,7 +301,13 @@ if __name__ == "__main__":
     except IOError:
         with open('/var/log/panel_gen/calls.log', 'w') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
-        
+    
+    # Set up ncurses.
+    stdscr = curses.initscr()
+    curses.noecho()
+    curses.cbreak()
+    stdscr.keypad(True)
+
     logging.info('--- Started panel_gen ---')
     
     # Before we do anything else, the program needs to know which switch it will be originating calls from.
@@ -306,9 +322,9 @@ if __name__ == "__main__":
     for o in args.o:
         if o == 'panel' or o == '722':
             orig_switch.append(panel())
-        elif o == '5xb' or o == '232':                  
+        elif o == '5xb' or o == '232':
             orig_switch.append(xb5())
-        elif o == '1xb' or o == '832':                   
+        elif o == '1xb' or o == '832':
             orig_switch.append(xb1())
         elif o == 'all':
             orig_switch.extend((xb1(), xb5(), panel()))
@@ -333,37 +349,59 @@ if __name__ == "__main__":
         logging.info('Deterministic Mode set!')
     logging.info('Call volume set to %s', args.v)
 
+
     try:
-        line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]    # Make lines.
-        while True:                                                                         # While always
-            for n in line:                                                                  # For as many lines as there are.
-                n.tick()                                                                    # Tick the timer, and do the things.
-    
-            # Output handling. Clear screen, draw table, sleep 1, repeat ... 
-            os.system('clear')
+        # Time to make the donuts!
+        line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+        while True:
+            for n in line:
+                n.tick()
+
+            # Output handling. make pretty things, sleep 1, repeat ... 
             table = [[n.kind, n.ident, n.term, n.timer, n.status] for n in line]
-            print " __________________________________________" 
-            print "|                                          |"
-            print "|  Rainier Full Mechanical Call Simulator  |"
-            print "|__________________________________________|\n\n"
-            print tabulate(table, headers=["switch", "ident", "term", "tick", "status"], tablefmt="pipe") 
+            stdscr.addstr(0,5," __________________________________________") 
+            stdscr.addstr(1,5,"|                                          |")
+            stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
+            stdscr.addstr(3,5,"|__________________________________________|")
+            stdscr.addstr(6,0,tabulate(table, headers=["switch", "ident", "term", "tick", "status"], tablefmt="pipe")) 
 
             # Print asterisk channels below the table so we can see what its actually doing.
             ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-            print "\n\n" + ast_out
+            stdscr.addstr(14,5,"============ Asterisk output ===========")
+            stdscr.addstr(16,0,ast_out)
+            
+            # Print the contents of /var/log/panel_gen/calls.log
+            logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
+            stdscr.addstr(25,5,'================= Logs =================',curses.A_BOLD)
+            stdscr.addstr(27,0,logs)
 
+            # Refresh the screen.
+            stdscr.refresh()
             # Take a nap.
             time.sleep(1)
-            
+
+
+
     # Gracefully handle keyboard interrupts. 
     except KeyboardInterrupt:
+            
+            curses.nocbreak()
+            stdscr.keypad(False)
+            curses.echo()
+            curses.endwin()
+    
             print "\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
             os.system("asterisk -rx \"channel request hangup all\"")
             os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
             logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
     except OSError as err:
+
+        curses.nocbreak()
+        stdscr.keypad(False)
+        curses.echo()
+        curses.endwin()
         print("\nOS error {0}".format(err))
-        print "\n\nERROR: This program needs to be run as user 'asterisk', so it can talk to Asterisk. If you're running as 'asterisk'  and you still see this error,"
-        print "it's possible you don't have Asterisk installed properly. Try running ' sudo asterisk -rv ' and see if that works.\n\n"
-        logging.error('****This program must be run as user \'asterisk\'.****')
+        logging.error('**** OS Error ****')
+        logging.error('{0}'.format(err))
+        logging.error('Check files that subprocess and logging try to open. Something is screwy there')
