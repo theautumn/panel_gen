@@ -117,7 +117,7 @@ class Line():
         c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term, variables=vars) 
         con = Context('sarah_callsim','s','1')
         #a = Application('Wait', str(self.timer - 10))                  # Deprecated. Leaving around just in case.
-        cf = CallFile(c, con, user='asterisk',)
+        cf = CallFile(c, con, user='asterisk')
         cf.spool()
 
         # Set the status of the call to 1 (active) and write to log file.
