@@ -16,6 +16,7 @@ import subprocess
 import argparse
 import logging
 import curses
+import threading
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
@@ -146,7 +147,7 @@ class Line():
         else:                                                   # Else,
             self.term = self.p_term(term_choices)               # Pick a new terminating line. 
         
-        stdscr.clear()                                          # Clear window to prevent overdraw.
+        scr.clear()                                          # Clear window to prevent overdraw.
 
 class panel():                                              
 # This class is parameters and methods for the panel switch.  It should not normally need to be edited.
@@ -257,7 +258,7 @@ class xb5():
         if args.v == 'light':
             t = int(round(random.gamma(20,8)))                  # Low Traffic
         elif args.v == 'heavy':
-            t = int(round(random.gamma(5,7)))                   # Heavy Traffic
+            t = int(round(random.gamma(4,6)))                   # Heavy Traffic
         else:
             t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
@@ -303,10 +304,10 @@ if __name__ == "__main__":
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
     
     # Set up ncurses.
-    stdscr = curses.initscr()
+    scr = curses.initscr()
     curses.noecho()
     curses.cbreak()
-    stdscr.keypad(True)
+    scr.keypad(True)
 
     logging.info('--- Started panel_gen ---')
     
@@ -359,24 +360,24 @@ if __name__ == "__main__":
 
             # Output handling. make pretty things, sleep 1, repeat ... 
             table = [[n.kind, n.ident, n.term, n.timer, n.status] for n in line]
-            stdscr.addstr(0,5," __________________________________________") 
-            stdscr.addstr(1,5,"|                                          |")
-            stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
-            stdscr.addstr(3,5,"|__________________________________________|")
-            stdscr.addstr(6,0,tabulate(table, headers=["switch", "ident", "term", "tick", "status"], tablefmt="pipe")) 
+            scr.addstr(0,5," __________________________________________") 
+            scr.addstr(1,5,"|                                          |")
+            scr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
+            scr.addstr(3,5,"|__________________________________________|")
+            scr.addstr(6,0,tabulate(table, headers=["switch", "ident", "term", "tick", "status"], tablefmt="pipe")) 
 
             # Print asterisk channels below the table so we can see what its actually doing.
             ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-            stdscr.addstr(14,5,"============ Asterisk output ===========")
-            stdscr.addstr(16,0,ast_out)
+            scr.addstr(16,5,"============ Asterisk output ===========")
+            scr.addstr(18,0,ast_out)
             
             # Print the contents of /var/log/panel_gen/calls.log
             logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
-            stdscr.addstr(25,5,'================= Logs =================',curses.A_BOLD)
-            stdscr.addstr(27,0,logs)
+            scr.addstr(27,5,'================= Logs =================',curses.A_BOLD)
+            scr.addstr(29,0,logs)
 
             # Refresh the screen.
-            stdscr.refresh()
+            scr.refresh()
             # Take a nap.
             time.sleep(1)
 
@@ -385,23 +386,30 @@ if __name__ == "__main__":
     # Gracefully handle keyboard interrupts. 
     except KeyboardInterrupt:
             
-            curses.nocbreak()
-            stdscr.keypad(False)
-            curses.echo()
-            curses.endwin()
-    
-            print "\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
-            os.system("asterisk -rx \"channel request hangup all\"")
-            os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-            logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
+        curses.nocbreak()
+        scr.keypad(False)
+        curses.echo()
+        curses.endwin()
+        print "\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
+        os.system("asterisk -rx \"channel request hangup all\"")
+        os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+        logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
     except OSError as err:
 
         curses.nocbreak()
-        stdscr.keypad(False)
+        scr.keypad(False)
         curses.echo()
         curses.endwin()
         print("\nOS error {0}".format(err))
         logging.error('**** OS Error ****')
         logging.error('{0}'.format(err))
         logging.error('Check files that subprocess and logging try to open. Something is screwy there')
+
+    except curses.error as err:
+
+        curses.nocbreak()
+        scr.keypad(False)
+        curses.echo()
+        curses.endwin()
+        print("\n{0}".format(err))
