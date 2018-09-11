@@ -140,7 +140,7 @@ class Line():
         else:                                                   # Else,
             self.term = self.PickCalledLine(term_choices)       # Pick a new terminating line. 
         
-        stdscr.clear()                                             # Clear window to prevent overdraw.
+        stdscr.clear()                                          # Clear window to prevent overdraw.
 
 
 
@@ -431,7 +431,7 @@ if __name__ == "__main__":
     except curses.error as err:
 
         curses.nocbreak()
-        scr.keypad(False)
+        stdscr.keypad(False)
         curses.echo()
         curses.endwin()
         print("\n{0}".format(err))
