@@ -16,12 +16,14 @@ import subprocess
 import argparse
 import logging
 import curses
+import re
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
 from pycall import CallFile, Call, Application, Context
 from asterisk.ami import AMIClient
 from asterisk.ami import EventListener
+from asterisk.ami import Response
 
 class Line():
 # Main class for calling lines. Contains all the essential vitamins and minerals.
@@ -38,6 +40,7 @@ class Line():
 
         self.timer = int(round(random.gamma(4,4)))                  # Set a start timer because i said so.
         self.ident = ident                                          # Set an integer for identity.
+        self.chan = '-'                                             # Set DAHDI channel to 0 to start
 
     def set_timer(self):
         
@@ -124,7 +127,7 @@ class Line():
         # line for the next go-around.
 
         self.status = 0                                         # Set the status of this call to 0.
-
+        self.chan = '-'
         logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.switch.dahdi_group, self.switch.kind)
 
         if args.d:                                              # Are we in deterministic mode?
@@ -139,7 +142,7 @@ class Line():
             self.term = args.l                                  # Set term line to user specified
         else:                                                   # Else,
             self.term = self.PickCalledLine(term_choices)       # Pick a new terminating line. 
-        
+
         stdscr.clear()                                          # Clear window to prevent overdraw.
 
 
@@ -165,7 +168,7 @@ class panel():
         else: 
             self.max_calls = 3                                  # Finally, if no args are given, use this default.
 
-        logging.info('Concurrent lines: %s', self.max_calls)
+#        logging.info('Concurrent lines: %s', self.max_calls)
 
         self.max_nxx1 = .6                                      # Load for office 1 in self.trunk_load
         self.max_nxx2 = .2                                      # Load for office 2 in self.trunk_load
@@ -201,9 +204,8 @@ class xb1():
             self.max_calls = args.a
         else:
             self.max_calls = 2
-            logging.info('**1XB max concurrent lines limited to 2 in the switch class**')
 
-        logging.info('Concurrent lines: %s', self.max_calls)
+#        logging.info('Concurrent lines: %s', self.max_calls)
 
         self.max_nxx1 = .5
         self.max_nxx2 = .5
@@ -243,7 +245,7 @@ class xb5():
         else:
             self.max_calls = 4
 
-        logging.info('Concurrent lines: %s', self.max_calls)
+#        logging.info('Concurrent lines: %s', self.max_calls)
 
         self.max_nxx1 = .2 
         self.max_nxx2 = .2
@@ -269,6 +271,28 @@ class step():
     def __init__(self):
         self.kind = "Step"
         self.linerange = [4100,4199]
+
+
+# <----- BEGIN BOOKKEEPING STUFF -----> #
+
+def event_notification(event, **kwargs):
+# This parses notifications received from Asterisk AMI, particularly DialBegin.
+# It uses regex to extract the DialString and DestChannel, then logs those, and
+# associates the dialed number with its DAHDI channel. This is then displayed for the user,
+# and perhaps used elsewhere in the code later. Who knows.
+    output = str(event)
+    pattern1 = re.compile('(?<=DialString\'\:\su.{8})(\d{7})')
+    pattern2 = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
+
+    cnid = pattern1.findall(output)
+    DAHDIchan = pattern2.findall(output)
+
+    logging.info('CNID: %s ', cnid[0])
+    logging.info('DAHDI: %s', DAHDIchan[0])
+    
+    for n in line:
+        if cnid[0] == str(n.term):
+            n.chan = DAHDIchan[0]
 
 def parse_args():   
     
@@ -317,7 +341,9 @@ if __name__ == "__main__":
 
     # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
-    client.login(username='panel_gen',secret='t431434')
+    future = client.login(username='panel_gen',secret='t431434')
+    if future.response.is_error():
+        raise Exception(str(future.response))
 
     # If we got this far, log that we started successfully.
     logging.info('--- Started panel_gen ---')
@@ -370,18 +396,21 @@ if __name__ == "__main__":
 
     try:
     # Time to make the donuts!
+        global line
         line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+        client.add_event_listener(event_notification, white_list='DialBegin')
+
         while True:
             for n in line:
                 n.tick()
-
+            
             # Output handling. make pretty things, sleep 1, repeat ... 
-            table = [[n.kind, n.ident, n.term, n.timer, n.status] for n in line]
+            table = [[n.kind, n.chan, n.term, n.timer, n.status] for n in line]
             stdscr.addstr(0,5," __________________________________________") 
             stdscr.addstr(1,5,"|                                          |")
             stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
             stdscr.addstr(3,5,"|__________________________________________|")
-            stdscr.addstr(6,0,tabulate(table, headers=["switch", "ident", "term", "tick", "status", "ring"], tablefmt="pipe")) 
+            stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "status", "ring"], tablefmt="pipe")) 
 
             # Print asterisk channels below the table so we can see what its actually doing.
             ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
