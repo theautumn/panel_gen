@@ -95,13 +95,14 @@ The interface is divided into three areas, which should be mostly self-explanato
 |    panel |         - | 2325773 |      4 |       0 |    on_hook |
 |    panel |        10 | 7225337 |    120 |       1 |    Ringing |
 
-switch: originating switch
-channel: DAHDI channel
-term: line being called
-tick: seconds before next event occurs
-state: line state according to Python
-asterisk: line state according to Asterisk
 ````
+__switch:__ originating switch
+__channel:__ DAHDI channel
+__term:__ line being called
+__tick:__ seconds before next event occurs
+__state:__ line state according to Python
+__asterisk:__ line state according to Asterisk
+
 
 Caveats
 -------
