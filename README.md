@@ -97,11 +97,17 @@ The interface is divided into three areas, which should be mostly self-explanato
 
 ````
 __switch:__ originating switch
+
 __channel:__ DAHDI channel
+
 __term:__ line being called
+
 __tick:__ seconds before next event occurs
+
 __state:__ line state according to Python
+
 __asterisk:__ line state according to Asterisk
+
 
 
 Caveats
