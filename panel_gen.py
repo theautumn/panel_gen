@@ -3,7 +3,7 @@
 #  A call generator thing for the Rainier Panel switch at the         #
 #  Connections Museum, Seattle WA.                                    #
 #                                                                     #
-#  Written by Sarah Autumn, 2017                                      #
+#  Written by Sarah Autumn, 2017-2018                                 #
 #  sarah@connectionsmuseum.org                                        #
 #  github.com/the_autumn/panel_gen                                    #
 #                                                                     #
@@ -23,7 +23,6 @@ from pathlib import Path
 from pycall import CallFile, Call, Application, Context
 from asterisk.ami import AMIClient
 from asterisk.ami import EventListener
-from asterisk.ami import Response
 
 class Line():
 # Main class for calling lines. Contains all the essential vitamins and minerals.
@@ -119,7 +118,6 @@ class Line():
         cf = CallFile(c, con, user='asterisk')
         cf.spool()
 
-        logging.info('Calling %s on DAHDI/%s from %s', self.term, self.switch.dahdi_group, self.switch.kind)
 
     def hangup(self):
         # This is more for show than anything else. Asterisk manages the actual hangup of a call in progress.
@@ -285,12 +283,13 @@ def event_notification(event, **kwargs):
     cnid = pattern1.findall(output)
     DAHDIchan = pattern2.findall(output)
 
-    logging.info('CNID: %s ', cnid[0])
-    logging.info('DAHDI: %s', DAHDIchan[0])
+#    logging.info('CNID: %s ', cnid[0])
+#    logging.info('DAHDI: %s', DAHDIchan[0])
     
     for n in line:
         if cnid[0] == str(n.term):
             n.chan = DAHDIchan[0]
+            logging.info('Calling %s on DAHDI/%s from %s', n.term, n.chan, n.switch.kind)
 
 def parse_args():   
     
@@ -300,19 +299,24 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. Defaults to originate a sane amount of calls from the panel switch if no args are given.')
     parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7],
-                        help='Maximum number of active lines. Default is 3 for the panel switch. Other switches will depend on stuff.')
-    parser.add_argument('-d', action='store_true', help='Deterministic mode. Eliminate timing randomness so various functions of the switch can be tested at-will. Places one call at a time. Will ignore -a and -v options entirely. Use with -l.')
+            help='Maximum number of active lines. Default is 3 for the panel switch. Other switches will depend on stuff.')
+    parser.add_argument('-d', action='store_true',
+            help='Deterministic mode. Eliminate timing randomness so various functions of the switch can be tested at-will. Places one call at a time. Will ignore -a and -v options entirely. Use with -l.')
     parser.add_argument('-l', metavar='line', type=int, 
-                        help='Call only a particular line. Can be used with the -d option for placing test calls to a number over and over again.')
-    parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],  choices=['1xb','5xb','panel','all','722', '832', '232'],
-                        help='Originate calls from a particular switch. Takes either 3 digit NXX values or switch name.  1xb, 5xb, panel, or all. Default is panel.')
-    parser.add_argument('-t', metavar='switch', type=str, nargs='?', action='append', default=[], choices=['1xb','5xb','panel','office','step', '722', '832', '232', '365', '275'],
-                        help='Terminate calls only on a particular switch. Takes either 3 digit NXX values or switch name. Defaults to sane options for whichever switch you are originating from.')
+            help='Call only a particular line. Can be used with the -d option for placing test calls to a number over and over again.')
+    parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],
+            choices=['1xb','5xb','panel','all','722', '832', '232'],
+            help='Originate calls from a particular switch. Takes either 3 digit NXX values or switch name.  1xb, 5xb, panel, or all. Default is panel.')
+    parser.add_argument('-t', metavar='switch', type=str, nargs='?', action='append', default=[],
+            choices=['1xb','5xb','panel','office','step', '722', '832', '232', '365', '275'],
+            help='Terminate calls only on a particular switch. Takes either 3 digit NXX values or switch name. Defaults to sane options for whichever switch you are originating from.')
     parser.add_argument('-v', metavar='volume', type=str, default='normal',
-                        help='Call volume is a proprietary blend of frequency and randomness. Can be light, normal, or heavy. Default is normal, which is good for average load.')
+            help='Call volume is a proprietary blend of frequency and randomness. Can be light, normal, or heavy. Default is normal, which is good for average load.')
     parser.add_argument('-w', metavar='seconds', type=int, help='Use with -d option to specify wait time between calls.')
-    parser.add_argument('-z', metavar='seconds', type=int, help='Use with -d option to specify call duration.')
-    parser.add_argument('-log', metavar='loglevel', type=str, default='INFO', help='Set log level to WARNING, INFO, DEBUG.')
+    parser.add_argument('-z', metavar='seconds', type=int,
+            help='Use with -d option to specify call duration.')
+    parser.add_argument('-log', metavar='loglevel', type=str, default='INFO',
+            help='Set log level to WARNING, INFO, DEBUG.')
 
     args = parser.parse_args()
     return args
@@ -338,7 +342,8 @@ def start(stdscr):
         stdscr.addstr(1,5,"|                                          |")
         stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
         stdscr.addstr(3,5,"|__________________________________________|")
-        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "status", "ring"], tablefmt="pipe", stralign = "right" )) 
+        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "status", "ring"],
+        tablefmt="pipe", stralign = "right" )) 
 
         # Print asterisk channels below the table so we can see what its actually doing.
         ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
@@ -356,7 +361,8 @@ def start(stdscr):
         time.sleep(1)
         stdscr.clear()
 
-# Init a bunch of things. Program starts here.
+# Init a bunch of things. Program stars here, and then calls curses.wrapper() which
+# sets up ncurses and calls start() which is where the main loop lives.
 if __name__ == "__main__":
 
     args = parse_args()
@@ -364,10 +370,12 @@ if __name__ == "__main__":
     # If logfile does not exist, create it so logging can write to it.
     try:
         with open('/var/log/panel_gen/calls.log', 'a') as file:
-            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', 
+            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
     except IOError:
         with open('/var/log/panel_gen/calls.log', 'w') as file:
-            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
+            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
     
 
     # Connect to AMI
@@ -426,9 +434,12 @@ if __name__ == "__main__":
     Step = step()
     
     # The below calls curses wrapper and tells it to run the function 'start', which actually sets
-    # everything in motion. This is the lynchpin, here.
+    # everything in motion. This is the lynchpin, here. It's in a [try] block, so if there's an 
+    # exception like a keyboard interrupt, the output below will still get printed to the screen, 
+    # even after curses cleans up.
     try:
         curses.wrapper(start)
+    
     # Gracefully handle keyboard interrupts. 
     except KeyboardInterrupt:
             
