@@ -143,12 +143,10 @@ class Line():
         else:                                                   # Else,
             self.term = self.PickCalledLine(term_choices)       # Pick a new terminating line. 
 
-        stdscr.clear()                                          # Clear window to prevent overdraw.
-
-
 
 # <----- END MAIN PROGRAM STUFF -----> #
 
+# <----- BEGIN SWITCH CLASSES -----> #
 
 class panel():                                              
 # This class is parameters and methods for the panel switch.  It should not normally need to be edited.
@@ -319,6 +317,44 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def start(stdscr):
+# Time to make the donuts!
+
+    # For some reason when we init curses using wrapper(), we have to tell it
+    # to use terminal default colors, otherwise the display gets wonky.
+    curses.use_default_colors()
+
+    global line
+    line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+    client.add_event_listener(event_notification, white_list='DialBegin')
+
+    while True:
+        for n in line:
+            n.tick()
+            
+        # Output handling. make pretty things, sleep 1, repeat ... 
+        table = [[n.kind, n.chan, n.term, n.timer, n.status] for n in line]
+        stdscr.addstr(0,5," __________________________________________") 
+        stdscr.addstr(1,5,"|                                          |")
+        stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
+        stdscr.addstr(3,5,"|__________________________________________|")
+        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "status", "ring"], tablefmt="pipe", stralign = "right" )) 
+
+        # Print asterisk channels below the table so we can see what its actually doing.
+        ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
+        stdscr.addstr(16,5,"============ Asterisk output ===========")
+        stdscr.addstr(18,0,ast_out)
+            
+        # Print the contents of /var/log/panel_gen/calls.log
+        logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
+        stdscr.addstr(27,5,'================= Logs =================',curses.A_BOLD)
+        stdscr.addstr(29,0,logs)
+            
+        # Refresh the screen.
+        stdscr.refresh()
+        # Take a nap.
+        time.sleep(1)
+        stdscr.clear()
 
 # Init a bunch of things. Program starts here.
 if __name__ == "__main__":
@@ -333,11 +369,6 @@ if __name__ == "__main__":
         with open('/var/log/panel_gen/calls.log', 'w') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
     
-    # Set up ncurses.
-    stdscr = curses.initscr()
-    curses.noecho()
-    curses.cbreak()
-    stdscr.keypad(True)
 
     # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
@@ -393,49 +424,15 @@ if __name__ == "__main__":
     Adams = xb5()
     Lakeview = xb1()
     Step = step()
-
+    
+    # The below calls curses wrapper and tells it to run the function 'start', which actually sets
+    # everything in motion. This is the lynchpin, here.
     try:
-    # Time to make the donuts!
-        global line
-        line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
-        client.add_event_listener(event_notification, white_list='DialBegin')
-
-        while True:
-            for n in line:
-                n.tick()
-            
-            # Output handling. make pretty things, sleep 1, repeat ... 
-            table = [[n.kind, n.chan, n.term, n.timer, n.status] for n in line]
-            stdscr.addstr(0,5," __________________________________________") 
-            stdscr.addstr(1,5,"|                                          |")
-            stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
-            stdscr.addstr(3,5,"|__________________________________________|")
-            stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "status", "ring"], tablefmt="pipe")) 
-
-            # Print asterisk channels below the table so we can see what its actually doing.
-            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-            stdscr.addstr(16,5,"============ Asterisk output ===========")
-            stdscr.addstr(18,0,ast_out)
-            
-            # Print the contents of /var/log/panel_gen/calls.log
-            logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
-            stdscr.addstr(27,5,'================= Logs =================',curses.A_BOLD)
-            stdscr.addstr(29,0,logs)
-
-            # Refresh the screen.
-            stdscr.refresh()
-            # Take a nap.
-            time.sleep(1)
-
-
+        curses.wrapper(start)
     # Gracefully handle keyboard interrupts. 
     except KeyboardInterrupt:
             
         # Clean up curses.
-        curses.nocbreak()
-        stdscr.keypad(False)
-        curses.echo()
-        curses.endwin()
         print "\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
         
         #Log out of AMI
@@ -448,19 +445,7 @@ if __name__ == "__main__":
 
     except OSError as err:
 
-        curses.nocbreak()
-        stdscr.keypad(False)
-        curses.echo()
-        curses.endwin()
         print("\nOS error {0}".format(err))
         logging.error('**** OS Error ****')
         logging.error('{0}'.format(err))
         logging.error('Check files that subprocess and logging try to open. Something is screwy there')
-
-    except curses.error as err:
-
-        curses.nocbreak()
-        stdscr.keypad(False)
-        curses.echo()
-        curses.endwin()
-        print("\n{0}".format(err))
