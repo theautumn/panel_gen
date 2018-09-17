@@ -40,6 +40,7 @@ class Line():
         self.timer = int(round(random.gamma(4,4)))                  # Set a start timer because i said so.
         self.ident = ident                                          # Set an integer for identity.
         self.chan = '-'                                             # Set DAHDI channel to 0 to start
+        self.AstStatus = 'on_hook'
 
     def set_timer(self):
         
@@ -126,6 +127,7 @@ class Line():
 
         self.status = 0                                         # Set the status of this call to 0.
         self.chan = '-'
+        self.AstStatus = 'on_hook'
         logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.switch.dahdi_group, self.switch.kind)
 
         if args.d:                                              # Are we in deterministic mode?
@@ -271,25 +273,35 @@ class step():
 
 # <----- BEGIN BOOKKEEPING STUFF -----> #
 
-def event_notification(event, **kwargs):
+def on_DialBegin(event, **kwargs):
 # This parses notifications received from Asterisk AMI, particularly DialBegin.
 # It uses regex to extract the DialString and DestChannel, then logs those, and
 # associates the dialed number with its DAHDI channel. This is then displayed for the user,
 # and perhaps used elsewhere in the code later. Who knows.
     output = str(event)
-    pattern1 = re.compile('(?<=DialString\'\:\su.{8})(\d{7})')
-    pattern2 = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
-
-    cnid = pattern1.findall(output)
-    DAHDIchan = pattern2.findall(output)
-
-#    logging.info('CNID: %s ', cnid[0])
-#    logging.info('DAHDI: %s', DAHDIchan[0])
+    DialString = re.compile('(?<=DialString\'\:\su.{8})(\d{7})')
+    DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
     
+    DialString = DialString.findall(output)
+    DestChannel = DestChannel.findall(output)
+
     for n in line:
-        if cnid[0] == str(n.term):
-            n.chan = DAHDIchan[0]
+        if DialString[0] == str(n.term):
+            n.chan = DestChannel[0]
+            n.AstStatus = 'Dialing'
             logging.info('Calling %s on DAHDI/%s from %s', n.term, n.chan, n.switch.kind)
+
+def on_DialEnd(event, **kwargs):
+    output = str(event)
+    EventType = re.compile('(DialEnd)')
+    DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
+
+    EventType = EventType.findall(output)
+    DestChannel = DestChannel.findall(output)
+
+    for n in line:
+        if DestChannel[0] == str(n.chan):
+            n.AstStatus = 'Ringing'
 
 def parse_args():   
     
@@ -330,19 +342,20 @@ def start(stdscr):
 
     global line
     line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
-    client.add_event_listener(event_notification, white_list='DialBegin')
+    client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
+    client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
 
     while True:
         for n in line:
             n.tick()
             
         # Output handling. make pretty things, sleep 1, repeat ... 
-        table = [[n.kind, n.chan, n.term, n.timer, n.status] for n in line]
+        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.AstStatus] for n in line]
         stdscr.addstr(0,5," __________________________________________") 
         stdscr.addstr(1,5,"|                                          |")
         stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
         stdscr.addstr(3,5,"|__________________________________________|")
-        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "status", "ring"],
+        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk"],
         tablefmt="pipe", stralign = "right" )) 
 
         # Print asterisk channels below the table so we can see what its actually doing.

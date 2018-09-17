@@ -80,6 +80,29 @@ optional arguments:
 
 One other thing I suggest is making bash aliases for this if its something you're going to use often with the same configuration or set of args. That way, you just use your alias, and avoid a bunch of bash command line vomit.
 
+The interface is divided into three areas, which should be mostly self-explanatory. I did it this way, so that I could have the three most important things at a glance, while looking at the monitor. The only bit that warrants some explanation is the main table at the top:
+
+````
+      __________________________________________
+     |                                          |
+     |  Rainier Full Mechanical Call Simulator  |
+     |__________________________________________|
+
+
+|   switch |   channel |    term |   tick |   state |   asterisk |
+|---------:|----------:|--------:|-------:|--------:|-----------:|
+|    panel |         1 | 7225720 |     34 |       1 |    Dialing |
+|    panel |         - | 2325773 |      4 |       0 |    on_hook |
+|    panel |        10 | 7225337 |    120 |       1 |    Ringing |
+
+switch: originating switch
+channel: DAHDI channel
+term: line being called
+tick: seconds before next event occurs
+state: line state according to Python
+asterisk: line state according to Asterisk
+````
+
 Caveats
 -------
 This program is designed to control a 100 year old, motor driven analog switch. The fact that it has so many moving parts means that what looks good on paper is not always the way it behaves in real life. This is especially true when it comes to timing: Call completion times are variable depending on the number dialed. Also, Asterisk has no way of knowing what the switch is doing, outside of the normal subscriber supervision (on hook/off hook). The switch may return various call progress tones back to the caller, but there is currently no easy way for those tones to be recognized and acted upon. Because of this, I've had to engineer in a few behaviors to make the program "safe", in that it won't get overzealous and try to do too many things too fast. One such behavior is inserting 'wwww' in the dialplan before the actual dialed number. This makes asterisk wait a few seconds between picking up the line and actually dialing. This gives the switch time to connect the line to an idle sender and return dial tone. Without this, the simulator would fail entirely. 
