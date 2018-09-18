@@ -25,7 +25,6 @@ The Panel switch requires the FXO cards in the channel bank to be configured wit
 This program must be run as user 'asterisk', or at least be able to write to the following directories:
 <code>/var/spool/asterisk</code> and <code>/var/log/panel_gen</code><br />
 
-If /var/log/panel_gen doesn't exist, it will need to be created. There's currently no installer to do it for you automatically.
 
 Setup
 -----
