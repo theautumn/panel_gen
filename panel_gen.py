@@ -58,12 +58,12 @@ class Line():
         self.timer -= 1
         if self.timer <= 0:
             if self.status == 0:
-                if self.switch.is_dialing < self.switch.max_dialing:
+                if self.switch.is_dialing < self.switch.max_dialing - 1:
                     self.call()
                     self.status = 1
                 else:
                     self.timer = int(round(random.gamma(5,5)))
-                    logging.info("Exceeded sender limit, %s. Holding off for a few seconds.", self.switch.max_dialing)
+                    logging.info("Exceeded sender limit: %s. Holding off for a few seconds.", self.switch.max_dialing)
             elif self.status == 1:
                 self.hangup()
         return self.timer
@@ -289,8 +289,13 @@ def on_DialBegin(event, **kwargs):
 # It uses regex to extract the DialString and DestChannel, then logs those, and
 # associates the dialed number with its DAHDI channel. This is then displayed for the user,
 # and perhaps used elsewhere in the code later. Who knows.
+
+# The regex match for DialString relies on the dialplan having at least
+# one 'w' (wait) in it to wait before dialing. If you change that, the 
+# regex will break. Normally, we should always wait before dialing.
+    
     output = str(event)
-    DialString = re.compile('(?<=DialString\'\:\su.{8})(\d{7})')
+    DialString = re.compile('(?<=w)(\d{7})')
     DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
     
     DialString = DialString.findall(output)
@@ -323,7 +328,7 @@ def parse_args():
     # mostly sane options.
 
     parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. Defaults to originate a sane amount of calls from the panel switch if no args are given.')
-    parser.add_argument('-a', metavar='lines', type=int, choices=[1,10],
+    parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7,8,9,10],
             help='Maximum number of active lines. Default is 3 for the panel switch. Other switches will depend on stuff.')
     parser.add_argument('-d', action='store_true',
             help='Deterministic mode. Eliminate timing randomness so various functions of the switch can be tested at-will. Places one call at a time. Will ignore -a and -v options entirely. Use with -l.')
