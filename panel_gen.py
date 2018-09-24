@@ -49,13 +49,21 @@ class Line():
 
     def tick(self):
         # Decrement timers by 1 every second until it reaches 0
-        # At 0, check status and call or hangup as necessary.
+        # At 0, we're going to check a few things. First, status. If line is on hook "0",
+        # and if we haven't maxed out the senders, then call and set the status of the line to "1".
+        # If we have more dialing than we have sender capacity, then we reset the timer to
+        # a reasonable number of seconds and try again. 
+        # If self.status is "1", we simply call hangup(), which takes care of all the cleanup.
 
         self.timer -= 1
         if self.timer <= 0:
             if self.status == 0:
-                self.call()
-                self.status += 1
+                if self.switch.is_dialing < self.switch.max_dialing:
+                    self.call()
+                    self.status = 1
+                else:
+                    self.timer = int(round(random.gamma(5,5)))
+                    logging.info("Exceeded sender limit, %s. Holding off for a few seconds.", self.switch.max_dialing)
             elif self.status == 1:
                 self.hangup()
         return self.timer
@@ -155,6 +163,7 @@ class panel():
     def __init__(self):
         self.kind = "panel"                                     # The kind of switch we're calling from.
         self.max_dialing = 6                                    # We're limited by number of senders we have.
+        self.is_dialing = 0
         self.dahdi_group = "r6"                                 # Which DAHDI group to originate from.
         
         self.dcurve = self.newtimer()                           # Start a new timer when switch is instantiated.
@@ -192,6 +201,7 @@ class xb1():
     def __init__(self):
         self.kind = "1xb"
         self.max_dialing = 2
+        self.is_dialing = 0
         self.dahdi_group = "r11"
         
         self.dcurve = self.newtimer()
@@ -232,6 +242,7 @@ class xb5():
     def __init__(self):
         self.kind = "5XB"
         self.max_dialing = 7
+        self.is_dialing = 0
         self.dahdi_group = "r5"
 
         self.dcurve = self.newtimer()
@@ -289,6 +300,7 @@ def on_DialBegin(event, **kwargs):
         if DialString[0] == str(n.term):
             n.chan = DestChannel[0]
             n.AstStatus = 'Dialing'
+            n.switch.is_dialing += 1
             logging.info('Calling %s on DAHDI/%s from %s', n.term, n.chan, n.switch.kind)
 
 def on_DialEnd(event, **kwargs):
@@ -302,6 +314,7 @@ def on_DialEnd(event, **kwargs):
     for n in line:
         if DestChannel[0] == str(n.chan):
             n.AstStatus = 'Ringing'
+            n.switch.is_dialing -= 1
 
 def parse_args():   
     
@@ -310,7 +323,7 @@ def parse_args():
     # mostly sane options.
 
     parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. Defaults to originate a sane amount of calls from the panel switch if no args are given.')
-    parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7],
+    parser.add_argument('-a', metavar='lines', type=int, choices=[1,10],
             help='Maximum number of active lines. Default is 3 for the panel switch. Other switches will depend on stuff.')
     parser.add_argument('-d', action='store_true',
             help='Deterministic mode. Eliminate timing randomness so various functions of the switch can be tested at-will. Places one call at a time. Will ignore -a and -v options entirely. Use with -l.')
