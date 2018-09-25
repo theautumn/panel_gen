@@ -129,10 +129,14 @@ class Line():
 
 
     def hangup(self):
-        # This is more for show than anything else. Asterisk manages the actual hangup of a call in progress.
-        # The deal here is to set a new wait timer, set the status to 0 (on hook), and randomly pick a new term
-        # line for the next go-around.
+        # Asterisk manages the actual hangup of the call, but we need to make sure the program 
+        # flow is on track with whats happening out in the world. We check if a call 
+        # is being dialed when hangup() is called. If so, we need to decrement the dialing counter.
+        # Then, set status, chan, and AstStatus back to normal values, set a new timer, and
+        # set the next called line.
 
+        if self.AstStatus == 'Dialing':
+            self.switch.is_dialing -= 1
         self.status = 0                                         # Set the status of this call to 0.
         self.chan = '-'
         self.AstStatus = 'on_hook'
@@ -354,14 +358,18 @@ def parse_args():
 def start(stdscr):
 # Time to make the donuts!
 
+    # If we got this far, log that we started successfully.
+    logging.info('--- Started panel_gen ---')
+    
     # For some reason when we init curses using wrapper(), we have to tell it
     # to use terminal default colors, otherwise the display gets wonky.
     curses.use_default_colors()
 
-    global line
-    line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
     client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
     client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
+
+    global line
+    line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 
     while True:
         for n in line:
@@ -415,9 +423,6 @@ if __name__ == "__main__":
     if future.response.is_error():
         raise Exception(str(future.response))
 
-    # If we got this far, log that we started successfully.
-    logging.info('--- Started panel_gen ---')
-    
     # Before we do anything else, the program needs to know which switch it will be originating calls from.
     # Can be any of switch class: panel, xb5, xb1, all
     
