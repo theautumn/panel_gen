@@ -59,7 +59,7 @@ class Line():
         if self.timer <= 0:
             if self.status == 0:
                 if self.switch.is_dialing < self.switch.max_dialing - 1:
-                    self.call()
+                    self.Call()
                     self.status = 1
                 else:
                     self.timer = int(round(random.gamma(5,5)))
@@ -96,10 +96,10 @@ class Line():
 
 
         term = int(str(term_office) + str(term_station))        # And put it together.
-        logging.info('Terminating line selected: %s', term)
+        #logging.info('Terminating line selected: %s', term)
         return term
 
-    def call(self):
+    def Call(self):
         # Dialing takes ~10 to 12 seconds. This should be somewhat consistent value 
         # because its done by Asterisk / DAHDI. We're going to set a timer 
         # for call duration here, and then a few lines down,
@@ -138,9 +138,9 @@ class Line():
         if self.AstStatus == 'Dialing':
             self.switch.is_dialing -= 1
         self.status = 0                                         # Set the status of this call to 0.
+        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.chan = '-'
         self.AstStatus = 'on_hook'
-        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.switch.dahdi_group, self.switch.kind)
 
         if args.d:                                              # Are we in deterministic mode?
             if args.w:                                          # args.w is wait time between calls
@@ -223,11 +223,9 @@ class xb1():
         self.max_nxx2 = .5
         self.max_nxx3 = 0
         self.max_nxx4 = 0
-      #  self.nxx = [722, 832, 232]
-      #  self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  
-        self.nxx = [832,232]
-        self.trunk_load = [self.max_nxx1, self.max_nxx2]
-        self.linerange = [100, 199]
+        self.nxx = [722, 832, 232]
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  
+        self.linerange = [105, 129]
 
     def newtimer(self):
         if args.v == 'light':
@@ -290,9 +288,9 @@ class step():
 
 def on_DialBegin(event, **kwargs):
 # This parses notifications received from Asterisk AMI, particularly DialBegin.
-# It uses regex to extract the DialString and DestChannel, then logs those, and
-# associates the dialed number with its DAHDI channel. This is then displayed for the user,
-# and perhaps used elsewhere in the code later. Who knows.
+# It uses regex to extract the DialString and DestChannel, then associates the
+# dialed number with its DAHDI channel. This is then displayed for the user.
+# Also increments the is_dialing counter.
 
 # The regex match for DialString relies on the dialplan having at least
 # one 'w' (wait) in it to wait before dialing. If you change that, the 
@@ -313,11 +311,12 @@ def on_DialBegin(event, **kwargs):
             logging.info('Calling %s on DAHDI/%s from %s', n.term, n.chan, n.switch.kind)
 
 def on_DialEnd(event, **kwargs):
+# Same thing as above, except catches DialEnd and sets the state of the call
+# to "Ringing", and decrements the is_dialing counter.
+
     output = str(event)
-    EventType = re.compile('(DialEnd)')
     DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
 
-    EventType = EventType.findall(output)
     DestChannel = DestChannel.findall(output)
 
     for n in line:
@@ -386,13 +385,13 @@ def start(stdscr):
 
         # Print asterisk channels below the table so we can see what its actually doing.
         ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-        stdscr.addstr(16,5,"============ Asterisk output ===========")
-        stdscr.addstr(18,0,ast_out)
+        stdscr.addstr(20,5,"============ Asterisk output ===========")
+        stdscr.addstr(22,0,ast_out)
             
         # Print the contents of /var/log/panel_gen/calls.log
         logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
-        stdscr.addstr(27,5,'================= Logs =================',curses.A_BOLD)
-        stdscr.addstr(29,0,logs)
+        stdscr.addstr(32,5,'================= Logs =================',curses.A_BOLD)
+        stdscr.addstr(34,0,logs)
             
         # Refresh the screen.
         stdscr.refresh()
