@@ -7,7 +7,7 @@ Requirements
 ------------
 This project assumes you have the following:
 * a computer running Asterisk (this has been tested on 11 and 13)
-* a T1 card with DAHDI and lipri installed
+* a T1 card with DAHDI and libpri installed
 * a channel bank of some sort containing FXO cards
 * the required python modules installed:
 	* tabulate
