@@ -39,14 +39,13 @@ This application requires a context in your dialplan to pass calls into. The sim
 ```
 [sarah_callsim]
 
-        exten => s,1,Set(TALK_DETECT(set)=)
-        exten => s,n,Wait(${waittime})
+	exten => s,1,Wait(${waittime})
         exten => s,n,Hangup()
 ```
 
 Usage
 -----
-Setting up Asterisk and a channel bank is way beyond the scope of this readme so lets assume you've somehow managed to do that without losing all your marbles. It should be possible to grab the code, install the libraries, and run just <code>python panel_gen.py</code> and have everything work out fine, (although you will have to edit the DAHDI group, and switch classes to suit your needs). There are command line arguments that have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them. I'll paste them here as well:
+Setting up Asterisk and a channel bank is way beyond the scope of this readme so lets assume you've somehow managed to do that without losing all your marbles. It should be possible to grab the code, install the libraries, and run just <code>python panel_gen.py</code> as root, and have everything work out fine, (although you will have to edit the DAHDI group, and switch classes to suit your needs). There are command line arguments that have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them. I'll paste them here as well:
 
 ```
 usage: panel_gen.py [-h] [-a lines] [-d] [-l line] [-o [switch]] [-t switch]
@@ -57,8 +56,7 @@ amount of calls from the panel switch if no args are given.
 
 optional arguments:
   -h, --help   show this help message and exit
-  -a lines     Maximum number of active lines. Default is 3 for the panel
-               switch. Other switches will depend on stuff.
+  -a lines     Maximum number of active lines.
   -d           Deterministic mode. Eliminate timing randomness so various
                functions of the switch can be tested at-will. Will ignore -a
                and -v options entirely.
@@ -68,7 +66,7 @@ optional arguments:
                NXX values or switch name. 1xb, 5xb, panel, or all. Default is
                panel.
   -t switch    Terminate calls only on a particular switch. Takes either 3
-               digit NXX values or switch name. Defaults to sane options for
+               digit NXX values or switch name. Defaults to options for
                whichever switch you are originating from.
   -v volume    Call volume is a proprietary blend of frequency and randomness.
                Can be light, normal, or heavy. Default is normal, which is
@@ -77,9 +75,9 @@ optional arguments:
   -z seconds   Use with -d option to specify call duration.
 ```
 
-One other thing I suggest is making bash aliases for this if its something you're going to use often with the same configuration or set of args. That way, you just use your alias, and avoid a bunch of bash command line vomit.
+The program is capable of generating calls from, and terminating calls to, any of the switches in the museum. The switch classes determines what the rules for each switch are, and they're set up with the switch capacities and limitations baked in. This way, if you are originating or terminating on any switch, panel_gen is intelligent enough to know if it's possible to make the call it's about to make.
 
-The interface is divided into three areas, which should be mostly self-explanatory. I did it this way, so that I could have the three most important things at a glance, while looking at the monitor. The only bit that warrants some explanation is the main table at the top:
+The interface is divided into three areas, which should be mostly self-explanatory. I did it this way, so that I could have the most important things at a glance, while looking at the screen. The only bit that warrants some explanation is the main table at the top:
 
 ````
       __________________________________________
@@ -96,15 +94,10 @@ The interface is divided into three areas, which should be mostly self-explanato
 
 ````
 __switch:__ originating switch
-
 __channel:__ DAHDI channel
-
 __term:__ line being called
-
 __tick:__ seconds before next event occurs
-
 __state:__ line state according to Python
-
 __asterisk:__ line state according to Asterisk
 
 
