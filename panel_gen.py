@@ -10,7 +10,7 @@
 #---------------------------------------------------------------------#
 
 import time
-import os 
+import os
 import sys
 import subprocess
 import argparse
@@ -32,7 +32,8 @@ class Line():
         self.switch = switch
         self.kind = switch.kind
         self.status = 0                                             # Set status to on-hook.
-        if args.l:                                                  # If user specified a line
+
+	if args.l:                                                  # If user specified a line
             self.term = args.l                                      # Set term line to user specified
         else:                                                       # Else,
             self.term = self.PickCalledLine(term_choices)           # Generate a term line randomly.
@@ -43,7 +44,6 @@ class Line():
         self.AstStatus = 'on_hook'
 
     def set_timer(self):
-        
         self.timer = switch.newtimer
         return self.timer
 
@@ -73,7 +73,7 @@ class Line():
         # as defined by the class of the switch we're calling from. Else, pick a random from the
         # args that the user gave with the -t switch.
 
-        if term_choices == []:   
+        if term_choices == []:
             term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)
         else:
             term_office = random.choice(term_choices)
@@ -100,13 +100,13 @@ class Line():
         return term
 
     def Call(self):
-        # Dialing takes ~10 to 12 seconds. This should be somewhat consistent value 
-        # because its done by Asterisk / DAHDI. We're going to set a timer 
+        # Dialing takes ~10 to 12 seconds. This should be somewhat consistent value
+        # because its done by Asterisk / DAHDI. We're going to set a timer
         # for call duration here, and then a few lines down,
-        # we're gonna tell Asterisk to set its own wait timer to the same value - 10. 
-        # This should give us a reasonable buffer between the program's counter and 
-        # Asterisk's wait timer (which itself begins when the call goes from 
-        # dialing to "UP"). 
+        # we're gonna tell Asterisk to set its own wait timer to the same value - 10.
+        # This should give us a reasonable buffer between the program's counter and
+        # Asterisk's wait timer (which itself begins when the call goes from
+        # dialing to "UP").
 
         if args.d:                                              # Are we in deterministic mode?
             if args.z:                                          # args.z is call duration
@@ -120,17 +120,17 @@ class Line():
         vars = {'waittime': wait}                               # Set the vars to actually pass over
 
         # Make the .call file amd throw it into the asterisk spool.
-        # New behavior 8-15-18 is to pass control of the call to the sarah_callsim context in 
-        # the dialplan. Hopefully, this will allow me to better interact with Asterisk from here. 
-        c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term, variables=vars) 
+        # New behavior 8-15-18 is to pass control of the call to the sarah_callsim context in
+        # the dialplan. Hopefully, this will allow me to better interact with Asterisk from here.
+        c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term, variables=vars)
         con = Context('sarah_callsim','s','1')
         cf = CallFile(c, con, user='asterisk')
         cf.spool()
 
 
     def hangup(self):
-        # Asterisk manages the actual hangup of the call, but we need to make sure the program 
-        # flow is on track with whats happening out in the world. We check if a call 
+        # Asterisk manages the actual hangup of the call, but we need to make sure the program
+        # flow is on track with whats happening out in the world. We check if a call
         # is being dialed when hangup() is called. If so, we need to decrement the dialing counter.
         # Then, set status, chan, and AstStatus back to normal values, set a new timer, and
         # set the next called line.
@@ -153,40 +153,36 @@ class Line():
         if args.l:                                              # If user specified a line
             self.term = args.l                                  # Set term line to user specified
         else:                                                   # Else,
-            self.term = self.PickCalledLine(term_choices)       # Pick a new terminating line. 
+            self.term = self.PickCalledLine(term_choices)       # Pick a new terminating line.
 
 
-# <----- END MAIN PROGRAM STUFF -----> #
-
+# <----- END LINE CLASS THINGS -----> #
 # <----- BEGIN SWITCH CLASSES -----> #
 
-class panel():                                              
+class panel():
 # This class is parameters and methods for the panel switch.  It should not normally need to be edited.
 # If you wish to change the office codes, or trunk weight, this is where you do it.
-    
+
     def __init__(self):
         self.kind = "panel"                                     # The kind of switch we're calling from.
         self.max_dialing = 6                                    # We're limited by number of senders we have.
         self.is_dialing = 0
         self.dahdi_group = "r6"                                 # Which DAHDI group to originate from.
-        
         self.dcurve = self.newtimer()                           # Start a new timer when switch is instantiated.
-        
+
         if args.d:                                              # If deterministic mode is set,
             self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
         elif args.a:
             self.max_calls = args.a                             # Else, use the value given with -a
-        else: 
+        else:
             self.max_calls = 3                                  # Finally, if no args are given, use this default.
-
-#        logging.info('Concurrent lines: %s', self.max_calls)
 
         self.max_nxx1 = .6                                      # Load for office 1 in self.trunk_load
         self.max_nxx2 = .2                                      # Load for office 2 in self.trunk_load
         self.max_nxx3 = .2                                      # Load for office 3 in self.trunk_load
         self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
         self.nxx = [722, 365, 232]                              # Office codes that can be dialed.
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
         self.linerange = [5000,5999]                            # Range of lines that can be chosen.
 
     def newtimer(self):
@@ -207,7 +203,6 @@ class xb1():
         self.max_dialing = 2
         self.is_dialing = 0
         self.dahdi_group = "r11"
-        
         self.dcurve = self.newtimer()
 
         if args.d:
@@ -217,14 +212,12 @@ class xb1():
         else:
             self.max_calls = 2
 
-#        logging.info('Concurrent lines: %s', self.max_calls)
-
         self.max_nxx1 = .5
         self.max_nxx2 = .5
         self.max_nxx3 = 0
         self.max_nxx4 = 0
         self.nxx = [722, 832, 232]
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]  
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
         self.linerange = [105, 129]
 
     def newtimer(self):
@@ -246,7 +239,6 @@ class xb5():
         self.max_dialing = 7
         self.is_dialing = 0
         self.dahdi_group = "r5"
-
         self.dcurve = self.newtimer()
 
         if args.d:
@@ -256,14 +248,12 @@ class xb5():
         else:
             self.max_calls = 4
 
-#        logging.info('Concurrent lines: %s', self.max_calls)
-
-        self.max_nxx1 = .2 
+        self.max_nxx1 = .2
         self.max_nxx2 = .2
         self.max_nxx3 = .4
         self.max_nxx4 = .2
         self.nxx = [722, 832, 232, 275]
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4] 
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
         self.linerange = [5000,5999]
 
     def newtimer(self):
@@ -281,7 +271,7 @@ class step():
 
     def __init__(self):
         self.kind = "Step"
-        self.linerange = [4100,4199]
+        self.linerange = [4124,4199]
 
 
 # <----- BEGIN BOOKKEEPING STUFF -----> #
@@ -295,11 +285,11 @@ def on_DialBegin(event, **kwargs):
 # The regex match for DialString relies on the dialplan having at least
 # one 'w' (wait) in it to wait before dialing. If you change that, the 
 # regex will break. Normally, we should always wait before dialing.
-    
+
     output = str(event)
     DialString = re.compile('(?<=w)(\d{7})')
     DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
-    
+
     DialString = DialString.findall(output)
     DestChannel = DestChannel.findall(output)
 
@@ -324,17 +314,17 @@ def on_DialEnd(event, **kwargs):
             n.AstStatus = 'Ringing'
             n.switch.is_dialing -= 1
 
-def parse_args():   
-    
+def parse_args():
+
     # Stuff for command line arguments, so we can configure some options at runtime.
     # If no arguments are presented, the program will run with default
     # mostly sane options.
 
     parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. Defaults to originate a sane amount of calls from the panel switch if no args are given.')
     parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7,8,9,10],
-            help='Maximum number of active lines. Default is 3 for the panel switch. Other switches will depend on stuff.')
+            help='Maximum number of active lines.')
     parser.add_argument('-d', action='store_true',
-            help='Deterministic mode. Eliminate timing randomness so various functions of the switch can be tested at-will. Places one call at a time. Will ignore -a and -v options entirely. Use with -l.')
+            help='Deterministic mode. Eliminate timing randomness. Places one call at a time. Ignores -a and -v options entirely. Use with -l.')
     parser.add_argument('-l', metavar='line', type=int, 
             help='Call only a particular line. Can be used with the -d option for placing test calls to a number over and over again.')
     parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],
@@ -355,76 +345,9 @@ def parse_args():
     return args
 
 def start(stdscr):
-# Time to make the donuts!
-
-    # If we got this far, log that we started successfully.
-    logging.info('--- Started panel_gen ---')
-    
-    # For some reason when we init curses using wrapper(), we have to tell it
-    # to use terminal default colors, otherwise the display gets wonky.
-    curses.use_default_colors()
-
-    client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
-    client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
-
-    global line
-    line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
-
-    while True:
-        for n in line:
-            n.tick()
-            
-        # Output handling. make pretty things, sleep 1, repeat ... 
-        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.AstStatus] for n in line]
-        stdscr.addstr(0,5," __________________________________________") 
-        stdscr.addstr(1,5,"|                                          |")
-        stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
-        stdscr.addstr(3,5,"|__________________________________________|")
-        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk"],
-        tablefmt="pipe", stralign = "right" )) 
-
-        # Print asterisk channels below the table so we can see what its actually doing.
-        ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-        stdscr.addstr(20,5,"============ Asterisk output ===========")
-        stdscr.addstr(22,0,ast_out)
-            
-        # Print the contents of /var/log/panel_gen/calls.log
-        logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
-        stdscr.addstr(32,5,'================= Logs =================',curses.A_BOLD)
-        stdscr.addstr(34,0,logs)
-            
-        # Refresh the screen.
-        stdscr.refresh()
-        # Take a nap.
-        time.sleep(1)
-        stdscr.clear()
-
-# Init a bunch of things. Program stars here, and then calls curses.wrapper() which
-# sets up ncurses and calls start() which is where the main loop lives.
-if __name__ == "__main__":
-
-    args = parse_args()
-
-    # If logfile does not exist, create it so logging can write to it.
-    try:
-        with open('/var/log/panel_gen/calls.log', 'a') as file:
-            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', 
-            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
-    except IOError:
-        with open('/var/log/panel_gen/calls.log', 'w') as file:
-            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
-    
-
-    # Connect to AMI
-    client = AMIClient(address='127.0.0.1',port=5038)
-    future = client.login(username='panel_gen',secret='t431434')
-    if future.response.is_error():
-        raise Exception(str(future.response))
 
     # Before we do anything else, the program needs to know which switch it will be originating calls from.
     # Can be any of switch class: panel, xb5, xb1, all
-    
     global orig_switch
     orig_switch = []
 
@@ -462,25 +385,92 @@ if __name__ == "__main__":
     logging.info('Call volume set to %s', args.v)
 
 
+    # If we got this far, log that we started successfully.
+    logging.info('--- Started panel_gen ---')
+
+    # For some reason when we init curses using wrapper(), we have to tell it
+    # to use terminal default colors, otherwise the display gets wonky.
+    curses.use_default_colors()
+
+    client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
+    client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
+
+    # Here is where we actually make the lines. Important stuff!
+    global line
+    line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+
+    # The main loop that kicks everything into gear. 
+    while True:
+        for n in line:
+            n.tick()
+
+        # Output handling. make pretty things, sleep 1, repeat ... 
+        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.AstStatus] for n in line]
+        stdscr.addstr(0,5," __________________________________________") 
+        stdscr.addstr(1,5,"|                                          |")
+        stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
+        stdscr.addstr(3,5,"|__________________________________________|")
+        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk"],
+        tablefmt="pipe", stralign = "right" )) 
+
+        # Print asterisk channels below the table so we can see what its actually doing.
+        ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
+        stdscr.addstr(20,5,"============ Asterisk output ===========")
+        stdscr.addstr(22,0,ast_out)
+
+        # Print the contents of /var/log/panel_gen/calls.log
+        logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
+        stdscr.addstr(32,5,'================= Logs =================',curses.A_BOLD)
+        stdscr.addstr(34,0,logs)
+
+        # Refresh the screen.
+        stdscr.refresh()
+        # Take a nap.
+        time.sleep(1)
+        stdscr.clear()
+
+# Init a bunch of things. Program stars here, and then calls curses.wrapper() which
+# sets up ncurses and calls start() which is where the main loop lives.
+if __name__ == "__main__":
+
+    global args
+    args = parse_args()
+
+    # If logfile does not exist, create it so logging can write to it.
+    try:
+        with open('/var/log/panel_gen/calls.log', 'a') as file:
+            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', 
+            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+    except IOError:
+        with open('/var/log/panel_gen/calls.log', 'w') as file:
+            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
+            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+
     # Instantiate some switches. This is so we can ask to get their parameters later.
     Rainier = panel()
     Adams = xb5()
     Lakeview = xb1()
     Step = step()
-    
+
+    # Connect to AMI
+    client = AMIClient(address='127.0.0.1',port=5038)
+    future = client.login(username='panel_gen',secret='t431434')
+    if future.response.is_error():
+        raise Exception(str(future.response))
+
     # The below calls curses wrapper and tells it to run the function 'start', which actually sets
-    # everything in motion. This is the lynchpin, here. It's in a [try] block, so if there's an 
-    # exception like a keyboard interrupt, the output below will still get printed to the screen, 
+    # everything in motion. This is the lynchpin, here. It's in a [try] block, so if there's an
+    # exception like a keyboard interrupt, the output below will still get printed to the screen,
     # even after curses cleans up.
     try:
         curses.wrapper(start)
-    
-    # Gracefully handle keyboard interrupts. 
+
+    # Gracefully handle keyboard interrupts.
     except KeyboardInterrupt:
-            
+
         # Clean up curses.
         print "\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
-        
+
         #Log out of AMI
         client.logoff()
 
