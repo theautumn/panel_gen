@@ -138,7 +138,7 @@ class Line():
         if self.AstStatus == 'Dialing':
             logging.info('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
-        logging.info('Hung up %s on DAHDI/%s from %s. %s calls dialing.', self.term, self.chan, self.switch.kind, self.switch.is_dialing)
+        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind, self.switch.is_dialing)
         self.status = 0                                         # Set the status of this call to 0.
         self.chan = '-'
         self.AstStatus = 'on_hook'
@@ -298,12 +298,12 @@ def on_DialBegin(event, **kwargs):
     #logging.info('%s', DestChannel)
 
     for n in line:
-        if DialString[0] == str(n.term) and n.AstStatus != 'Ringing':
+        if DialString[0] == str(n.term) and n.AstStatus == 'on_hook':
             # logging.info('DialString match %s and %s', DialString[0], str(n.term))
             n.chan = DB_DestChannel[0]
             n.AstStatus = 'Dialing'
             n.switch.is_dialing += 1
-            logging.info('Calling %s on DAHDI/%s from %s with %s dialing', n.term, n.chan, n.switch.kind, n.switch.is_dialing)
+            logging.info('Calling %s on DAHDI/%s from %s', n.term, n.chan, n.switch.kind)
 
 def on_DialEnd(event, **kwargs):
 # Same thing as above, except catches DialEnd and sets the state of the call
@@ -316,7 +316,7 @@ def on_DialEnd(event, **kwargs):
     DE_DestChannel = DE_DestChannel.findall(output)
 
     for n in line:
-        if DE_DestChannel[0] == str(n.chan):
+        if DE_DestChannel[0] == str(n.chan) and n.AstStatus == 'Dialing':
             n.AstStatus = 'Ringing'
             n.switch.is_dialing -= 1
             # logging.info('on_DialEnd with %s calls dialing', n.switch.is_dialing)
@@ -428,6 +428,8 @@ def start(stdscr):
         logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
         stdscr.addstr(32,5,'================= Logs =================',curses.A_BOLD)
         stdscr.addstr(34,0,logs)
+
+        # stdscr.addstr(45,0,str(n.switch.is_dialing))
 
         # Refresh the screen.
         stdscr.refresh()
