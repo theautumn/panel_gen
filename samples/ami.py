@@ -5,6 +5,7 @@ import os
 import time
 from settings import login, connection
 import re
+import datetime
 
 from asterisk.ami import AMIClient
 from asterisk.ami import EventListener
@@ -13,7 +14,8 @@ from asterisk.ami import Response
 def event_notification(source, event):
     output = str(event)
     order = re.sub(',','\n',output)
-    print output
+    print(datetime.datetime.now())
+    print order
 #    pattern1 = re.compile('(?<=DialString\'\:\su.{8})(\d{7})') 
 #    pattern2 = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
 #    cnid = pattern1.findall(output)

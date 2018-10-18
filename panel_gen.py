@@ -58,12 +58,12 @@ class Line():
         self.timer -= 1
         if self.timer <= 0:
             if self.status == 0:
-                if self.switch.is_dialing < self.switch.max_dialing - 1:
+                if self.switch.is_dialing < self.switch.max_dialing:
                     self.Call()
                     self.status = 1
                 else:
                     self.timer = int(round(random.gamma(5,5)))
-                    logging.info("Exceeded sender limit: %s. Holding off for a few seconds.", self.switch.max_dialing)
+                    logging.info("Exceeded sender limit: %s with %s calls dialing. Delaying call.", self.switch.max_dialing, self.switch.is_dialing)
             elif self.status == 1:
                 self.hangup()
         return self.timer
@@ -136,9 +136,10 @@ class Line():
         # set the next called line.
 
         if self.AstStatus == 'Dialing':
+            logging.info('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
+        logging.info('Hung up %s on DAHDI/%s from %s. %s calls dialing.', self.term, self.chan, self.switch.kind, self.switch.is_dialing)
         self.status = 0                                         # Set the status of this call to 0.
-        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.chan = '-'
         self.AstStatus = 'on_hook'
 
@@ -165,7 +166,7 @@ class panel():
 
     def __init__(self):
         self.kind = "panel"                                     # The kind of switch we're calling from.
-        self.max_dialing = 6                                    # We're limited by number of senders we have.
+        self.max_dialing = 5                                    # Sender E is out of order, so max is 5.
         self.is_dialing = 0
         self.dahdi_group = "r6"                                 # Which DAHDI group to originate from.
         self.dcurve = self.newtimer()                           # Start a new timer when switch is instantiated.
@@ -218,7 +219,7 @@ class xb1():
         self.max_nxx4 = 0
         self.nxx = [722, 832, 232]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.linerange = [105, 129]
+        self.linerange = [105, 149]
 
     def newtimer(self):
         if args.v == 'light':
@@ -260,7 +261,7 @@ class xb5():
         if args.v == 'light':
             t = int(round(random.gamma(20,8)))                  # Low Traffic
         elif args.v == 'heavy':
-            t = int(round(random.gamma(4,6)))                   # Heavy Traffic
+            t = int(round(random.gamma(4,5)))            # 4,6  # Heavy Traffic
         else:
             t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
@@ -286,34 +287,39 @@ def on_DialBegin(event, **kwargs):
 # one 'w' (wait) in it to wait before dialing. If you change that, the 
 # regex will break. Normally, we should always wait before dialing.
 
+    # logging.info('Reached DialBegin')
     output = str(event)
     DialString = re.compile('(?<=w)(\d{7})')
-    DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
+    DB_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
 
     DialString = DialString.findall(output)
-    DestChannel = DestChannel.findall(output)
+    DB_DestChannel = DB_DestChannel.findall(output)
+    #logging.info('%s', DialString)
+    #logging.info('%s', DestChannel)
 
     for n in line:
-        if DialString[0] == str(n.term):
-            n.chan = DestChannel[0]
+        if DialString[0] == str(n.term) and n.AstStatus != 'Ringing':
+            # logging.info('DialString match %s and %s', DialString[0], str(n.term))
+            n.chan = DB_DestChannel[0]
             n.AstStatus = 'Dialing'
             n.switch.is_dialing += 1
-            logging.info('Calling %s on DAHDI/%s from %s', n.term, n.chan, n.switch.kind)
+            logging.info('Calling %s on DAHDI/%s from %s with %s dialing', n.term, n.chan, n.switch.kind, n.switch.is_dialing)
 
 def on_DialEnd(event, **kwargs):
 # Same thing as above, except catches DialEnd and sets the state of the call
 # to "Ringing", and decrements the is_dialing counter.
 
+    # logging.info('Begin DialEnd')
     output = str(event)
-    DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
+    DE_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
 
-    DestChannel = DestChannel.findall(output)
+    DE_DestChannel = DE_DestChannel.findall(output)
 
     for n in line:
-        if DestChannel[0] == str(n.chan):
+        if DE_DestChannel[0] == str(n.chan):
             n.AstStatus = 'Ringing'
             n.switch.is_dialing -= 1
-
+            # logging.info('on_DialEnd with %s calls dialing', n.switch.is_dialing)
 def parse_args():
 
     # Stuff for command line arguments, so we can configure some options at runtime.
