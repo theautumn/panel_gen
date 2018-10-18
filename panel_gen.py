@@ -5,7 +5,7 @@
 #                                                                     #
 #  Written by Sarah Autumn, 2017-2018                                 #
 #  sarah@connectionsmuseum.org                                        #
-#  github.com/the_autumn/panel_gen                                    #
+#  github.com/theautumn/panel_gen                                     #
 #                                                                     #
 #---------------------------------------------------------------------#
 
