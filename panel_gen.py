@@ -138,7 +138,7 @@ class Line():
         if self.AstStatus == 'Dialing':
             logging.info('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
-        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind, self.switch.is_dialing)
+        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0                                         # Set the status of this call to 0.
         self.chan = '-'
         self.AstStatus = 'on_hook'
@@ -250,9 +250,9 @@ class xb5():
             self.max_calls = 4
 
         self.max_nxx1 = .2
-        self.max_nxx2 = .2
-        self.max_nxx3 = .4
-        self.max_nxx4 = .2
+        self.max_nxx2 = .1
+        self.max_nxx3 = .6
+        self.max_nxx4 = .1
         self.nxx = [722, 832, 232, 275]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
         self.linerange = [5000,5999]
