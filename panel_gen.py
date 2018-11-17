@@ -1,3 +1,6 @@
+#
+#
+#
 #---------------------------------------------------------------------#
 #                                                                     #
 #  A call generator thing for the Rainier Panel switch at the         #
@@ -477,7 +480,7 @@ def start(stdscr):
             stdscr.addstr(22,0,ast_out)
 
         # Print the contents of /var/log/panel_gen/calls.log
-        if y > 48:
+        if y > 45:
             logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
             stdscr.addstr(32,5,'================= Logs =================')
             stdscr.addstr(34,0,logs)
