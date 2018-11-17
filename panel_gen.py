@@ -320,11 +320,11 @@ def on_DialEnd(event, **kwargs):
             n.AstStatus = 'Ringing'
             n.switch.is_dialing -= 1
             # logging.info('on_DialEnd with %s calls dialing', n.switch.is_dialing)
-def parse_args():
 
-    # Stuff for command line arguments, so we can configure some options at runtime.
-    # If no arguments are presented, the program will run with default
-    # mostly sane options.
+def parse_args():
+# Stuff for command line arguments, so we can configure some options at runtime.
+# If no arguments are presented, the program will run with default
+# mostly sane options.
 
     parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. Defaults to originate a sane amount of calls from the panel switch if no args are given.')
     parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7,8,9,10],
@@ -352,6 +352,8 @@ def parse_args():
 
 
 def pausedwin(stdscr):
+# Draw the PAUSED notification when execution is paused.
+
     y, x = stdscr.getmaxyx()
     half_cols = x/2
     rows_size = 5
@@ -360,14 +362,14 @@ def pausedwin(stdscr):
 
     pause_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
     pause_scr.box()
-    pause_scr.addstr(2, 2, "P A U S E D", curses.color_pair(1))
+    pause_scr.addstr(2, half_cols/2 - 5, "P A U S E D", curses.color_pair(1))
     pause_scr.bkgd(' ', curses.color_pair(2))
     pause_scr.refresh()
 
 def start(stdscr):
+# Before we do anything else, the program needs to know which switch it will be originating calls from.
+# Can be any of switch class: panel, xb5, xb1, all
 
-    # Before we do anything else, the program needs to know which switch it will be originating calls from.
-    # Can be any of switch class: panel, xb5, xb1, all
     global orig_switch
     
     orig_switch = []
@@ -414,7 +416,7 @@ def start(stdscr):
     curses.use_default_colors()
     curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
     curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
-    
+    y, x = stdscr.getmaxyx()
 
     # Assert nodelay so curses doesn't pause while waiting for a keypress.
     stdscr.nodelay(1)
@@ -436,9 +438,10 @@ def start(stdscr):
         if key == ord(' '):
             pausedwin(stdscr)
             stdscr.nodelay(0)
-        elif key == ord('r'):
-            stdscr.nodelay(1)
-            stdscr.clear()
+            key = stdscr.getch()
+            if key == ord(' '):
+                stdscr.nodelay(1)
+                stdscr.clear()
 
         # Tick the clock
         for n in line:
@@ -460,9 +463,10 @@ def start(stdscr):
 
         # Print the contents of /var/log/panel_gen/calls.log
         logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
-        stdscr.addstr(32,5,'================= Logs =================',curses.A_BOLD)
+        stdscr.addstr(32,5,'================= Logs =================')
         stdscr.addstr(34,0,logs)
 
+        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
         # stdscr.addstr(45,0,str(n.switch.is_dialing))
 
         # Refresh the screen.
