@@ -350,6 +350,19 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def getkey(stdscr):
+    key = stdscr.getch()
+    if key == ord(' '):
+        pausedwin(stdscr)
+        key = stdscr.getch()
+        if key == ord(' '):
+            stdscr.nodelay(1)
+            stdscr.erase()
+
+def is_resized(stdscr, y, x):
+        stdscr.clear()
+        curses.resizeterm(y, x)
+        stdscr.refresh()
 
 def pausedwin(stdscr):
 # Draw the PAUSED notification when execution is paused.
@@ -357,13 +370,15 @@ def pausedwin(stdscr):
     y, x = stdscr.getmaxyx()
     half_cols = x/2
     rows_size = 5
-    x_start_row = y - 8
+    x_start_row = y - 9
     y_start_col = half_cols - half_cols / 2
 
+    stdscr.nodelay(0)
     pause_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
     pause_scr.box()
     pause_scr.addstr(2, half_cols/2 - 5, "P A U S E D", curses.color_pair(1))
     pause_scr.bkgd(' ', curses.color_pair(2))
+    stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
     pause_scr.refresh()
 
 def start(stdscr):
@@ -433,15 +448,13 @@ def start(stdscr):
 
         # Handle keyboard pause and resume. If pause, then set nodelay to 0, 
         # which pauses execution (thanks, curses!)
-        key = stdscr.getch()
+        getkey(stdscr)
 
-        if key == ord(' '):
-            pausedwin(stdscr)
-            stdscr.nodelay(0)
-            key = stdscr.getch()
-            if key == ord(' '):
-                stdscr.nodelay(1)
-                stdscr.clear()
+        # Check if screen has been resized. Handle it.
+        resized = curses.is_term_resized(y, x)
+        if resized is True:
+            y, x = stdscr.getmaxyx()
+            is_resized(stdscr, y, x)
 
         # Tick the clock
         for n in line:
@@ -449,6 +462,7 @@ def start(stdscr):
 
         # Output handling. make pretty things, sleep 1, repeat ... 
         table = [[n.kind, n.chan, n.term, n.timer, n.status, n.AstStatus] for n in line]
+        stdscr.erase()
         stdscr.addstr(0,5," __________________________________________") 
         stdscr.addstr(1,5,"|                                          |")
         stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
@@ -457,25 +471,24 @@ def start(stdscr):
         tablefmt="pipe", stralign = "right" )) 
 
         # Print asterisk channels below the table so we can see what its actually doing.
-        ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-        stdscr.addstr(20,5,"============ Asterisk output ===========")
-        stdscr.addstr(22,0,ast_out)
+        if y > 30:
+            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
+            stdscr.addstr(20,5,"============ Asterisk output ===========")
+            stdscr.addstr(22,0,ast_out)
 
         # Print the contents of /var/log/panel_gen/calls.log
-        logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
-        stdscr.addstr(32,5,'================= Logs =================')
-        stdscr.addstr(34,0,logs)
+        if y > 48:
+            logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
+            stdscr.addstr(32,5,'================= Logs =================')
+            stdscr.addstr(34,0,logs)
 
         stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
-        # stdscr.addstr(45,0,str(n.switch.is_dialing))
 
         # Refresh the screen.
         stdscr.refresh()
 
         # Take a nap.
         time.sleep(1)
-        #stdscr.clear()
-
 
 # Init a bunch of things. Program stars here, and then calls curses.wrapper() which
 # sets up ncurses and calls start() which is where the main loop lives.
@@ -533,3 +546,4 @@ if __name__ == "__main__":
         logging.error('**** OS Error ****')
         logging.error('{0}'.format(err))
         logging.error('Check files that subprocess and logging try to open. Something is screwy there')
+
