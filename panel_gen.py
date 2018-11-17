@@ -350,11 +350,26 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+
+def pausedwin(stdscr):
+    y, x = stdscr.getmaxyx()
+    half_cols = x/2
+    rows_size = 5
+    x_start_row = y - 8
+    y_start_col = half_cols - half_cols / 2
+
+    pause_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
+    pause_scr.box()
+    pause_scr.addstr(2, 2, "P A U S E D", curses.color_pair(1))
+    pause_scr.bkgd(' ', curses.color_pair(2))
+    pause_scr.refresh()
+
 def start(stdscr):
 
     # Before we do anything else, the program needs to know which switch it will be originating calls from.
     # Can be any of switch class: panel, xb5, xb1, all
     global orig_switch
+    
     orig_switch = []
 
     if args.o == []:                                    # If no args provided, just assume panel switch.
@@ -397,6 +412,12 @@ def start(stdscr):
     # For some reason when we init curses using wrapper(), we have to tell it
     # to use terminal default colors, otherwise the display gets wonky.
     curses.use_default_colors()
+    curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
+    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
+    
+
+    # Assert nodelay so curses doesn't pause while waiting for a keypress.
+    stdscr.nodelay(1)
 
     client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
     client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
@@ -407,6 +428,19 @@ def start(stdscr):
 
     # The main loop that kicks everything into gear. 
     while True:
+
+        # Handle keyboard pause and resume. If pause, then set nodelay to 0, 
+        # which pauses execution (thanks, curses!)
+        key = stdscr.getch()
+
+        if key == ord(' '):
+            pausedwin(stdscr)
+            stdscr.nodelay(0)
+        elif key == ord('r'):
+            stdscr.nodelay(1)
+            stdscr.clear()
+
+        # Tick the clock
         for n in line:
             n.tick()
 
@@ -433,9 +467,11 @@ def start(stdscr):
 
         # Refresh the screen.
         stdscr.refresh()
+
         # Take a nap.
         time.sleep(1)
-        stdscr.clear()
+        #stdscr.clear()
+
 
 # Init a bunch of things. Program stars here, and then calls curses.wrapper() which
 # sets up ncurses and calls start() which is where the main loop lives.
