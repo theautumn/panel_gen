@@ -2,6 +2,7 @@
 Auto call generator for the Panel switch at Connections Museum, Seattle.
 
 Connections Museum, Seattle has in its collection the last remaining Panel-type telephone switch in the world. The switch functions, but mostly sits idle all day, since there is very little human-generated traffic to keep it busy. This program is my attempt to create a small load on the panel switch--and others at the museum--during idle time, so it appears to be processing calls from subscribers.
+![screenshot of panel_gen](samples/panel_gen.png "panel_gen main window")
 
 Requirements
 ------------
