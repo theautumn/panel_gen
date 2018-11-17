@@ -21,10 +21,13 @@ This project assumes you have the following:
 	* curses
 	* asterisk.ami
 
-The Panel switch requires the FXO cards in the channel bank to be configured with fxs_ls signalling. The DAHDI configs are part of this repo in the <code>etc</code> directory, and the Adit configs are part of this repository also. Please note that your hardware and software may vary from what I used, but the configs should be a good starting place nonetheless.
+The DAHDI configs are part of this repo in the <code>etc</code> directory, and the Adit configs are part of this repository also. Please note that your hardware and software may vary from what I used, but the configs should be a good starting place nonetheless.
 
-This program must be run as user 'root', or at least be able to write to the following directories:
-<code>/var/spool/asterisk</code> and <code>/var/log/panel_gen</code>. It also requires the ability to run <code>asterisk</code> and <code>tail</code>.<br />
+This program must be run as a user who is able to write to the following directories:
+<code>/var/spool/asterisk</code> and <code>/var/log/panel_gen</code>. 
+It also requires the ability to run <code>asterisk</code> and <code>tail</code>.
+
+Setting up permissions on your system is an exercise left to the reader.<br />
 
 
 Setup
