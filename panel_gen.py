@@ -1,6 +1,3 @@
-#
-#
-#
 #---------------------------------------------------------------------#
 #                                                                     #
 #  A call generator thing for the Rainier Panel switch at the         #
@@ -161,7 +158,8 @@ class Line():
 
 
 # <----- END LINE CLASS THINGS -----> #
-# <----- BEGIN SWITCH CLASSES -----> #
+
+# <----- BEGIN SWITCH CLASSES ------> #
 
 class panel():
 # This class is parameters and methods for the panel switch.  It should not normally need to be edited.
@@ -353,43 +351,57 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def getkey(stdscr):
-    key = stdscr.getch()
-    if key == ord(' '):
-        pausedwin(stdscr)
+
+class Screen():
+# This puts all the screen handling junk in its own class, so I can just poke it at will.
+
+    def __init__(self, stdscr):
+        # For some reason when we init curses using wrapper(), we have to tell it
+        # to use terminal default colors, otherwise the display gets wonky.
+        curses.use_default_colors()
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
+        y, x = stdscr.getmaxyx()
+        stdscr.nodelay(1)
+
+    def getkey(self, stdscr):
+    # Wait for a <spacebar>. When found, pause the thing, draw a "paused" box, and wait for another <spacebar>.
         key = stdscr.getch()
         if key == ord(' '):
-            stdscr.nodelay(1)
-            stdscr.erase()
+            self.pausedwin(stdscr)
+            key = stdscr.getch()
+            if key == ord(' '):
+                stdscr.nodelay(1)
+                stdscr.erase()
 
-def is_resized(stdscr, y, x):
+    def is_resized(stdscr, y, x):
+    # This gets called if the screen is resized. Makes it happy so exceptions don't get thrown.
         stdscr.clear()
         curses.resizeterm(y, x)
         stdscr.refresh()
 
-def pausedwin(stdscr):
-# Draw the PAUSED notification when execution is paused.
+    def pausedwin(self, stdscr):
+    # Draw the PAUSED notification when execution is paused.
+        y, x = stdscr.getmaxyx()
+        half_cols = x/2
+        rows_size = 5
+        x_start_row = y - 9
+        y_start_col = half_cols - half_cols / 2
 
-    y, x = stdscr.getmaxyx()
-    half_cols = x/2
-    rows_size = 5
-    x_start_row = y - 9
-    y_start_col = half_cols - half_cols / 2
+        stdscr.nodelay(0)
+        pause_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
+        pause_scr.box()
+        pause_scr.addstr(2, half_cols/2 - 5, "P A U S E D", curses.color_pair(1))
+        pause_scr.bkgd(' ', curses.color_pair(2))
+        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
+        pause_scr.refresh()
 
-    stdscr.nodelay(0)
-    pause_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
-    pause_scr.box()
-    pause_scr.addstr(2, half_cols/2 - 5, "P A U S E D", curses.color_pair(1))
-    pause_scr.bkgd(' ', curses.color_pair(2))
-    stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
-    pause_scr.refresh()
 
 def start(stdscr):
 # Before we do anything else, the program needs to know which switch it will be originating calls from.
 # Can be any of switch class: panel, xb5, xb1, all
 
     global orig_switch
-    
     orig_switch = []
 
     if args.o == []:                                    # If no args provided, just assume panel switch.
@@ -429,16 +441,10 @@ def start(stdscr):
     # If we got this far, log that we started successfully.
     logging.info('--- Started panel_gen ---')
 
-    # For some reason when we init curses using wrapper(), we have to tell it
-    # to use terminal default colors, otherwise the display gets wonky.
-    curses.use_default_colors()
-    curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
-    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
-    y, x = stdscr.getmaxyx()
+    # Instantiate a screen, so we can play with it later.
+    screen = Screen(stdscr)
 
-    # Assert nodelay so curses doesn't pause while waiting for a keypress.
-    stdscr.nodelay(1)
-
+    # These listeners are for the AMI so I can catch events. Probably should go somewhere else, but whatev.
     client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
     client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
 
@@ -451,9 +457,10 @@ def start(stdscr):
 
         # Handle keyboard pause and resume. If pause, then set nodelay to 0, 
         # which pauses execution (thanks, curses!)
-        getkey(stdscr)
+        screen.getkey(stdscr)
 
         # Check if screen has been resized. Handle it.
+        y, x = stdscr.getmaxyx()
         resized = curses.is_term_resized(y, x)
         if resized is True:
             y, x = stdscr.getmaxyx()
@@ -493,9 +500,9 @@ def start(stdscr):
         # Take a nap.
         time.sleep(1)
 
+if __name__ == "__main__":
 # Init a bunch of things. Program stars here, and then calls curses.wrapper() which
 # sets up ncurses and calls start() which is where the main loop lives.
-if __name__ == "__main__":
 
     global args
     args = parse_args()
