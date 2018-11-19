@@ -374,7 +374,7 @@ class Screen():
                 stdscr.nodelay(1)
                 stdscr.erase()
 
-    def is_resized(stdscr, y, x):
+    def is_resized(self, stdscr, y, x):
     # This gets called if the screen is resized. Makes it happy so exceptions don't get thrown.
         stdscr.clear()
         curses.resizeterm(y, x)
@@ -396,11 +396,38 @@ class Screen():
         stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
         pause_scr.refresh()
 
+    def draw(self, stdscr, y, x):
+        # Output handling. make pretty things, sleep 1, repeat ... 
+        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.AstStatus] for n in line]
+        stdscr.erase()
+        stdscr.addstr(0,5," __________________________________________") 
+        stdscr.addstr(1,5,"|                                          |")
+        stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
+        stdscr.addstr(3,5,"|__________________________________________|")
+        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk"],
+        tablefmt="pipe", stralign = "right" )) 
 
-def start(stdscr):
+        # Print asterisk channels below the table so we can see what its actually doing.
+        if y > 35:
+            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
+            stdscr.addstr(20,5,"============ Asterisk output ===========")
+            stdscr.addstr(22,0,ast_out)
+
+        # Print the contents of /var/log/panel_gen/calls.log
+        if y > 45:
+            logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
+            stdscr.addstr(32,5,'================= Logs =================')
+            stdscr.addstr(34,0,logs)
+
+        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
+
+        # Refresh the screen.
+        stdscr.refresh()
+
+
+def set_environment(args):
 # Before we do anything else, the program needs to know which switch it will be originating calls from.
 # Can be any of switch class: panel, xb5, xb1, all
-
     global orig_switch
     orig_switch = []
 
@@ -430,13 +457,8 @@ def start(stdscr):
         elif t == 'office' or t == '365':
             term_choices.append(365)
 
-    logging.info('Originating calls on %s', args.o)
-    if args.t != []:
-        logging.info('Terminating calls on %s', term_choices)
-    if args.d == True:
-        logging.info('Deterministic Mode set!')
-    logging.info('Call volume set to %s', args.v)
-
+def start(stdscr):
+# We get here from __main__, and this kicks the loop into gear.
 
     # If we got this far, log that we started successfully.
     logging.info('--- Started panel_gen ---')
@@ -455,8 +477,7 @@ def start(stdscr):
     # The main loop that kicks everything into gear. 
     while True:
 
-        # Handle keyboard pause and resume. If pause, then set nodelay to 0, 
-        # which pauses execution (thanks, curses!)
+        # Handle keyboard pause and resume.
         screen.getkey(stdscr)
 
         # Check if screen has been resized. Handle it.
@@ -464,38 +485,14 @@ def start(stdscr):
         resized = curses.is_term_resized(y, x)
         if resized is True:
             y, x = stdscr.getmaxyx()
-            is_resized(stdscr, y, x)
+            screen.is_resized(stdscr, y, x)
 
         # Tick the clock
         for n in line:
             n.tick()
 
-        # Output handling. make pretty things, sleep 1, repeat ... 
-        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.AstStatus] for n in line]
-        stdscr.erase()
-        stdscr.addstr(0,5," __________________________________________") 
-        stdscr.addstr(1,5,"|                                          |")
-        stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
-        stdscr.addstr(3,5,"|__________________________________________|")
-        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk"],
-        tablefmt="pipe", stralign = "right" )) 
-
-        # Print asterisk channels below the table so we can see what its actually doing.
-        if y > 30:
-            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-            stdscr.addstr(20,5,"============ Asterisk output ===========")
-            stdscr.addstr(22,0,ast_out)
-
-        # Print the contents of /var/log/panel_gen/calls.log
-        if y > 45:
-            logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
-            stdscr.addstr(32,5,'================= Logs =================')
-            stdscr.addstr(34,0,logs)
-
-        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
-
-        # Refresh the screen.
-        stdscr.refresh()
+        # Draw the window
+        screen.draw(stdscr, y, x)
 
         # Take a nap.
         time.sleep(1)
@@ -506,6 +503,7 @@ if __name__ == "__main__":
 
     global args
     args = parse_args()
+    set_environment(args)
 
     # If logfile does not exist, create it so logging can write to it.
     try:
@@ -516,6 +514,13 @@ if __name__ == "__main__":
         with open('/var/log/panel_gen/calls.log', 'w') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
             filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+
+    logging.info('Originating calls on %s', args.o)
+    if args.t != []:
+        logging.info('Terminating calls on %s', term_choices)
+    if args.d == True:
+        logging.info('Deterministic Mode set!')
+    logging.info('Call volume set to %s', args.v)
 
     # Instantiate some switches. This is so we can ask to get their parameters later.
     Rainier = panel()
