@@ -104,6 +104,11 @@ The interface is divided into three areas, which should be mostly self-explanato
 * **state**: line state according to Python
 * **asterisk**: line state according to Asterisk
 
+While running, there are a few magic keys you can use to control program flow. This feature is currently in alpha phase, and may break everything:
+* **spacebar**: pause/resume
+* **u/d**: add/remove lines
+* **h**: show help screen
+
 Examples
 -------
 I've created a bash alias to make this easier to run, but the following examples assume you've not done that. If you'd like to create one, you can edit ~/.bashrc, and add <code>alias panel_gen='sudo -u asterisk python ~/panel_gen/panel_gen.py'</code> to the end of the file. Change the directory where panel_gen lives, as necessary.
