@@ -108,6 +108,9 @@ While running, there are a few magic keys you can use to control program flow. T
 * **spacebar**: pause/resume
 * **u/d**: add/remove lines
 * **h**: show help screen
+* **ctrl + c**: hang up all lines and quit
+
+Be aware that when paused, the program's timers stop, but Asterisk's timers keep going. This means that existing calls will eventually time out, and hang up, but no new calls will be originated until the program is unpaused. When panel_gen is unpaused, its timers will resume right from where they left off. This means that there may be a sync issue between what panel_gen thinks is happening, and what Asterisk thinks. This eventually resolves itself, when panel_gen's timers run down and new calls are originated.
 
 Examples
 -------
