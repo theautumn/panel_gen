@@ -9,7 +9,7 @@
 #                                                                     #
 #---------------------------------------------------------------------#
 
-import time
+from time import sleep
 import os
 import sys
 import subprocess
@@ -18,6 +18,7 @@ import logging
 import curses
 import re
 import threading
+import requests
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
@@ -37,7 +38,7 @@ class Line():
 	if args.l:                                                  # If user specified a line
             self.term = args.l                                      # Set term line to user specified
         else:                                                       # Else,
-            self.term = self.PickCalledLine(term_choices)           # Generate a term line randomly.
+            self.term = self.pick_called_line(term_choices)         # Generate a term line randomly.
 
         self.timer = int(round(random.gamma(4,4)))                  # Set a start timer because i said so.
         self.ident = ident                                          # Set an integer for identity.
@@ -69,7 +70,7 @@ class Line():
                 self.hangup()
         return self.timer
 
-    def PickCalledLine(self, term_choices):
+    def pick_called_line(self, term_choices):
         # If a terminating office wasn't given at runtime, then just default to a random choice
         # as defined by the class of the switch we're calling from. Else, pick a random from the
         # args that the user gave with the -t switch.
@@ -155,7 +156,7 @@ class Line():
         if args.l:                                              # If user specified a line
             self.term = args.l                                  # Set term line to user specified
         else:                                                   # Else,
-            self.term = self.PickCalledLine(term_choices)       # Pick a new terminating line.
+            self.term = self.pick_called_line(term_choices)       # Pick a new terminating line.
 
 
 # <----- END LINE CLASS THINGS -----> #
@@ -353,6 +354,40 @@ def parse_args():
     return args
 
 
+def set_environment(args):
+    # Before we do anything else, the program needs to know which switch it will be originating calls from.
+    # Can be any of switch class: panel, xb5, xb1, all
+    global orig_switch
+    orig_switch = []
+
+    if args.o == []:                                    # If no args provided, just assume panel switch.
+        args.o = ['panel']
+
+    for o in args.o:
+        if o == 'panel' or o == '722':
+            orig_switch.append(panel())
+        elif o == '5xb' or o == '232':
+            orig_switch.append(xb5())
+        elif o == '1xb' or o == '832':
+            orig_switch.append(xb1())
+        elif o == 'all':
+            orig_switch.extend((xb1(), xb5(), panel()))
+
+    global term_choices
+    term_choices = []
+
+    for t in args.t:
+        if t == 'panel' or t == '722':
+            term_choices.append(722)
+        elif t == '5xb' or t == '232':
+            term_choices.append(232)
+        elif t == '1xb' or t == '832':
+            term_choices.append(832)
+        elif t == 'office' or t == '365':
+            term_choices.append(365)
+
+
+
 class Screen():
     # Draw the screen, get user input.
 
@@ -466,44 +501,18 @@ class Screen():
         stdscr.refresh()
 
 
-def set_environment(args):
-    # Before we do anything else, the program needs to know which switch it will be originating calls from.
-    # Can be any of switch class: panel, xb5, xb1, all
-    global orig_switch
-    orig_switch = []
 
-    if args.o == []:                                    # If no args provided, just assume panel switch.
-        args.o = ['panel']
-
-    for o in args.o:
-        if o == 'panel' or o == '722':
-            orig_switch.append(panel())
-        elif o == '5xb' or o == '232':
-            orig_switch.append(xb5())
-        elif o == '1xb' or o == '832':
-            orig_switch.append(xb1())
-        elif o == 'all':
-            orig_switch.extend((xb1(), xb5(), panel()))
-
-    global term_choices
-    term_choices = []
-
-    for t in args.t:
-        if t == 'panel' or t == '722':
-            term_choices.append(722)
-        elif t == '5xb' or t == '232':
-            term_choices.append(232)
-        elif t == '1xb' or t == '832':
-            term_choices.append(832)
-        elif t == 'office' or t == '365':
-            term_choices.append(365)
+#-->                      <--#
+# Work and UI threads are below
+#-->                      <--#
 
 
-def ui_thread_wrapper():
+def ui_thread_wrapper(stopper):
     try: 
         curses.wrapper(ui_thread_main)
     except Exception as e:
         print "oh fuck"
+
 
 def ui_thread_main(stdscr):
 
@@ -527,7 +536,8 @@ def ui_thread_main(stdscr):
     except Exception as e:
        stdscr.addstr(2, 0, str(e), curses.A_REVERSE)
 
-def work_thread_main(paused):
+
+def work_thread(paused, stopper):
     # We get here from __main__, and this kicks the loop into gear.
 
     logging.info('--- Started panel_gen ---')
@@ -536,6 +546,7 @@ def work_thread_main(paused):
     client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
     client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
 
+    self.stopper = stopper
 
     # The main loop that kicks everything into gear. 
     while True:
@@ -544,17 +555,21 @@ def work_thread_main(paused):
             for n in line:
                 n.tick()
         elif paused == True:
-            time.sleep(0.1)
+            sleep(0.1)
 
         # https://www.daniweb.com/programming/software-development/code/485072/count-seconds-in-the-background-python
         # https://stackoverflow.com/questions/48180414/python-curses-threading-output-thread-reports-a-lagging-value-for-global-varia
         # Take a nap.
-        time.sleep(1)
+        sleep(1)
+
+
 
 
 if __name__ == "__main__":
     # Init a bunch of things. Program stars here, and then calls curses.wrapper() which
     # sets up ncurses and calls start() which is where the main loop lives.
+
+    stopper = threading.Event()
 
     global paused
     paused = False
@@ -601,8 +616,9 @@ if __name__ == "__main__":
     # exception like a keyboard interrupt, the output below will still get printed to the screen,
     # even after curses cleans up.
     try:
-        t = threading.Thread(target = ui_thread_wrapper)
-        u = threading.Thread(target = work_thread_main, args = (paused,))
+        t = threading.Thread(target = ui_thread_wrapper, args = (stopper,))
+        u = threading.Thread(target = work_thread, args = (paused, stopper,))
+        u.daemon = True
         t.start()
         u.start()
 
