@@ -436,8 +436,6 @@ class Screen():
         y_start_col = half_cols - half_cols / 2
 
         stdscr.nodelay(0)
-        signal.pause()
-        paused = True
         pause_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
         pause_scr.box()
         pause_scr.addstr(2, half_cols/2 - 5, "P A U S E D", curses.color_pair(1))
@@ -510,6 +508,7 @@ class ui_thread(threading.Thread):
 
         threading.Thread.__init__(self)
         self.shutdown_flag = threading.Event()
+        self.paused_flag = threading.Event()
 
     def run(self):
             try:
@@ -524,7 +523,6 @@ class ui_thread(threading.Thread):
 
         while not self.shutdown_flag.is_set():
             try:
-
                 # Handle user input.
                 screen.getkey(stdscr)
 
@@ -550,6 +548,7 @@ class work_thread(threading.Thread):
 
         threading.Thread.__init__(self)
         self.shutdown_flag = threading.Event()
+        self.paused_flag = threading.Event()
 
         # We get here from __main__, and this kicks the loop into gear.
 
