@@ -3,7 +3,7 @@
 #  A call generator thing for the Rainier Panel switch at the         #
 #  Connections Museum, Seattle WA.                                    #
 #                                                                     #
-#  Written by Sarah Autumn, 2017-2018                                 #
+#  Written by Sarah Autumn, 2017-2019                                 #
 #  sarah@connectionsmuseum.org                                        #
 #  github.com/theautumn/panel_gen                                     #
 #                                                                     #
@@ -12,6 +12,7 @@
 from time import sleep
 import os
 import sys
+import signal
 import subprocess
 import argparse
 import logging
@@ -25,6 +26,7 @@ from pathlib import Path
 from pycall import CallFile, Call, Application, Context
 from asterisk.ami import AMIClient
 from asterisk.ami import EventListener
+#import pudb; pu.db
 
 class Line():
 # Main class for calling lines. Contains all the essential vitamins and minerals.
@@ -89,7 +91,7 @@ class Line():
         elif term_office == 832:
             term_station = "%04d" % random.randint(Lakeview.linerange[0],Lakeview.linerange[1])
         elif term_office == 232:
-             term_station = random.randint(Adams.linerange[0], Adams.linerange[1])
+            term_station = random.randint(Adams.linerange[0], Adams.linerange[1])
         elif term_office == 275:
             term_station = random.randint(Step.linerange[0], Step.linerange[1])
         else:
@@ -270,7 +272,7 @@ class xb5():
         return t
 
 class step():
-    # This class is for the SxS office. It's very minimal right now, as we are not currently
+    # This class is for the SxS office. It's very minimal, as we are not currently
     # originating calls from there, only completing them from the 5XB.
 
     def __init__(self):
@@ -281,7 +283,7 @@ class step():
 # <----- BEGIN BOOKKEEPING STUFF -----> #
 
 def on_DialBegin(event, **kwargs):
-    # This parses notifications received from Asterisk AMI, particularly DialBegin.
+    # This parses DialBegin notifications from the AMI.
     # It uses regex to extract the DialString and DestChannel, then associates the
     # dialed number with its DAHDI channel. This is then displayed for the user.
     # Also increments the is_dialing counter.
@@ -290,7 +292,6 @@ def on_DialBegin(event, **kwargs):
     # one 'w' (wait) in it to wait before dialing. If you change that, the 
     # regex will break. Normally, we should always wait before dialing.
 
-    # logging.info('Reached DialBegin')
     output = str(event)
     DialString = re.compile('(?<=w)(\d{7})')
     DB_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
@@ -312,10 +313,8 @@ def on_DialEnd(event, **kwargs):
     # Same thing as above, except catches DialEnd and sets the state of the call
     # to "Ringing", and decrements the is_dialing counter.
 
-    # logging.info('Begin DialEnd')
     output = str(event)
     DE_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
-
     DE_DestChannel = DE_DestChannel.findall(output)
 
     for n in line:
@@ -350,13 +349,9 @@ def parse_args():
     parser.add_argument('-log', metavar='loglevel', type=str, default='INFO',
             help='Set log level to WARNING, INFO, DEBUG.')
 
+    global args
     args = parser.parse_args()
-    return args
 
-
-def set_environment(args):
-    # Before we do anything else, the program needs to know which switch it will be originating calls from.
-    # Can be any of switch class: panel, xb5, xb1, all
     global orig_switch
     orig_switch = []
 
@@ -386,6 +381,7 @@ def set_environment(args):
         elif t == 'office' or t == '365':
             term_choices.append(365)
 
+    return args
 
 
 class Screen():
@@ -402,7 +398,7 @@ class Screen():
 
 
     def getkey(self, stdscr):
-        # Wait for a <spacebar>. When found, pause the thing, draw a "paused" box, and wait for another <spacebar>.
+        #Handles user input. Currently kind of broken because threading.
         key = stdscr.getch()
 
         if key == ord(' '):
@@ -440,6 +436,7 @@ class Screen():
         y_start_col = half_cols - half_cols / 2
 
         stdscr.nodelay(0)
+        signal.pause()
         paused = True
         pause_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
         pause_scr.box()
@@ -506,77 +503,89 @@ class Screen():
 # Work and UI threads are below
 #-->                      <--#
 
+class ui_thread(threading.Thread):
+    # The UI thread!
 
-def ui_thread_wrapper(stopper):
-    try: 
-        curses.wrapper(ui_thread_main)
-    except Exception as e:
-        print "oh fuck"
+    def __init__(self):
 
+        threading.Thread.__init__(self)
+        self.shutdown_flag = threading.Event()
 
-def ui_thread_main(stdscr):
+    def run(self):
+            try:
+                curses.wrapper(self.ui_main)
+            except Exception as e:
+                print(e)
 
-    try:
+    def ui_main(self, stdscr):
+
         # Instantiate a screen, so we can play with it later.
         screen = Screen(stdscr)
 
-        while True:
-            # Handle user input.
-            screen.getkey(stdscr)
+        while not self.shutdown_flag.is_set():
+            try:
 
-            # Check if screen has been resized. Handle it.
-            y, x = stdscr.getmaxyx()
-            resized = curses.is_term_resized(y, x)
-            if resized is True:
+                # Handle user input.
+                screen.getkey(stdscr)
+
+                # Check if screen has been resized. Handle it.
                 y, x = stdscr.getmaxyx()
-                screen.is_resized(stdscr, y, x)
+                resized = curses.is_term_resized(y, x)
+                if resized is True:
+                    y, x = stdscr.getmaxyx()
+                    screen.is_resized(stdscr, y, x)
 
-            # Draw the window
-            screen.draw(stdscr, line, y, x)
-    except Exception as e:
-       stdscr.addstr(2, 0, str(e), curses.A_REVERSE)
+                # Draw the window
+                screen.draw(stdscr, line, y, x)
 
+            except Exception as e:
+                stdscr.addstr(2, 0, str(e), curses.A_REVERSE)
 
-def work_thread(paused, stopper):
-    # We get here from __main__, and this kicks the loop into gear.
+        stdscr.erase()
+        stdscr.refresh()
 
-    logging.info('--- Started panel_gen ---')
+class work_thread(threading.Thread):
 
-    # These listeners are for the AMI so I can catch events. Probably should go somewhere else, but whatev.
-    client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
-    client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
+    def __init__(self):
 
-    self.stopper = stopper
+        threading.Thread.__init__(self)
+        self.shutdown_flag = threading.Event()
 
-    # The main loop that kicks everything into gear. 
-    while True:
-        if paused == False:
-        # Tick the clock
+        # We get here from __main__, and this kicks the loop into gear.
+
+        logging.info('--- Started panel_gen ---')
+
+        # These listeners are for the AMI so I can catch events.
+        client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
+        client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
+
+    def run(self):
+
+        while not self.shutdown_flag.is_set():
+            # The main loop that kicks everything into gear. 
             for n in line:
                 n.tick()
-        elif paused == True:
-            sleep(0.1)
 
-        # https://www.daniweb.com/programming/software-development/code/485072/count-seconds-in-the-background-python
-        # https://stackoverflow.com/questions/48180414/python-curses-threading-output-thread-reports-a-lagging-value-for-global-varia
-        # Take a nap.
-        sleep(1)
+            # Take a nap.
+            sleep(1)
 
+class ServiceExit(Exception):
+    pass
+
+def app_shutdown(signum, frame):
+    raise ServiceExit
 
 
 
 if __name__ == "__main__":
-    # Init a bunch of things. Program stars here, and then calls curses.wrapper() which
-    # sets up ncurses and calls start() which is where the main loop lives.
+    # Init a bunch of things.
 
-    stopper = threading.Event()
+    # Set up signal handlers so we can shutdown cleanly later.
+    signal.signal(signal.SIGTERM, app_shutdown)
+    signal.signal(signal.SIGINT, app_shutdown)
 
-    global paused
-    paused = False
-
-    global args
-    args = parse_args()
-    set_environment(args)
+    # Parse any arguments the user gave us.
+    parse_args()
 
     # If logfile does not exist, create it so logging can write to it.
     try:
@@ -601,7 +610,7 @@ if __name__ == "__main__":
     Lakeview = xb1()
     Step = step()
 
-    # Here is where we actually make the lines. Important stuff!
+    # Here is where we actually make the lines.
     global line
     line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 
@@ -611,33 +620,37 @@ if __name__ == "__main__":
     if future.response.is_error():
         raise Exception(str(future.response))
 
-    # The below calls curses wrapper and tells it to run the function 'start', which actually sets
-    # everything in motion. This is the lynchpin, here. It's in a [try] block, so if there's an
-    # exception like a keyboard interrupt, the output below will still get printed to the screen,
-    # even after curses cleans up.
     try:
-        t = threading.Thread(target = ui_thread_wrapper, args = (stopper,))
-        u = threading.Thread(target = work_thread, args = (paused, stopper,))
-        u.daemon = True
+        t = ui_thread()
+        t.daemon = True
+        w = work_thread()
+        w.daemon = True
         t.start()
-        u.start()
+        w.start()
 
-    except KeyboardInterrupt:
+        while True:
+            sleep(100)
 
-        # Clean up curses.
-        print "\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
+    except (KeyboardInterrupt, SystemExit, ServiceExit):
+        t.shutdown_flag.set()
+        w.shutdown_flag.set()
+        t.join()
+        w.join()
 
-        #Log out of AMI
-        client.logoff()
+        logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
         # Hang up and clean up spool.
         os.system("asterisk -rx \"channel request hangup all\"")
         os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-        logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
+        print "\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
+        print "Thank you for playing Wing Commander!\n\n"
+
+        #Log out of AMI
+        client.logoff()
+        
     except OSError as err:
 
         print("\nOS error {0}".format(err))
         logging.error('**** OS Error ****')
         logging.error('{0}'.format(err))
-        logging.error('Check files that subprocess and logging try to open. Something is screwy there')
