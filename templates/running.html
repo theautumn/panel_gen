@@ -19,12 +19,8 @@
 
   <!-- CSS
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-  <link rel="stylesheet" href="css/normalize.css">
-  <link rel="stylesheet" href="css/skeleton.css">
-
-  <!-- Favicon
-  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-  <link rel="icon" type="image/png" href="images/favicon.png">
+  <link rel="stylesheet" href="/static/css/normalize.css">
+  <link rel="stylesheet" href="/static/css/skeleton.css">
 
 </head>
 <body>
@@ -35,11 +31,12 @@
     <div class="row">
       <div class="one-half column" style="margin-top: 25%">
         <h4>No. 5 Crossbar</h4>
-	<form method="post" action="/dothething">
-	<input class="button-primary" type="submit" value="start">
-	<input class="button" type="submit" value="stop">
+	<form method="post" action="/">
+	<input class="button-primary" type="submit", name="command", value="start">
+	<input class="button" type="submit", name="command", value="stop">
 	</form>
       </div>
+   <h5>Running</h5>	
     </div>
   </div>
 

@@ -19,7 +19,6 @@ import logging
 import curses
 import re
 import threading
-import requests
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
@@ -348,6 +347,8 @@ def parse_args():
             help='Use with -d option to specify call duration.')
     parser.add_argument('-log', metavar='loglevel', type=str, default='INFO',
             help='Set log level to WARNING, INFO, DEBUG.')
+    parser.add_argument('--http', action='store_true',
+            help='Run in headless HTTP server mode for remote control.')
 
     global args
     args = parser.parse_args()
@@ -477,10 +478,11 @@ class Screen():
         tablefmt="pipe", stralign = "right" )) 
 
         # Print asterisk channels below the table so we can see what its actually doing.
-        if y > 35:
-            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-            stdscr.addstr(20,5,"============ Asterisk output ===========")
-            stdscr.addstr(22,0,ast_out)
+        if not args.http == True:
+            if y > 35:
+                ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
+                stdscr.addstr(20,5,"============ Asterisk output ===========")
+                stdscr.addstr(22,0,ast_out)
 
         # Print the contents of /var/log/panel_gen/calls.log
         if y > 45:
@@ -568,13 +570,12 @@ class work_thread(threading.Thread):
             # Take a nap.
             sleep(1)
 
+
 class ServiceExit(Exception):
     pass
 
 def app_shutdown(signum, frame):
     raise ServiceExit
-
-
 
 if __name__ == "__main__":
     # Init a bunch of things.
@@ -585,6 +586,9 @@ if __name__ == "__main__":
 
     # Parse any arguments the user gave us.
     parse_args()
+
+    if args.http == True:
+        print('Starting panel_gen in headless mode. Ctrl + C to exit')
 
     # If logfile does not exist, create it so logging can write to it.
     try:
@@ -613,27 +617,29 @@ if __name__ == "__main__":
     global line
     line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 
-    # Connect to AMI
+    # Conne ct to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
     future = client.login(username='panel_gen',secret='t431434')
     if future.response.is_error():
         raise Exception(str(future.response))
 
     try:
-        t = ui_thread()
-        t.daemon = True
+        if not args.http == True:
+            t = ui_thread()
+            t.daemon = True
+            t.start()
         w = work_thread()
         w.daemon = True
-        t.start()
         w.start()
 
         while True:
             sleep(100)
 
     except (KeyboardInterrupt, SystemExit, ServiceExit):
-        t.shutdown_flag.set()
+        if not args.http == True:
+            t.shutdown_flag.set()
+            t.join()
         w.shutdown_flag.set()
-        t.join()
         w.join()
 
         logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
