@@ -88,7 +88,7 @@ class Line():
         if term_office == 722 or term_office == 365:
             term_station = random.randint(Rainier.linerange[0], Rainier.linerange[1])
         elif term_office == 832:
-            term_station = "%04d" % random.choice(Lakeview.linerange))
+            term_station = "%04d" % random.choice(Lakeview.linerange)
         elif term_office == 232:
             term_station = random.choice(Adams.linerange)
         elif term_office == 275:
@@ -261,7 +261,7 @@ class xb5():
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
         self.linerange = [1330,1009,1904,1435,9072,9073,1274,9485,1020,5678,5852,
                         1003,6766,6564,9076,1026,5018,1137,9138,1165,1309,1440,9485,
-                        9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,4057,1524
+                        9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,4057,1524,
                         1035,9070,1071]
 
     def newtimer(self):

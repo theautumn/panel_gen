@@ -1,3 +1,11 @@
+#----------------------------------------------
+# HTTP server for panel_gen
+# Run with $sudo python http_server.py
+#
+# Web page created with Skeleton CSS framework
+# http://www.getskeleton.com
+#-----------------------------------------------
+
 from flask import Flask, render_template, redirect, request, flash
 import subprocess
 import os
@@ -15,6 +23,10 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+class RUN_STRING:
+    PANEL = 'python /home/sarah/panel_gen/panel_gen.py -a 4  --http'
+    XB5 = 'python /home/sarah/panel_gen/panel_gen.py -o 5xb -t 832 -t 232 -t 275 -a 7 -v heavy --http'
+
 @app.route('/', methods=['GET', 'POST'])
 def landing():
     global p
@@ -22,7 +34,7 @@ def landing():
         command = request.form['command']
         if command == "start":
             print(bcolors.OKGREEN + '>>  Got a START request' + bcolors.ENDC)
-            p = subprocess.Popen('python /home/sarah/panel_gen/panel_gen.py -o 5xb -t 832 -t 232 -t 275 -a 7 -v heavy --http', shell=True, preexec_fn=os.setsid)
+            p = subprocess.Popen(RUN_STRING.XB5, shell=True, preexec_fn=os.setsid)
             return render_template('running.html')
         elif command == "stop":
             try:
