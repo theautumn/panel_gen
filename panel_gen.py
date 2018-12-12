@@ -88,9 +88,9 @@ class Line():
         if term_office == 722 or term_office == 365:
             term_station = random.randint(Rainier.linerange[0], Rainier.linerange[1])
         elif term_office == 832:
-            term_station = "%04d" % random.randint(Lakeview.linerange[0],Lakeview.linerange[1])
+            term_station = "%04d" % random.choice(Lakeview.linerange))
         elif term_office == 232:
-            term_station = random.randint(Adams.linerange[0], Adams.linerange[1])
+            term_station = random.choice(Adams.linerange)
         elif term_office == 275:
             term_station = random.randint(Step.linerange[0], Step.linerange[1])
         else:
@@ -223,7 +223,7 @@ class xb1():
         self.max_nxx4 = 0
         self.nxx = [722, 832, 232]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.linerange = [105, 149]
+        self.linerange = [105,107,108,109,110,111,112,113,114]
 
     def newtimer(self):
         if args.v == 'light':
@@ -259,7 +259,10 @@ class xb5():
         self.max_nxx4 = .1
         self.nxx = [722, 832, 232, 275]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
-        self.linerange = [5000,5999]
+        self.linerange = [1330,1009,1904,1435,9072,9073,1274,9485,1020,5678,5852,
+                        1003,6766,6564,9076,1026,5018,1137,9138,1165,1309,1440,9485,
+                        9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,4057,1524
+                        1035,9070,1071]
 
     def newtimer(self):
         if args.v == 'light':
@@ -574,8 +577,14 @@ class work_thread(threading.Thread):
 class ServiceExit(Exception):
     pass
 
+class WebShutdown(Exception):
+    pass
+
 def app_shutdown(signum, frame):
     raise ServiceExit
+
+def web_shutdown(signum, frame):
+    raise WebShutdown
 
 if __name__ == "__main__":
     # Init a bunch of things.
@@ -583,6 +592,7 @@ if __name__ == "__main__":
     # Set up signal handlers so we can shutdown cleanly later.
     signal.signal(signal.SIGTERM, app_shutdown)
     signal.signal(signal.SIGINT, app_shutdown)
+    signal.signal(signal.SIGALRM, web_shutdown)
 
     # Parse any arguments the user gave us.
     parse_args()
@@ -635,7 +645,8 @@ if __name__ == "__main__":
         while True:
             sleep(100)
 
-    except (KeyboardInterrupt, SystemExit, ServiceExit):
+    except (KeyboardInterrupt, ServiceExit):
+        
         if not args.http == True:
             t.shutdown_flag.set()
             t.join()
@@ -648,14 +659,39 @@ if __name__ == "__main__":
         os.system("asterisk -rx \"channel request hangup all\"")
         os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
 
-        print "\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
-        print "Thank you for playing Wing Commander!\n\n"
-
-        #Log out of AMI
+        # Log out of AMI
         client.logoff()
-        
-    except OSError as err:
 
-        print("\nOS error {0}".format(err))
+        print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
+        print("Thank you for playing Wing Commander!\n\n")
+
+    except WebShutdown:
+
+        if not args.http == True:
+            t.shutdown_flag.set()
+            t.join()
+        w.shutdown_flag.set()
+        w.join()
+
+        logging.info("Exited due to web interface shutdown")
+
+        # Hang up and clean up spool.
+        os.system("asterisk -rx \"channel request hangup all\"")
+        os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+
+        # Log out of AMI
+        client.logoff()
+
+        print("panel_gen web shutdown complete.\n")
+
+    except OSError as e:
+
+        if not args.http == True:
+            t.shutdown_flag.set()
+            t.join()
+        w.shutdown_flag.set()
+        w.join()
+
+        print("\nOS error {0}".format(e))
         logging.error('**** OS Error ****')
-        logging.error('{0}'.format(err))
+        logging.error('{0}'.format(e))
