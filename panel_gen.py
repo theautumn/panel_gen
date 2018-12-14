@@ -3,26 +3,29 @@
 #  A call generator thing for the Rainier Panel switch at the         #
 #  Connections Museum, Seattle WA.                                    #
 #                                                                     #
-#  Written by Sarah Autumn, 2017-2018                                 #
+#  Written by Sarah Autumn, 2017-2019                                 #
 #  sarah@connectionsmuseum.org                                        #
 #  github.com/theautumn/panel_gen                                     #
 #                                                                     #
 #---------------------------------------------------------------------#
 
-import time
+from time import sleep
 import os
 import sys
+import signal
 import subprocess
 import argparse
 import logging
 import curses
 import re
+import threading
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
 from pycall import CallFile, Call, Application, Context
 from asterisk.ami import AMIClient
 from asterisk.ami import EventListener
+#import pudb; pu.db
 
 class Line():
 # Main class for calling lines. Contains all the essential vitamins and minerals.
@@ -36,7 +39,7 @@ class Line():
 	if args.l:                                                  # If user specified a line
             self.term = args.l                                      # Set term line to user specified
         else:                                                       # Else,
-            self.term = self.PickCalledLine(term_choices)           # Generate a term line randomly.
+            self.term = self.pick_called_line(term_choices)         # Generate a term line randomly.
 
         self.timer = int(round(random.gamma(4,4)))                  # Set a start timer because i said so.
         self.ident = ident                                          # Set an integer for identity.
@@ -52,8 +55,8 @@ class Line():
         # At 0, we're going to check a few things. First, status. If line is on hook "0",
         # and if we haven't maxed out the senders, then call and set the status of the line to "1".
         # If we have more dialing than we have sender capacity, then we reset the timer to
-        # a reasonable number of seconds and try again. 
-        # If self.status is "1", we simply call hangup(), which takes care of all the cleanup.
+        # a "reasonable number of seconds" and try again. 
+        # If self.status is "1", we simply call hangup(), which takes care of the cleanup.
 
         self.timer -= 1
         if self.timer <= 0:
@@ -68,7 +71,7 @@ class Line():
                 self.hangup()
         return self.timer
 
-    def PickCalledLine(self, term_choices):
+    def pick_called_line(self, term_choices):
         # If a terminating office wasn't given at runtime, then just default to a random choice
         # as defined by the class of the switch we're calling from. Else, pick a random from the
         # args that the user gave with the -t switch.
@@ -85,9 +88,9 @@ class Line():
         if term_office == 722 or term_office == 365:
             term_station = random.randint(Rainier.linerange[0], Rainier.linerange[1])
         elif term_office == 832:
-            term_station = "%04d" % random.randint(Lakeview.linerange[0],Lakeview.linerange[1])
+            term_station = "%04d" % random.choice(Lakeview.linerange)
         elif term_office == 232:
-             term_station = random.randint(Adams.linerange[0], Adams.linerange[1])
+            term_station = random.choice(Adams.linerange)
         elif term_office == 275:
             term_station = random.randint(Step.linerange[0], Step.linerange[1])
         else:
@@ -100,8 +103,7 @@ class Line():
         return term
 
     def Call(self):
-        # Dialing takes ~10 to 12 seconds. This should be somewhat consistent value
-        # because its done by Asterisk / DAHDI. We're going to set a timer
+        # Dialing takes ~10 to 12 seconds. We're going to set a timer
         # for call duration here, and then a few lines down,
         # we're gonna tell Asterisk to set its own wait timer to the same value - 10.
         # This should give us a reasonable buffer between the program's counter and
@@ -120,8 +122,9 @@ class Line():
         vars = {'waittime': wait}                               # Set the vars to actually pass over
 
         # Make the .call file amd throw it into the asterisk spool.
-        # New behavior 8-15-18 is to pass control of the call to the sarah_callsim context in
-        # the dialplan. Hopefully, this will allow me to better interact with Asterisk from here.
+        # Pass control of the call to the sarah_callsim context in
+        # the dialplan. This will allow me to better interact with 
+        # Asterisk from here.
         c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term, variables=vars)
         con = Context('sarah_callsim','s','1')
         cf = CallFile(c, con, user='asterisk')
@@ -154,7 +157,7 @@ class Line():
         if args.l:                                              # If user specified a line
             self.term = args.l                                  # Set term line to user specified
         else:                                                   # Else,
-            self.term = self.PickCalledLine(term_choices)       # Pick a new terminating line.
+            self.term = self.pick_called_line(term_choices)       # Pick a new terminating line.
 
 
 # <----- END LINE CLASS THINGS -----> #
@@ -162,12 +165,12 @@ class Line():
 # <----- BEGIN SWITCH CLASSES ------> #
 
 class panel():
-# This class is parameters and methods for the panel switch.  It should not normally need to be edited.
-# If you wish to change the office codes, or trunk weight, this is where you do it.
+    # This class is parameters and methods for the panel switch.
+    # It should not normally need to be edited.
 
     def __init__(self):
         self.kind = "panel"                                     # The kind of switch we're calling from.
-        self.max_dialing = 5                                    # Sender E is out of order, so max is 5.
+        self.max_dialing = 6
         self.is_dialing = 0
         self.dahdi_group = "r6"                                 # Which DAHDI group to originate from.
         self.dcurve = self.newtimer()                           # Start a new timer when switch is instantiated.
@@ -197,8 +200,8 @@ class panel():
         return t
 
 class xb1():
-# This class is for the No. 1 Crossbar. Same as panel, above, but with different parameters.
-# For a description of each of these lines, see the panel class above.
+    # This class is for the No. 1 Crossbar.
+    # For a description of each of these lines, see the panel class above.
 
     def __init__(self):
         self.kind = "1xb"
@@ -220,7 +223,7 @@ class xb1():
         self.max_nxx4 = 0
         self.nxx = [722, 832, 232]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.linerange = [105, 149]
+        self.linerange = [105,107,108,109,110,111,112,113,114]
 
     def newtimer(self):
         if args.v == 'light':
@@ -233,8 +236,8 @@ class xb1():
 
 
 class xb5():
-# This class is for the No. 5 Crossbar. Same as panel, above, but with different parameters.
-# For a description of these, see the panel class, up there ^
+    # This class is for the No. 5 Crossbar.
+    # For a description of these line, see the panel class, above.
 
     def __init__(self):
         self.kind = "5XB"
@@ -256,7 +259,10 @@ class xb5():
         self.max_nxx4 = .1
         self.nxx = [722, 832, 232, 275]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
-        self.linerange = [5000,5999]
+        self.linerange = [1330,1009,1904,1435,9072,9073,1274,9485,1020,5678,5852,
+                        1003,6766,6564,9076,1026,5018,1137,9138,1165,1309,1440,9485,
+                        9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,4057,1524,
+                        1035,9070,1071]
 
     def newtimer(self):
         if args.v == 'light':
@@ -268,8 +274,8 @@ class xb5():
         return t
 
 class step():
-# This class is for the SxS office. It's very minimal right now, as we are not currently
-# originating calls from there, only completing them from the 5XB.
+    # This class is for the SxS office. It's very minimal, as we are not currently
+    # originating calls from there, only completing them from the 5XB.
 
     def __init__(self):
         self.kind = "Step"
@@ -279,16 +285,15 @@ class step():
 # <----- BEGIN BOOKKEEPING STUFF -----> #
 
 def on_DialBegin(event, **kwargs):
-# This parses notifications received from Asterisk AMI, particularly DialBegin.
-# It uses regex to extract the DialString and DestChannel, then associates the
-# dialed number with its DAHDI channel. This is then displayed for the user.
-# Also increments the is_dialing counter.
+    # This parses DialBegin notifications from the AMI.
+    # It uses regex to extract the DialString and DestChannel, then associates the
+    # dialed number with its DAHDI channel. This is then displayed for the user.
+    # Also increments the is_dialing counter.
 
-# The regex match for DialString relies on the dialplan having at least
-# one 'w' (wait) in it to wait before dialing. If you change that, the 
-# regex will break. Normally, we should always wait before dialing.
+    # The regex match for DialString relies on the dialplan having at least
+    # one 'w' (wait) in it to wait before dialing. If you change that, the 
+    # regex will break. Normally, we should always wait before dialing.
 
-    # logging.info('Reached DialBegin')
     output = str(event)
     DialString = re.compile('(?<=w)(\d{7})')
     DB_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
@@ -307,13 +312,11 @@ def on_DialBegin(event, **kwargs):
             logging.info('Calling %s on DAHDI/%s from %s', n.term, n.chan, n.switch.kind)
 
 def on_DialEnd(event, **kwargs):
-# Same thing as above, except catches DialEnd and sets the state of the call
-# to "Ringing", and decrements the is_dialing counter.
+    # Same thing as above, except catches DialEnd and sets the state of the call
+    # to "Ringing", and decrements the is_dialing counter.
 
-    # logging.info('Begin DialEnd')
     output = str(event)
     DE_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
-
     DE_DestChannel = DE_DestChannel.findall(output)
 
     for n in line:
@@ -323,9 +326,9 @@ def on_DialEnd(event, **kwargs):
             # logging.info('on_DialEnd with %s calls dialing', n.switch.is_dialing)
 
 def parse_args():
-# Stuff for command line arguments, so we can configure some options at runtime.
-# If no arguments are presented, the program will run with default
-# mostly sane options.
+    # Gets called at runtime and parses arguments given on command line.
+    # If no arguments are presented, the program will run with default
+    # mostly sane options.
 
     parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. Defaults to originate a sane amount of calls from the panel switch if no args are given.')
     parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7,8,9,10],
@@ -347,87 +350,12 @@ def parse_args():
             help='Use with -d option to specify call duration.')
     parser.add_argument('-log', metavar='loglevel', type=str, default='INFO',
             help='Set log level to WARNING, INFO, DEBUG.')
+    parser.add_argument('--http', action='store_true',
+            help='Run in headless HTTP server mode for remote control.')
 
+    global args
     args = parser.parse_args()
-    return args
 
-
-class Screen():
-# This puts all the screen handling junk in its own class, so I can just poke it at will.
-
-    def __init__(self, stdscr):
-        # For some reason when we init curses using wrapper(), we have to tell it
-        # to use terminal default colors, otherwise the display gets wonky.
-        curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
-        curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
-        y, x = stdscr.getmaxyx()
-        stdscr.nodelay(1)
-
-    def getkey(self, stdscr):
-    # Wait for a <spacebar>. When found, pause the thing, draw a "paused" box, and wait for another <spacebar>.
-        key = stdscr.getch()
-        if key == ord(' '):
-            self.pausedwin(stdscr)
-            key = stdscr.getch()
-            if key == ord(' '):
-                stdscr.nodelay(1)
-                stdscr.erase()
-
-    def is_resized(self, stdscr, y, x):
-    # This gets called if the screen is resized. Makes it happy so exceptions don't get thrown.
-        stdscr.clear()
-        curses.resizeterm(y, x)
-        stdscr.refresh()
-
-    def pausedwin(self, stdscr):
-    # Draw the PAUSED notification when execution is paused.
-        y, x = stdscr.getmaxyx()
-        half_cols = x/2
-        rows_size = 5
-        x_start_row = y - 9
-        y_start_col = half_cols - half_cols / 2
-
-        stdscr.nodelay(0)
-        pause_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
-        pause_scr.box()
-        pause_scr.addstr(2, half_cols/2 - 5, "P A U S E D", curses.color_pair(1))
-        pause_scr.bkgd(' ', curses.color_pair(2))
-        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
-        pause_scr.refresh()
-
-    def draw(self, stdscr, y, x):
-        # Output handling. make pretty things, sleep 1, repeat ... 
-        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.AstStatus] for n in line]
-        stdscr.erase()
-        stdscr.addstr(0,5," __________________________________________") 
-        stdscr.addstr(1,5,"|                                          |")
-        stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
-        stdscr.addstr(3,5,"|__________________________________________|")
-        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk"],
-        tablefmt="pipe", stralign = "right" )) 
-
-        # Print asterisk channels below the table so we can see what its actually doing.
-        if y > 35:
-            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-            stdscr.addstr(20,5,"============ Asterisk output ===========")
-            stdscr.addstr(22,0,ast_out)
-
-        # Print the contents of /var/log/panel_gen/calls.log
-        if y > 45:
-            logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
-            stdscr.addstr(32,5,'================= Logs =================')
-            stdscr.addstr(34,0,logs)
-
-        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
-
-        # Refresh the screen.
-        stdscr.refresh()
-
-
-def set_environment(args):
-# Before we do anything else, the program needs to know which switch it will be originating calls from.
-# Can be any of switch class: panel, xb5, xb1, all
     global orig_switch
     orig_switch = []
 
@@ -457,53 +385,261 @@ def set_environment(args):
         elif t == 'office' or t == '365':
             term_choices.append(365)
 
-def start(stdscr):
-# We get here from __main__, and this kicks the loop into gear.
+    return args
 
-    # If we got this far, log that we started successfully.
-    logging.info('--- Started panel_gen ---')
 
-    # Instantiate a screen, so we can play with it later.
-    screen = Screen(stdscr)
+class Screen():
+    # Draw the screen, get user input.
 
-    # These listeners are for the AMI so I can catch events. Probably should go somewhere else, but whatev.
-    client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
-    client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
-
-    # Here is where we actually make the lines. Important stuff!
-    global line
-    line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
-
-    # The main loop that kicks everything into gear. 
-    while True:
-
-        # Handle keyboard pause and resume.
-        screen.getkey(stdscr)
-
-        # Check if screen has been resized. Handle it.
+    def __init__(self, stdscr):
+        # For some reason when we init curses using wrapper(), we have to tell it
+        # to use terminal default colors, otherwise the display gets wonky.
+        
+        curses.use_default_colors()
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
         y, x = stdscr.getmaxyx()
-        resized = curses.is_term_resized(y, x)
-        if resized is True:
-            y, x = stdscr.getmaxyx()
-            screen.is_resized(stdscr, y, x)
+        stdscr.nodelay(1)
 
-        # Tick the clock
-        for n in line:
-            n.tick()
+    def getkey(self, stdscr):
+        #Handles user input. Currently kind of broken because threading.
+        
+        key = stdscr.getch()
 
-        # Draw the window
-        screen.draw(stdscr, y, x)
+        if key == ord(' '):
+            paused = self.pausedscreen(stdscr)
+            key = stdscr.getch()
+            if key == ord(' '):
+                stdscr.nodelay(1)
+                w.resume()
+                stdscr.erase()
+        # h: Help
+        if key == ord('h'):
+            self.helpscreen(stdscr)
+            key = stdscr.getch()
+            if key:
+                stdscr.nodelay(1)
+                stdscr.erase()
+                stdscr.refresh()
+        # u: add a line to the first switch.
+        if key == ord('u'):
+            line.append(Line(7, orig_switch[0]))
+        # d: delete the 0th line.
+        if key == ord('d'):
+            if len(line) <=1:
+                logging.info("Tried to delete last remaining line. No.")
+            elif len(line) > 1:
+                del line[0]
 
-        # Take a nap.
-        time.sleep(1)
+    def is_resized(self, stdscr, y, x):
+        # This gets called if the screen is resized. Makes it happy so exceptions don't get thrown.
+        
+        stdscr.clear()
+        curses.resizeterm(y, x)
+        stdscr.refresh()
+
+    def pausedscreen(self, stdscr):
+        # Draw the PAUSED notification when execution is paused.
+        # Just as importantly, pause the worker thread. Control goes back to 
+        # getkey(), which waits for another <spacebar> then resumes.
+        
+        y, x = stdscr.getmaxyx()
+        half_cols = x/2
+        rows_size = 5
+        x_start_row = y - 9
+        y_start_col = half_cols - half_cols / 2
+
+        stdscr.nodelay(0)
+        pause_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
+        pause_scr.box()
+        pause_scr.addstr(2, half_cols/2 - 5, "P A U S E D", curses.color_pair(1))
+        pause_scr.bkgd(' ', curses.color_pair(2))
+        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
+        pause_scr.refresh()
+        w.pause()
+
+    def helpscreen(self, stdscr):
+        # Draw the help screen when 'h' is pressed. Then, control goes back to 
+        # getkey(), which waits for any key, and goes back to drawing the UI.
+    
+        y, x = stdscr.getmaxyx()
+        half_cols = x/2
+        rows_size = 20
+        x_start_row = y - 40
+        y_start_col = half_cols - half_cols / 2
+        stdscr.nodelay(0)
+        stdscr.clear()
+        help_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
+        help_scr.box()
+        help_scr.bkgd(' ', curses.color_pair(1))
+        help_scr.addstr(2, half_cols/2 - 5, "HJAELP!", curses.color_pair(1))
+        help_scr.addstr(4, 5, "Spacebar         Run/Pause")
+        help_scr.addstr(5, 5, "u/d              Add/Remove Lines")
+        help_scr.addstr(6, 5, "h                Help")
+        help_scr.addstr(7, 5, "Ctrl + C         Quit")
+
+
+    def draw(self, stdscr, line, y, x):
+        # Output handling. make pretty things.
+        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.AstStatus] for n in line]
+        stdscr.erase()
+        stdscr.addstr(0,5," __________________________________________") 
+        stdscr.addstr(1,5,"|                                          |")
+        stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
+        stdscr.addstr(3,5,"|__________________________________________|")
+        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk"],
+        tablefmt="pipe", stralign = "right" )) 
+
+        # Print asterisk channels below the table so we can see what its actually doing.
+        if not args.http == True:
+            if y > 35:
+                ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
+                stdscr.addstr(20,5,"============ Asterisk output ===========")
+                stdscr.addstr(22,0,ast_out)
+
+        # Print the contents of /var/log/panel_gen/calls.log
+        if y > 45:
+            logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
+            stdscr.addstr(32,5,'================= Logs =================')
+            stdscr.addstr(34,0,logs)
+
+        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
+        stdscr.addstr(y-1,x-20,"Lines:",curses.A_BOLD)
+        stdscr.addstr(y-1,x-13, str(len(line)),curses.A_BOLD)
+
+        # Refresh the screen.
+        stdscr.refresh()
+
+
+
+#-->                      <--#
+# Work and UI threads are below
+#-->                      <--#
+
+class ui_thread(threading.Thread):
+    # The UI thread! Besides handling pause and resume, this also
+    # sets up a screen, and calls various things in Screen() to
+    # help with drawing. Note: This thread does not start if 
+    # panel_gen is run with the --http option. No UI necessary
+    # in headless mode.
+
+    def __init__(self):
+
+        threading.Thread.__init__(self)
+        self.shutdown_flag = threading.Event()
+        self.paused = False
+        self.paused_flag = threading.Condition()
+
+    def run(self):
+        try:
+            curses.wrapper(self.ui_main)
+        except Exception as e:
+            print(e)
+
+    def pause(self):
+        self.paused = True
+        self.paused_flag.acquire()
+
+    def resume(self):
+        self.paused = False
+        self.paused_flag.notify()
+        self.paused_flag.release()
+
+    def ui_main(self, stdscr):
+
+        # Instantiate a screen, so we can play with it later.
+        screen = Screen(stdscr)
+
+        while not self.shutdown_flag.is_set():
+            try:
+                # Handle user input.
+                screen.getkey(stdscr)
+
+                # Check if screen has been resized. Handle it.
+                y, x = stdscr.getmaxyx()
+                resized = curses.is_term_resized(y, x)
+                if resized is True:
+                    y, x = stdscr.getmaxyx()
+                    screen.is_resized(stdscr, y, x)
+
+                # Draw the window
+                screen.draw(stdscr, line, y, x)
+
+            except Exception as e:
+                stdscr.addstr(2, 0, str(e), curses.A_REVERSE)
+
+        stdscr.refresh()
+
+
+class work_thread(threading.Thread):
+    # Does all the work! Can be paused and resumed. Handles all of
+    # the exciting things, but most important is calling tick() 
+    # once per second. This evaluates the timers and makes call processing
+    # decisions.
+
+    def __init__(self):
+
+        threading.Thread.__init__(self)
+        self.shutdown_flag = threading.Event()
+        self.paused = False
+        self.paused_flag = threading.Condition(threading.Lock())
+
+        # We get here from __main__, and this kicks the loop into gear.
+
+        logging.info('--- Started panel_gen ---')
+
+        # These listeners are for the AMI so I can catch events.
+        client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
+        client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
+
+    def run(self):
+
+        while not self.shutdown_flag.is_set():
+            with self.paused_flag:
+                while self.paused:
+                    self.paused_flag.wait()
+            # The main loop that kicks everything into gear. 
+                for n in line:
+                    n.tick()
+
+                sleep(1)
+
+    def pause(self):
+        self.paused = True
+        self.paused_flag.acquire()
+
+    def resume(self):
+        self.paused = False
+        self.paused_flag.notify()
+        self.paused_flag.release()
+
+class ServiceExit(Exception):
+    pass
+
+class WebShutdown(Exception):
+    pass
+
+def app_shutdown(signum, frame):
+    raise ServiceExit
+
+def web_shutdown(signum, frame):
+    raise WebShutdown
 
 if __name__ == "__main__":
-# Init a bunch of things. Program stars here, and then calls curses.wrapper() which
-# sets up ncurses and calls start() which is where the main loop lives.
+    # Init a bunch of things at runtime.
 
-    global args
-    args = parse_args()
-    set_environment(args)
+    # Set up signal handlers so we can shutdown cleanly later.
+    signal.signal(signal.SIGTERM, app_shutdown)
+    signal.signal(signal.SIGINT, app_shutdown)
+    signal.signal(signal.SIGALRM, web_shutdown)
+    
+    paused = None
+
+    # Parse any arguments the user gave us.
+    parse_args()
+
+    if args.http == True:
+        print('Starting panel_gen in headless mode. Ctrl + C to exit')
 
     # If logfile does not exist, create it so logging can write to it.
     try:
@@ -528,37 +664,76 @@ if __name__ == "__main__":
     Lakeview = xb1()
     Step = step()
 
+    # Here is where we actually make the lines.
+    global line
+    line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+
     # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
     future = client.login(username='panel_gen',secret='t431434')
     if future.response.is_error():
         raise Exception(str(future.response))
 
-    # The below calls curses wrapper and tells it to run the function 'start', which actually sets
-    # everything in motion. This is the lynchpin, here. It's in a [try] block, so if there's an
-    # exception like a keyboard interrupt, the output below will still get printed to the screen,
-    # even after curses cleans up.
     try:
-        curses.wrapper(start)
+        if not args.http == True:
+            t = ui_thread()
+            t.daemon = True
+            t.start()
+        w = work_thread()
+        w.daemon = True
+        w.start()
 
-    # Gracefully handle keyboard interrupts.
-    except KeyboardInterrupt:
+        while True:
+            sleep(0.5)
 
-        # Clean up curses.
-        print "\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/"
+    except (KeyboardInterrupt, ServiceExit):
+    # Exception handler for console-based shutdown. 
 
-        #Log out of AMI
-        client.logoff()
+        t.shutdown_flag.set()
+        t.join()
+        w.shutdown_flag.set()
+        w.join()
+
+        logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
         # Hang up and clean up spool.
         os.system("asterisk -rx \"channel request hangup all\"")
         os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-        logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
-    except OSError as err:
+        # Log out of AMI
+        client.logoff()
 
-        print("\nOS error {0}".format(err))
+        print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
+        print("Thank you for playing Wing Commander!\n\n")
+
+    except WebShutdown:
+        # Exception handler for http-server shutdown. The http-server
+        # passes SIGALRM, which calls web_shutdown and eventually
+        # leads us here. 
+
+        w.shutdown_flag.set()
+        w.join()
+
+        logging.info("Exited due to web interface shutdown")
+
+        # Hang up and clean up spool.
+        os.system("asterisk -rx \"channel request hangup all\"")
+        os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+
+        # Log out of AMI
+        client.logoff()
+
+        print("panel_gen web shutdown complete.\n")
+
+    except OSError as e:
+        # Exception for any other errors that I'm not explicitly handling.
+
+        if not args.http == True:
+            t.shutdown_flag.set()
+            t.join()
+        w.shutdown_flag.set()
+        w.join()
+
+        print("\nOS error {0}".format(e))
         logging.error('**** OS Error ****')
-        logging.error('{0}'.format(err))
-        logging.error('Check files that subprocess and logging try to open. Something is screwy there')
-
+        logging.error('{0}'.format(e))
