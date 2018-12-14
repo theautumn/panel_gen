@@ -394,27 +394,33 @@ class Screen():
     def __init__(self, stdscr):
         # For some reason when we init curses using wrapper(), we have to tell it
         # to use terminal default colors, otherwise the display gets wonky.
+        
         curses.use_default_colors()
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
         curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
         y, x = stdscr.getmaxyx()
         stdscr.nodelay(1)
 
-
     def getkey(self, stdscr):
         #Handles user input. Currently kind of broken because threading.
+        
         key = stdscr.getch()
 
         if key == ord(' '):
-            self.pausedscreen(stdscr)
+            paused = self.pausedscreen(stdscr)
             key = stdscr.getch()
             if key == ord(' '):
                 stdscr.nodelay(1)
+                w.resume()
                 stdscr.erase()
         # h: Help
         if key == ord('h'):
             self.helpscreen(stdscr)
             key = stdscr.getch()
+            if key:
+                stdscr.nodelay(1)
+                stdscr.erase()
+                stdscr.refresh()
         # u: add a line to the first switch.
         if key == ord('u'):
             line.append(Line(7, orig_switch[0]))
@@ -427,12 +433,16 @@ class Screen():
 
     def is_resized(self, stdscr, y, x):
         # This gets called if the screen is resized. Makes it happy so exceptions don't get thrown.
+        
         stdscr.clear()
         curses.resizeterm(y, x)
         stdscr.refresh()
 
     def pausedscreen(self, stdscr):
         # Draw the PAUSED notification when execution is paused.
+        # Just as importantly, pause the worker thread. Control goes back to 
+        # getkey(), which waits for another <spacebar> then resumes.
+        
         y, x = stdscr.getmaxyx()
         half_cols = x/2
         rows_size = 5
@@ -446,10 +456,12 @@ class Screen():
         pause_scr.bkgd(' ', curses.color_pair(2))
         stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
         pause_scr.refresh()
-        return paused
+        w.pause()
 
     def helpscreen(self, stdscr):
-        # Draw the help screen when 'h' is pressed.
+        # Draw the help screen when 'h' is pressed. Then, control goes back to 
+        # getkey(), which waits for any key, and goes back to drawing the UI.
+    
         y, x = stdscr.getmaxyx()
         half_cols = x/2
         rows_size = 20
@@ -466,8 +478,6 @@ class Screen():
         help_scr.addstr(6, 5, "h                Help")
         help_scr.addstr(7, 5, "Ctrl + C         Quit")
 
-        #stdscr.refresh()
-        #help_scr.refresh()
 
     def draw(self, stdscr, line, y, x):
         # Output handling. make pretty things.
@@ -507,19 +517,33 @@ class Screen():
 #-->                      <--#
 
 class ui_thread(threading.Thread):
-    # The UI thread!
+    # The UI thread! Besides handling pause and resume, this also
+    # sets up a screen, and calls various things in Screen() to
+    # help with drawing. Note: This thread does not start if 
+    # panel_gen is run with the --http option. No UI necessary
+    # in headless mode.
 
     def __init__(self):
 
         threading.Thread.__init__(self)
         self.shutdown_flag = threading.Event()
-        self.paused_flag = threading.Event()
+        self.paused = False
+        self.paused_flag = threading.Condition()
 
     def run(self):
-            try:
-                curses.wrapper(self.ui_main)
-            except Exception as e:
-                print(e)
+        try:
+            curses.wrapper(self.ui_main)
+        except Exception as e:
+            print(e)
+
+    def pause(self):
+        self.paused = True
+        self.paused_flag.acquire()
+
+    def resume(self):
+        self.paused = False
+        self.paused_flag.notify()
+        self.paused_flag.release()
 
     def ui_main(self, stdscr):
 
@@ -544,16 +568,21 @@ class ui_thread(threading.Thread):
             except Exception as e:
                 stdscr.addstr(2, 0, str(e), curses.A_REVERSE)
 
-        stdscr.erase()
         stdscr.refresh()
 
+
 class work_thread(threading.Thread):
+    # Does all the work! Can be paused and resumed. Handles all of
+    # the exciting things, but most important is calling tick() 
+    # once per second. This evaluates the timers and makes call processing
+    # decisions.
 
     def __init__(self):
 
         threading.Thread.__init__(self)
         self.shutdown_flag = threading.Event()
-        self.paused_flag = threading.Event()
+        self.paused = False
+        self.paused_flag = threading.Condition(threading.Lock())
 
         # We get here from __main__, and this kicks the loop into gear.
 
@@ -566,13 +595,23 @@ class work_thread(threading.Thread):
     def run(self):
 
         while not self.shutdown_flag.is_set():
+            with self.paused_flag:
+                while self.paused:
+                    self.paused_flag.wait()
             # The main loop that kicks everything into gear. 
-            for n in line:
-                n.tick()
+                for n in line:
+                    n.tick()
 
-            # Take a nap.
-            sleep(1)
+                sleep(1)
 
+    def pause(self):
+        self.paused = True
+        self.paused_flag.acquire()
+
+    def resume(self):
+        self.paused = False
+        self.paused_flag.notify()
+        self.paused_flag.release()
 
 class ServiceExit(Exception):
     pass
@@ -587,12 +626,14 @@ def web_shutdown(signum, frame):
     raise WebShutdown
 
 if __name__ == "__main__":
-    # Init a bunch of things.
+    # Init a bunch of things at runtime.
 
     # Set up signal handlers so we can shutdown cleanly later.
     signal.signal(signal.SIGTERM, app_shutdown)
     signal.signal(signal.SIGINT, app_shutdown)
     signal.signal(signal.SIGALRM, web_shutdown)
+    
+    paused = None
 
     # Parse any arguments the user gave us.
     parse_args()
@@ -627,7 +668,7 @@ if __name__ == "__main__":
     global line
     line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 
-    # Conne ct to AMI
+    # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
     future = client.login(username='panel_gen',secret='t431434')
     if future.response.is_error():
@@ -643,13 +684,13 @@ if __name__ == "__main__":
         w.start()
 
         while True:
-            sleep(100)
+            sleep(0.5)
 
     except (KeyboardInterrupt, ServiceExit):
-        
-        if not args.http == True:
-            t.shutdown_flag.set()
-            t.join()
+    # Exception handler for console-based shutdown. 
+
+        t.shutdown_flag.set()
+        t.join()
         w.shutdown_flag.set()
         w.join()
 
@@ -666,10 +707,10 @@ if __name__ == "__main__":
         print("Thank you for playing Wing Commander!\n\n")
 
     except WebShutdown:
+        # Exception handler for http-server shutdown. The http-server
+        # passes SIGALRM, which calls web_shutdown and eventually
+        # leads us here. 
 
-        if not args.http == True:
-            t.shutdown_flag.set()
-            t.join()
         w.shutdown_flag.set()
         w.join()
 
@@ -685,6 +726,7 @@ if __name__ == "__main__":
         print("panel_gen web shutdown complete.\n")
 
     except OSError as e:
+        # Exception for any other errors that I'm not explicitly handling.
 
         if not args.http == True:
             t.shutdown_flag.set()

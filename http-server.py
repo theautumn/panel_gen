@@ -32,6 +32,17 @@ class RUN_STRING:
     PANEL = 'python /home/sarah/panel_gen/panel_gen.py -a 4  --http'
     XB5 = 'python /home/sarah/panel_gen/panel_gen.py -o 5xb -t 832 -t 232 -t 275 -a 7 -v heavy --http'
 
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        command = request.form['command']
+        if command == "Panel":
+            return panelhome()
+        elif command == "5xb":
+            return xb5home()
+
+    return render_template('index.html')
+
 @app.route('/5xb', methods=['GET', 'POST'])
 def xb5home():
     global p
@@ -55,18 +66,18 @@ def xb5home():
 
 @app.route('/panel', methods=['GET', 'POST'])
 def panelhome():
-    global p
+    global q
     if request.method == 'POST':
         command = request.form['command']
         if command == "start":
             print(bcolors.OKGREEN + '>>  Got a START request for PANEL' + bcolors.ENDC)
-            p = subprocess.Popen(RUN_STRING.PANEL, shell=True, preexec_fn=os.setsid)
+            q = subprocess.Popen(RUN_STRING.PANEL, shell=True, preexec_fn=os.setsid)
             return render_template('panel.html', status="Running")
         elif command == "stop":
             try:
                 print(bcolors.FAIL + '<<  Got a STOP request for PANEL' + bcolors.ENDC)
-                os.killpg(os.getpgid(p.pid), signal.SIGALRM)
-                p = None
+                os.killpg(os.getpgid(q.pid), signal.SIGALRM)
+                q = None
                 return render_template('panel.html', status="Stopped")
             except Exception:
                 print(bcolors.WARNING + 'Nothing to terminate. Returning to index page...' + bcolors.ENDC)
