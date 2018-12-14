@@ -77,6 +77,9 @@ optional arguments:
                good for average load.
   -w seconds   Use with -d option to specify wait time between calls.
   -z seconds   Use with -d option to specify call duration.
+  --http       Run in headless HTTP server mode for remote control. This
+  	       is not normally something a user would run manually. Instead
+	       it's there for http-server.py to play with.
 ```
 
 The program is capable of generating calls from, and terminating calls to, any of the switches in the museum. The switch classes determines what the rules for each switch are, and they're set up with the switch capacities and limitations baked in. This way, if you are originating or terminating on any switch, panel_gen is intelligent enough to know if it's possible to make the call it's about to make.
@@ -111,6 +114,10 @@ While running, there are a few magic keys you can use to control program flow. T
 * **ctrl + c**: hang up all lines and quit
 
 Be aware that when paused, the program's timers stop, but Asterisk's timers keep going. This means that existing calls will eventually time out, and hang up, but no new calls will be originated until the program is unpaused. When panel_gen is unpaused, its timers will resume right from where they left off. This means that there may be a sync issue between what panel_gen thinks is happening, and what Asterisk thinks. This eventually resolves itself, when panel_gen's timers run down and new calls are originated.
+
+HTTP Server
+-----------
+There is a simple, insecure HTTP server provided in http-server.py which serves up a basic web page so panel_gen can be executed via a volunteer's smartphone. This should not be available to everybody, as there are no security or sanity checks, and there's probably a thousand ways to break it. I keep it limited to a secure network so only those with the WPA key can access it. Still, it's quite cool! The actual server is [Flask](https://github.com/pallets/flask), and the CSS framework is [Skeleton](https://github.com/dhg/Skeleton).
 
 Examples
 -------
