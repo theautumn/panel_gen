@@ -1,9 +1,8 @@
 {% extends 'layout.html' %}
-{% block header %}{% endblock %}
-
+{% block header %}Connections Museum{% endblock %}
 {% block content %}
     	<form method="post" action="/">
-	<input class="button-primary" type="submit", name="command", value="Panel">
+	<input class="button" type="submit", name="command", value="Panel">
 	<input class="button" type="submit", name="command", value="5xb">
 	<div>
 		<h5> {{ status }} </h5>
