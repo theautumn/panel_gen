@@ -30,33 +30,78 @@ class bcolors:
 
 class RUN_STRING:
     PANEL = 'python /home/sarah/panel_gen/panel_gen.py -a 4  --http'
-    XB5 = 'python /home/sarah/panel_gen/panel_gen.py -o 5xb -t 832 -t 232 -t 275 -a 7 -v heavy --http'
+    XB5 = 'python /home/sarah/panel_gen/panel_gen.py -o 5xb -a 8 -v heavy --http'
+
+class PROCESS:
+    PANEL = "panel_gen.py -a 4"
+    XB5 = "panel_gen.py -o 5xb"
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    global p, q
+
     if request.method == 'POST':
         command = request.form['command']
-        if command == "Panel":
-            return panelhome()
-        elif command == "5xb":
-            return xb5home()
+        if command == "Panel Start":
+            tmp = os.popen("ps -Af").read()
+            if PROCESS.PANEL not in tmp[:]:
+                print(bcolors.OKGREEN + '>>  Got a START request for PANEL' + bcolors.ENDC)
+                p = subprocess.Popen(RUN_STRING.PANEL, shell=True, preexec_fn=os.setsid)
+                return render_template('index.html')
+            else:
+                print(bcolors.HEADER + "Process already running. Cant start twice!" + bcolors.ENDC)
+
+        elif command == "Panel Stop":
+            try:
+                print(bcolors.FAIL + '<<  Got a STOP request for PANEL' + bcolors.ENDC)
+                os.killpg(os.getpgid(p.pid), signal.SIGALRM)
+                p = None
+                return render_template('index.html')
+            except Exception:
+                print(bcolors.WARNING + 'Nothing to terminate. Returning to index page...' + bcolors.ENDC)
+                return render_template('index.html')
+
+        elif command == "5XB Start":
+            tmp2 = os.popen("ps -Af").read()
+            if PROCESS.XB5 not in tmp2[:]:
+                print(bcolors.OKGREEN + '>>  Got a START request for 5XB' + bcolors.ENDC)
+                q = subprocess.Popen(RUN_STRING.XB5, shell=True, preexec_fn=os.setsid)
+                return render_template('index.html')
+            else:
+                print(bcolors.HEADER + "Process already running. Cant start twice!" + bcolors.ENDC)
+        elif command == "5XB Stop":
+            try:
+                print(bcolors.FAIL + '<<  Got a STOP request for 5XB' + bcolors.ENDC)
+                os.killpg(os.getpgid(q.pid), signal.SIGALRM)
+                xb5_state = "Stopped"
+                q = None
+                return render_template('index.html')
+            except Exception:
+                print(bcolors.WARNING + 'Nothing to terminate. Returning to index page...' + bcolors.ENDC)
+                return render_template('index.html')
 
     return render_template('index.html')
 
 @app.route('/5xb', methods=['GET', 'POST'])
 def xb5home():
-    global p
+    global q
+    
     if request.method == 'POST':
         command = request.form['command']
         if command == "start":
-            print(bcolors.OKGREEN + '>>  Got a START request for 5XB' + bcolors.ENDC)
-            p = subprocess.Popen(RUN_STRING.XB5, shell=True, preexec_fn=os.setsid)
-            return render_template('5xb.html', status="Running")
+            tmp2 = os.popen("ps -Af").read()
+            if PROCESS.XB5 not in tmp2[:]:
+                print(bcolors.OKGREEN + '>>  Got a START request for 5XB' + bcolors.ENDC)
+                q = subprocess.Popen(RUN_STRING.XB5, shell=True, preexec_fn=os.setsid)
+                return render_template('5xb.html')
+            else:
+                print(bcolors.HEADER + "Process already running. Cant start twice!" + bcolors.ENDC)
+
         elif command == "stop":
             try:
                 print(bcolors.FAIL + '<<  Got a STOP request for 5XB' + bcolors.ENDC)
-                os.killpg(os.getpgid(p.pid), signal.SIGALRM)
-                p = None
+                os.killpg(os.getpgid(q.pid), signal.SIGALRM)
+                q = None
                 return render_template('5xb.html', status="Stopped")
             except Exception:
                 print(bcolors.WARNING + 'Nothing to terminate. Returning to index page...' + bcolors.ENDC)
@@ -66,18 +111,22 @@ def xb5home():
 
 @app.route('/panel', methods=['GET', 'POST'])
 def panelhome():
-    global q
+    global p
     if request.method == 'POST':
         command = request.form['command']
         if command == "start":
-            print(bcolors.OKGREEN + '>>  Got a START request for PANEL' + bcolors.ENDC)
-            q = subprocess.Popen(RUN_STRING.PANEL, shell=True, preexec_fn=os.setsid)
-            return render_template('panel.html', status="Running")
+            tmp = os.popen("ps -Af").read()
+            if PROCESS.PANEL not in tmp[:]:
+                print(bcolors.OKGREEN + '>>  Got a START request for PANEL' + bcolors.ENDC)
+                p = subprocess.Popen(RUN_STRING.PANEL, shell=True, preexec_fn=os.setsid)
+                return render_template('panel.html')
+            else:
+                print(bcolors.HEADER + "Process already running. Cant start twice!" + bcolors.ENDC)
         elif command == "stop":
             try:
                 print(bcolors.FAIL + '<<  Got a STOP request for PANEL' + bcolors.ENDC)
-                os.killpg(os.getpgid(q.pid), signal.SIGALRM)
-                q = None
+                os.killpg(os.getpgid(p.pid), signal.SIGALRM)
+                p = None
                 return render_template('panel.html', status="Stopped")
             except Exception:
                 print(bcolors.WARNING + 'Nothing to terminate. Returning to index page...' + bcolors.ENDC)

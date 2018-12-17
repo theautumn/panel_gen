@@ -110,16 +110,16 @@ class Line():
         # Asterisk's wait timer (which itself begins when the call goes from
         # dialing to "UP").
 
-        if args.d:                                              # Are we in deterministic mode?
-            if args.z:                                          # args.z is call duration
-                self.timer = args.z                             # Set length of call to what user specified
+        if args.d:                                          # Are we in deterministic mode?
+            if args.z:                                      # args.z is call duration
+                self.timer = args.z                         # Set length of call to what user specified
             else:
-                self.timer = 15                                 # If no args.z, use default value for -d mode.
-        else:                                                   # If we are in normal mode, then it's easy
-            self.timer = self.switch.newtimer()                 # Reset the timer for the next go-around.
+                self.timer = 15                             # If no args.z, use default value for -d mode.
+        else:                                               # If we are in normal mode, then it's easy
+            self.timer = self.switch.newtimer()             # Reset the timer for the next go-around.
 
-        wait = str(self.timer - 10)                             # Wait value to pass to Asterisk dialplan
-        vars = {'waittime': wait}                               # Set the vars to actually pass over
+        wait = str(self.timer - 10)                         # Wait value to pass to Asterisk dialplan
+        vars = {'waittime': wait}                           # Set the vars to actually pass over
 
         # Make the .call file amd throw it into the asterisk spool.
         # Pass control of the call to the sarah_callsim context in
@@ -402,7 +402,7 @@ class Screen():
         stdscr.nodelay(1)
 
     def getkey(self, stdscr):
-        #Handles user input. Currently kind of broken because threading.
+        #Handles user input.
         
         key = stdscr.getch()
 
@@ -613,6 +613,7 @@ class work_thread(threading.Thread):
         self.paused_flag.notify()
         self.paused_flag.release()
 
+
 class ServiceExit(Exception):
     pass
 
@@ -624,6 +625,7 @@ def app_shutdown(signum, frame):
 
 def web_shutdown(signum, frame):
     raise WebShutdown
+
 
 if __name__ == "__main__":
     # Init a bunch of things at runtime.
