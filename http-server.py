@@ -73,11 +73,24 @@ def index():
             try:
                 print(bcolors.FAIL + '<<  Got a STOP request for 5XB' + bcolors.ENDC)
                 os.killpg(os.getpgid(q.pid), signal.SIGALRM)
-                xb5_state = "Stopped"
                 q = None
                 return render_template('index.html')
             except Exception:
                 print(bcolors.WARNING + 'Nothing to terminate. Returning to index page...' + bcolors.ENDC)
+                return render_template('index.html')
+        elif command == "Force Stop":
+            try:
+                print(bcolors.FAIL + '<<  Got a FORCE STOP request! >>' + bcolors.ENDC)
+                n = subprocess.Popen(['ps', '-ax'], stdout=subprocess.PIPE)
+                out, err = n.communicate()
+
+                for line in out.splitlines():
+                    if 'panel_gen.py' in line:
+                        pid = int(line.split(None, 1)[0])
+                        os.kill(pid, signal.SIGALRM)
+                p, q = None
+                return render_template('index.html')
+            except Exception as e:
                 return render_template('index.html')
 
     return render_template('index.html')

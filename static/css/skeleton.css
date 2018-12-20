@@ -221,13 +221,13 @@ input[type="button"].button-primary:focus {
   color: #FFF;
   background-color: #1EAEDB;
   border-color: #1EAEDB; }
-.button.button-green,
+.button.button-red,
 button.button-green,
-input[type="submit"].button-green,
-input[type="reset"].button-green,
-input[type="button"].button-green {
+input[type="submit"].button-red,
+input[type="reset"].button-red,
+input[type="button"].button-red {
   color: #FFF;
-  background-color: #48c580;
+  background-color: #e84545;
   border-color: #33C3F0; }
 
 /* Forms

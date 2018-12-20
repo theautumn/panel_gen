@@ -41,7 +41,7 @@ class Line():
         else:                                                       # Else,
             self.term = self.pick_called_line(term_choices)         # Generate a term line randomly.
 
-        self.timer = int(round(random.gamma(4,4)))                  # Set a start timer because i said so.
+        self.timer = int(round(random.gamma(3,3)))                  # Set a start timer because i said so.
         self.ident = ident                                          # Set an integer for identity.
         self.chan = '-'                                             # Set DAHDI channel to 0 to start
         self.AstStatus = 'on_hook'

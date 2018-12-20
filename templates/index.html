@@ -1,13 +1,18 @@
 {% extends 'layout.html' %}
 {% block header %}Connections Museum{% endblock %}
 {% block content %}
-    	<form method="post" action="/">
-	<input class="button-primary" type="submit", name="command", value="Panel Start">
-	<input class="button" type="submit", name="command", value="Panel Stop">
+    		<form method="post" action="/">
+		<input class="button-primary" type="submit", name="command", value="Panel Start">
+		<input class="button" type="submit", name="command", value="Panel Stop">
 	<div>
-    	<form method="post" action="/">
-	<input class="button-primary" type="submit", name="command", value="5XB Start">
-	<input class="button" type="submit", name="command", value="5XB Stop">
+    		<form method="post" action="/">
+		<input class="button-primary" type="submit", name="command", value="5XB Start">
+		<input class="button" type="submit", name="command", value="5XB Stop">
 	</div>
+	<div>
+		<form method="post" action="/">
+		<input class="button-red" type="submit", name="command", value="Force Stop">
+	</div>
+
 {% endblock %}
 
