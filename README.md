@@ -49,7 +49,7 @@ This application requires a context in your dialplan to pass calls into. The sim
 
 Usage
 -----
-Setting up Asterisk and a channel bank is way beyond the scope of this readme so lets assume you've somehow managed to do that without losing all your marbles. It should be possible to grab the code, install the libraries, and run just <code>python panel_gen.py</code> as root, and have everything work out fine, (although you will have to edit the DAHDI group, and switch classes to suit your needs). There are command line arguments that have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them. I'll paste them here as well:
+Setting up Asterisk and a channel bank is way beyond the scope of this readme so lets assume you've somehow managed to do that without losing all your marbles. It should be possible to grab the code, install the libraries, and run just <code>python panel_gen.py</code> as user 'asterisk', and have everything work out fine, (although you will have to edit the DAHDI group, and switch classes to suit your needs). There are command line arguments that have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them. I'll paste them here as well:
 
 ```
 usage: panel_gen.py [-h] [-a lines] [-d] [-l line] [-o [switch]] [-t switch]
