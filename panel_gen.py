@@ -536,14 +536,6 @@ class ui_thread(threading.Thread):
         except Exception as e:
             print(e)
 
-    def pause(self):
-        self.paused = True
-        self.paused_flag.acquire()
-
-    def resume(self):
-        self.paused = False
-        self.paused_flag.notify()
-        self.paused_flag.release()
 
     def ui_main(self, stdscr):
 
