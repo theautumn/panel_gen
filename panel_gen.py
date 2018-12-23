@@ -259,10 +259,10 @@ class xb5():
         self.max_nxx4 = .1
         self.nxx = [722, 832, 232, 275]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
-        self.linerange = [1330,1009,1904,1435,9072,9073,1274,9485,1020,5678,5852,
-                        1003,6766,6564,9076,1026,5018,1137,9138,1165,1309,1440,9485,
-                        9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,4057,1524,
-                        1035,9070,1071]
+        self.linerange = [1330,1009,1904,1435,9072,9073,1274,1485,1020,5678,5852,
+                        1003,6766,6564,1076,1026,5018,1137,9138,1165,1309,1440,9485,
+                        9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,4057,1055,
+                        1035,1126,9267,1381,1470,9512,1663,9743,1841,1921]
 
     def newtimer(self):
         if args.v == 'light':
@@ -536,7 +536,6 @@ class ui_thread(threading.Thread):
         except Exception as e:
             print(e)
 
-
     def ui_main(self, stdscr):
 
         # Instantiate a screen, so we can play with it later.
@@ -590,10 +589,10 @@ class work_thread(threading.Thread):
             with self.paused_flag:
                 while self.paused:
                     self.paused_flag.wait()
+
             # The main loop that kicks everything into gear. 
                 for n in line:
                     n.tick()
-
                 sleep(1)
 
     def pause(self):
