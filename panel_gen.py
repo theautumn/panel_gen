@@ -10,8 +10,7 @@
 #---------------------------------------------------------------------#
 
 from time import sleep
-import os
-import sys
+from os import system
 import signal
 import subprocess
 import argparse
@@ -23,8 +22,7 @@ from tabulate import tabulate
 from numpy import random
 from pathlib import Path
 from pycall import CallFile, Call, Application, Context
-from asterisk.ami import AMIClient
-from asterisk.ami import EventListener
+from asterisk.ami import AMIClient, EventListener
 #import pudb; pu.db
 
 class Line():
@@ -41,7 +39,7 @@ class Line():
         else:                                                       # Else,
             self.term = self.pick_called_line(term_choices)         # Generate a term line randomly.
 
-        self.timer = int(round(random.gamma(3,3)))                  # Set a start timer because i said so.
+        self.timer = int(random.gamma(3,4))                         # Set a start timer because i said so.
         self.ident = ident                                          # Set an integer for identity.
         self.chan = '-'                                             # Set DAHDI channel to 0 to start
         self.AstStatus = 'on_hook'
@@ -690,8 +688,8 @@ if __name__ == "__main__":
         logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
         # Hang up and clean up spool.
-        os.system("asterisk -rx \"channel request hangup all\"")
-        os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+        system("asterisk -rx \"channel request hangup all\"")
+        system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
 
         # Log out of AMI
         client.logoff()
@@ -710,8 +708,8 @@ if __name__ == "__main__":
         logging.info("Exited due to web interface shutdown")
 
         # Hang up and clean up spool.
-        os.system("asterisk -rx \"channel request hangup all\"")
-        os.system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+        system("asterisk -rx \"channel request hangup all\"")
+        system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
 
         # Log out of AMI
         client.logoff()
