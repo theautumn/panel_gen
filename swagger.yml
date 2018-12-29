@@ -1,0 +1,79 @@
+# https://realpython.com/flask-connexion-rest-api/#getting-started
+swagger: "2.0"
+info:
+  description: This defines the API calls you can run against panel_gen
+  version: "1.0.0"
+  title: panel_gen traffic generator
+consumes:
+  - application/json
+produces:
+  - application/json
+
+basePath: /api
+
+# Paths supported by the server application
+paths:
+  /switch:
+    get:
+      operationId: switch.read
+      tags:
+        - Switch
+      summary: The switch data structure supported by panel_gen
+      description: Read switchy things
+      responses:
+        200:
+          description: Successful read switch operation
+          schema:
+            type: array
+            items:
+              properties:
+                kind:
+                  type: string
+                running:
+                  type: boolean
+                active_lines:
+                  type: integer
+                max_dialing:
+                  type: integer
+                is_dialing:
+                  type: boolean
+                dahdi_group:
+                  type: string
+                nxx:
+                  type: string
+                linerange:
+                  type: string
+
+    post:
+        operationId: switch.create
+        tags:
+          - Switch
+        summary: Create a new instance of a switch.
+        description: Can be used to instantiate a switch object.
+        parameters:
+          - name: Switch
+            in: Switch
+            description: Virtual switch to create.
+            required: True
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                running:
+                  type: boolean
+                active_lines:
+                  type: string
+                max_dialing:
+                  type: integer
+                is_dialing:
+                  type: boolean
+                dahdi_group:
+                  type: string
+                nxx:
+                  type: string
+                linerange:
+                  type: string
+        responses:
+          201:
+            description: Successfully created panel switch.
