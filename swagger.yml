@@ -63,7 +63,7 @@ paths:
                 running:
                   type: boolean
                 active_lines:
-                  type: string
+                  type: integer
                 max_dialing:
                   type: integer
                 is_dialing:
