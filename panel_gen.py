@@ -23,7 +23,9 @@ from numpy import random
 from pathlib import Path
 from pycall import CallFile, Call, Application, Context
 from asterisk.ami import AMIClient, EventListener
-#import pudb; pu.db
+from flask import Flask, render_template, redirect, request, flash
+import connexion
+
 
 class Line():
 # Main class for calling lines. Contains all the essential vitamins and minerals.
@@ -497,9 +499,12 @@ class Screen():
 
         # Print the contents of /var/log/panel_gen/calls.log
         if y > 45:
-            logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
-            stdscr.addstr(32,5,'================= Logs =================')
-            stdscr.addstr(34,0,logs)
+            try:
+                logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
+                stdscr.addstr(32,5,'================= Logs =================')
+                stdscr.addstr(34,0,logs)
+            except Exception as e:
+                pass
 
         stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
         stdscr.addstr(y-1,x-20,"Lines:",curses.A_BOLD)
@@ -525,8 +530,6 @@ class ui_thread(threading.Thread):
 
         threading.Thread.__init__(self)
         self.shutdown_flag = threading.Event()
-        self.paused = False
-        self.paused_flag = threading.Condition()
 
     def run(self):
         try:
@@ -555,7 +558,7 @@ class ui_thread(threading.Thread):
                 screen.draw(stdscr, line, y, x)
 
             except Exception as e:
-                stdscr.addstr(2, 0, str(e), curses.A_REVERSE)
+                logging.info(e)
 
         stdscr.refresh()
 
@@ -603,8 +606,43 @@ class work_thread(threading.Thread):
         self.paused_flag.release()
 
 
+class http_thread(threading.Thread):
+
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.shutdown_flag = threading.Event()
+
+        log = logging.getLogger('werkzeug')
+        log.setLevel(logging.ERROR)
+
+    def run(self):
+		app = connexion.App(__name__, specification_dir='./')
+		app.add_api('swagger.yml')
+
+		while not self.shutdown_flag.is_set():
+			try:
+				app.run(host='0.0.0.0')
+			except Exception as e:
+				logging.info(e)
+
+    def shutdown_server(self):
+        func = request.environ.get('werkzeug.server.shutdown')
+
+        if func is None:
+            raise RuntimeError('Not running with the Werkzeug Server')
+        func()
+
+	@app.route('/', methods=['GET', 'POST'])
+	def home():
+	    return render_template('home.html')
+
+	@app.route('/shutdown', methods=['POST'])
+	def shutdown():
+		shutdown_server()
+		return 'Server shutting down...'        
+
 class ServiceExit(Exception):
-    pass
+	pass
 
 class WebShutdown(Exception):
     pass
@@ -614,6 +652,7 @@ def app_shutdown(signum, frame):
 
 def web_shutdown(signum, frame):
     raise WebShutdown
+
 
 
 if __name__ == "__main__":
@@ -628,9 +667,6 @@ if __name__ == "__main__":
 
     # Parse any arguments the user gave us.
     parse_args()
-
-    if args.http == True:
-        print('Starting panel_gen in headless mode. Ctrl + C to exit')
 
     # If logfile does not exist, create it so logging can write to it.
     try:
@@ -666,13 +702,17 @@ if __name__ == "__main__":
         raise Exception(str(future.response))
 
     try:
-        if not args.http == True:
-            t = ui_thread()
-            t.daemon = True
-            t.start()
+        t = ui_thread()
+        t.daemon = True
+        t.start()
         w = work_thread()
         w.daemon = True
         w.start()
+        
+        if args.http == True:
+            h = http_thread()
+            h.daemon = True
+            h.start()
 
         while True:
             sleep(0.5)
@@ -684,6 +724,9 @@ if __name__ == "__main__":
         t.join()
         w.shutdown_flag.set()
         w.join()
+        h.shutdown_server()
+        h.shutdown_flag.set()
+        h.join()
 
         logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
@@ -716,15 +759,17 @@ if __name__ == "__main__":
 
         print("panel_gen web shutdown complete.\n")
 
-    except OSError as e:
+    except Exception as e:
         # Exception for any other errors that I'm not explicitly handling.
 
-        if not args.http == True:
-            t.shutdown_flag.set()
-            t.join()
+	t.shutdown_flag.set()
+	t.join()
         w.shutdown_flag.set()
         w.join()
+        h.shutdown_flag.set()
+	h.join()
+
 
         print("\nOS error {0}".format(e))
-        logging.error('**** OS Error ****')
-        logging.error('{0}'.format(e))
+        logging.info('**** OS Error ****')
+        logging.info('{0}'.format(e))
