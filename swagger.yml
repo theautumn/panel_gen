@@ -1,7 +1,7 @@
 # https://realpython.com/flask-connexion-rest-api/#getting-started
 swagger: "2.0"
 info:
-  description: This defines the API calls you can run against panel_gen
+  description: This defines the API for panel_gen
   version: "1.0.0"
   title: panel_gen traffic generator
 consumes:
@@ -15,11 +15,11 @@ basePath: /api
 paths:
   /switch:
     get:
-      operationId: switch.read
+      operationId: switch.read_all
       tags:
-        - Switch
-      summary: The switch data structure supported by panel_gen
-      description: Read switchy things
+        - switch
+      summary: Read all switch objects
+      description: Read all switch objects
       responses:
         200:
           description: Successful read switch operation
@@ -36,7 +36,7 @@ paths:
                 max_dialing:
                   type: integer
                 is_dialing:
-                  type: boolean
+                  type: integer 
                 dahdi_group:
                   type: string
                 nxx:
@@ -47,33 +47,128 @@ paths:
     post:
         operationId: switch.create
         tags:
-          - Switch
-        summary: Create a new instance of a switch.
-        description: Can be used to instantiate a switch object.
+          - switch
+        summary: Create a new instance of a switch
+        description: Instantiate a switch object
         parameters:
-          - name: Switch
-            in: Switch
-            description: Virtual switch to create.
+          - name: switch
+            in: body
+            description: Virtual switch to create
             required: True
             schema:
               type: object
               properties:
                 kind:
                   type: string
+                  description: Type of switch to create
                 running:
                   type: boolean
+                  description: Whether or not the switch is actively processing calls
                 active_lines:
                   type: integer
+                  description: Number of currently active lines
                 max_dialing:
                   type: integer
+                  description: Maximum number of calls that may be dialing at one time
                 is_dialing:
-                  type: boolean
+                  type: integer
+                  description: Number of lines on switch that are currently dialing
                 dahdi_group:
                   type: string
+                  description: DAHDI group to place calls on. Normally not needed
                 nxx:
                   type: string
+                  description: List of office codes we can dial from this switch 
                 linerange:
                   type: string
+                  description: Range of lines we can dial to this switch
         responses:
           201:
-            description: Successfully created panel switch.
+            description: Successfully created switch
+
+  /switch/{kind}:
+    get:
+      operationId: switch.read_one
+      tags:
+      - switch
+      summary: Read one switch from the switches list
+      description: Read one switch from the switches list
+      parameters:
+      - name: kind
+        in: path
+        description: Kind of switch to get from the list
+        type: string
+        required: True
+      responses:
+        200:
+          description: Successfully read switch from switches list operation
+          schema:
+            properties:
+              kind:
+                type: string
+              running:
+                type: boolean
+              active_lines:
+                type: integer
+              max_dialing:
+                type: integer
+              is_dialing:
+                type: integer
+              dahdi_group:
+                type: string
+              nxx:
+                type: string
+              linerange:
+                type: string
+    put:
+      operationId: switch.update
+      tags:
+        - switch
+      summary: Update a switch in the switches list
+      description: Update a switch in the switches list
+      parameters:
+        - name: kind
+          in: path
+          description: Kind of switch to update in the list
+          type: string
+          required: True
+        - name: switch
+          in: body
+          schema:
+            type: object
+            properties:
+              kind:
+                type: string
+              running:
+                type: boolean
+              active_lines:
+                type: integer
+              max_dialing:
+                type: integer
+              is_dialing:
+                type: integer
+              dahdi_group:
+                type: string
+              nxx:
+                type: string
+              linerange:
+                type: string
+      responses:
+        200:
+          description: Successfully updated switch in switches list
+
+    delete:
+      operationId: switch.delete
+      tags:
+        - switch
+      summary: Delete a switch from the switches list
+      description: Delete a switch
+      parameters:
+        - name: kind
+          in: path
+          type: string
+          required: True
+      responses:
+        200:
+          description: Successfully deleted a switch from switches list
+
