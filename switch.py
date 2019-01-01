@@ -96,8 +96,7 @@ def create(switch):
 def update(kind):
     """
     This function updates an existing switch in the switches structure
-    :param kind:   last name of switch to update in the switches structure
-    :param switch:  person to update
+    :param kind:   kind of switch to update in the switches structure
     :return:        updated switch structure
     """
     # Does the switch exist in switches?
@@ -109,7 +108,7 @@ def update(kind):
     # otherwise, nope, that's an error
     else:
         abort(
-            404, "Person with last name {kind} not found".format(kind=kind)
+            404, "Switch {kind} not found".format(kind=kind)
         )
 
 
@@ -129,5 +128,5 @@ def delete(kind):
     # Otherwise, nope, switch to delete not found
     else:
         abort(
-            404, "Person with last name {kind} not found".format(kind=kind)
+            404, "Switch {kind} not found".format(kind=kind)
         )

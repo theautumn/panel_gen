@@ -18,14 +18,12 @@ import logging
 import curses
 import re
 import threading
+import json
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
 from pycall import CallFile, Call, Application, Context
 from asterisk.ami import AMIClient, EventListener
-from flask import Flask, render_template, redirect, request, flash
-import connexion
-
 
 class Line():
 # Main class for calling lines. Contains all the essential vitamins and minerals.
@@ -44,7 +42,7 @@ class Line():
         self.timer = int(random.gamma(3,4))                         # Set a start timer because i said so.
         self.ident = ident                                          # Set an integer for identity.
         self.chan = '-'                                             # Set DAHDI channel to 0 to start
-        self.AstStatus = 'on_hook'
+        self.ast_status = 'on_hook'
 
     def set_timer(self):
         self.timer = switch.newtimer
@@ -55,7 +53,7 @@ class Line():
         # At 0, we're going to check a few things. First, status. If line is on hook "0",
         # and if we haven't maxed out the senders, then call and set the status of the line to "1".
         # If we have more dialing than we have sender capacity, then we reset the timer to
-        # a "reasonable number of seconds" and try again. 
+        # a "reasonable number of seconds" and try again.
         # If self.status is "1", we simply call hangup(), which takes care of the cleanup.
 
         self.timer -= 1
@@ -123,7 +121,7 @@ class Line():
 
         # Make the .call file amd throw it into the asterisk spool.
         # Pass control of the call to the sarah_callsim context in
-        # the dialplan. This will allow me to better interact with 
+        # the dialplan. This will allow me to better interact with
         # Asterisk from here.
         c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term, variables=vars)
         con = Context('sarah_callsim','s','1')
@@ -135,16 +133,16 @@ class Line():
         # Asterisk manages the actual hangup of the call, but we need to make sure the program
         # flow is on track with whats happening out in the world. We check if a call
         # is being dialed when hangup() is called. If so, we need to decrement the dialing counter.
-        # Then, set status, chan, and AstStatus back to normal values, set a new timer, and
+        # Then, set status, chan, and ast_status back to normal values, set a new timer, and
         # set the next called line.
 
-        if self.AstStatus == 'Dialing':
+        if self.ast_status == 'Dialing':
             logging.info('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
         logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0                                         # Set the status of this call to 0.
         self.chan = '-'
-        self.AstStatus = 'on_hook'
+        self.ast_status = 'on_hook'
 
         if args.d:                                              # Are we in deterministic mode?
             if args.w:                                          # args.w is wait time between calls
@@ -158,6 +156,13 @@ class Line():
             self.term = args.l                                  # Set term line to user specified
         else:                                                   # Else,
             self.term = self.pick_called_line(term_choices)       # Pick a new terminating line.
+
+
+    def get_line(self, key):
+        # Returns properties of specified line. Used by API.
+        n = int(key)
+        line_data = [line[n].kind]
+        return line_data
 
 
 # <----- END LINE CLASS THINGS -----> #
@@ -291,7 +296,7 @@ def on_DialBegin(event, **kwargs):
     # Also increments the is_dialing counter.
 
     # The regex match for DialString relies on the dialplan having at least
-    # one 'w' (wait) in it to wait before dialing. If you change that, the 
+    # one 'w' (wait) in it to wait before dialing. If you change that, the
     # regex will break. Normally, we should always wait before dialing.
 
     output = str(event)
@@ -304,10 +309,10 @@ def on_DialBegin(event, **kwargs):
     #logging.info('%s', DestChannel)
 
     for n in line:
-        if DialString[0] == str(n.term) and n.AstStatus == 'on_hook':
+        if DialString[0] == str(n.term) and n.ast_status == 'on_hook':
             # logging.info('DialString match %s and %s', DialString[0], str(n.term))
             n.chan = DB_DestChannel[0]
-            n.AstStatus = 'Dialing'
+            n.ast_status = 'Dialing'
             n.switch.is_dialing += 1
             logging.info('Calling %s on DAHDI/%s from %s', n.term, n.chan, n.switch.kind)
 
@@ -320,8 +325,8 @@ def on_DialEnd(event, **kwargs):
     DE_DestChannel = DE_DestChannel.findall(output)
 
     for n in line:
-        if DE_DestChannel[0] == str(n.chan) and n.AstStatus == 'Dialing':
-            n.AstStatus = 'Ringing'
+        if DE_DestChannel[0] == str(n.chan) and n.ast_status == 'Dialing':
+            n.ast_status = 'Ringing'
             n.switch.is_dialing -= 1
             # logging.info('on_DialEnd with %s calls dialing', n.switch.is_dialing)
 
@@ -335,7 +340,7 @@ def parse_args():
             help='Maximum number of active lines.')
     parser.add_argument('-d', action='store_true',
             help='Deterministic mode. Eliminate timing randomness. Places one call at a time. Ignores -a and -v options entirely. Use with -l.')
-    parser.add_argument('-l', metavar='line', type=int, 
+    parser.add_argument('-l', metavar='line', type=int,
             help='Call only a particular line. Can be used with the -d option for placing test calls to a number over and over again.')
     parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],
             choices=['1xb','5xb','panel','all','722', '832', '232'],
@@ -394,7 +399,7 @@ class Screen():
     def __init__(self, stdscr):
         # For some reason when we init curses using wrapper(), we have to tell it
         # to use terminal default colors, otherwise the display gets wonky.
-        
+
         curses.use_default_colors()
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
         curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
@@ -403,7 +408,7 @@ class Screen():
 
     def getkey(self, stdscr):
         #Handles user input.
-        
+
         key = stdscr.getch()
 
         if key == ord(' '):
@@ -433,16 +438,16 @@ class Screen():
 
     def is_resized(self, stdscr, y, x):
         # This gets called if the screen is resized. Makes it happy so exceptions don't get thrown.
-        
+
         stdscr.clear()
         curses.resizeterm(y, x)
         stdscr.refresh()
 
     def pausedscreen(self, stdscr):
         # Draw the PAUSED notification when execution is paused.
-        # Just as importantly, pause the worker thread. Control goes back to 
+        # Just as importantly, pause the worker thread. Control goes back to
         # getkey(), which waits for another <spacebar> then resumes.
-        
+
         y, x = stdscr.getmaxyx()
         half_cols = x/2
         rows_size = 5
@@ -459,9 +464,9 @@ class Screen():
         w.pause()
 
     def helpscreen(self, stdscr):
-        # Draw the help screen when 'h' is pressed. Then, control goes back to 
+        # Draw the help screen when 'h' is pressed. Then, control goes back to
         # getkey(), which waits for any key, and goes back to drawing the UI.
-    
+
         y, x = stdscr.getmaxyx()
         half_cols = x/2
         rows_size = 20
@@ -481,14 +486,14 @@ class Screen():
 
     def draw(self, stdscr, line, y, x):
         # Output handling. make pretty things.
-        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.AstStatus] for n in line]
+        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.ast_status] for n in line]
         stdscr.erase()
-        stdscr.addstr(0,5," __________________________________________") 
+        stdscr.addstr(0,5," __________________________________________")
         stdscr.addstr(1,5,"|                                          |")
         stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
         stdscr.addstr(3,5,"|__________________________________________|")
         stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk"],
-        tablefmt="pipe", stralign = "right" )) 
+        tablefmt="pipe", stralign = "right" ))
 
         # Print asterisk channels below the table so we can see what its actually doing.
         if not args.http == True:
@@ -522,7 +527,7 @@ class Screen():
 class ui_thread(threading.Thread):
     # The UI thread! Besides handling pause and resume, this also
     # sets up a screen, and calls various things in Screen() to
-    # help with drawing. Note: This thread does not start if 
+    # help with drawing. Note: This thread does not start if
     # panel_gen is run with the --http option. No UI necessary
     # in headless mode.
 
@@ -565,7 +570,7 @@ class ui_thread(threading.Thread):
 
 class work_thread(threading.Thread):
     # Does all the work! Can be paused and resumed. Handles all of
-    # the exciting things, but most important is calling tick() 
+    # the exciting things, but most important is calling tick()
     # once per second. This evaluates the timers and makes call processing
     # decisions.
 
@@ -591,7 +596,7 @@ class work_thread(threading.Thread):
                 while self.paused:
                     self.paused_flag.wait()
 
-            # The main loop that kicks everything into gear. 
+            # The main loop that kicks everything into gear.
                 for n in line:
                     n.tick()
                 sleep(1)
@@ -606,41 +611,6 @@ class work_thread(threading.Thread):
         self.paused_flag.release()
 
 
-class http_thread(threading.Thread):
-
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.shutdown_flag = threading.Event()
-
-        log = logging.getLogger('werkzeug')
-        log.setLevel(logging.ERROR)
-
-    def run(self):
-		app = connexion.App(__name__, specification_dir='./')
-		app.add_api('swagger.yml')
-
-		while not self.shutdown_flag.is_set():
-			try:
-				app.run(host='0.0.0.0')
-			except Exception as e:
-				logging.info(e)
-
-    def shutdown_server(self):
-        func = request.environ.get('werkzeug.server.shutdown')
-
-        if func is None:
-            raise RuntimeError('Not running with the Werkzeug Server')
-        func()
-
-	@app.route('/', methods=['GET', 'POST'])
-	def home():
-	    return render_template('home.html')
-
-	@app.route('/shutdown', methods=['POST'])
-	def shutdown():
-		shutdown_server()
-		return 'Server shutting down...'        
-
 class ServiceExit(Exception):
 	pass
 
@@ -654,15 +624,14 @@ def web_shutdown(signum, frame):
     raise WebShutdown
 
 
-
 if __name__ == "__main__":
-    # Init a bunch of things at runtime.
+    # Init a bunch of things if we're running as a standalone app.
 
     # Set up signal handlers so we can shutdown cleanly later.
     signal.signal(signal.SIGTERM, app_shutdown)
     signal.signal(signal.SIGINT, app_shutdown)
     signal.signal(signal.SIGALRM, web_shutdown)
-    
+
     paused = None
 
     # Parse any arguments the user gave us.
@@ -671,7 +640,7 @@ if __name__ == "__main__":
     # If logfile does not exist, create it so logging can write to it.
     try:
         with open('/var/log/panel_gen/calls.log', 'a') as file:
-            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', 
+            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
             filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
     except IOError:
         with open('/var/log/panel_gen/calls.log', 'w') as file:
@@ -708,25 +677,25 @@ if __name__ == "__main__":
         w = work_thread()
         w.daemon = True
         w.start()
-        
-        if args.http == True:
-            h = http_thread()
-            h.daemon = True
-            h.start()
+
+#        if args.http == True:
+#            h = http_thread()
+#            h.daemon = True
+#            h.start()
 
         while True:
             sleep(0.5)
 
     except (KeyboardInterrupt, ServiceExit):
-    # Exception handler for console-based shutdown. 
+    # Exception handler for console-based shutdown.
 
         t.shutdown_flag.set()
         t.join()
         w.shutdown_flag.set()
         w.join()
-        h.shutdown_server()
-        h.shutdown_flag.set()
-        h.join()
+#        h.shutdown_server()
+#        h.shutdown_flag.set()
+#        h.join()
 
         logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
@@ -743,7 +712,7 @@ if __name__ == "__main__":
     except WebShutdown:
         # Exception handler for http-server shutdown. The http-server
         # passes SIGALRM, which calls web_shutdown and eventually
-        # leads us here. 
+        # leads us here.
 
         w.shutdown_flag.set()
         w.join()
@@ -773,3 +742,26 @@ if __name__ == "__main__":
         print("\nOS error {0}".format(e))
         logging.info('**** OS Error ****')
         logging.info('{0}'.format(e))
+
+
+# Here is where we actually make the lines.
+args = parse_args()
+
+# Connect to AMI
+client = AMIClient(address='127.0.0.1',port=5038)
+future = client.login(username='panel_gen',secret='t431434')
+if future.response.is_error():
+    raise Exception(str(future.response))
+
+Rainier = panel()
+Adams = xb5()
+Lakeview = xb1()
+Step = step()
+
+line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+
+w = work_thread()
+w.daemon = True
+w.start()
+sleep(.5)
+

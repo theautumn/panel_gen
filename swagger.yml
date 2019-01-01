@@ -172,3 +172,153 @@ paths:
         200:
           description: Successfully deleted a switch from switches list
 
+  /line:
+    get:
+      operationId: line.read_all
+      tags:
+        - line
+      summary: Read all line objects
+      description: Read all line objects
+      responses:
+        200:
+          description: Successful read line operation
+          schema:
+            type: array
+            items:
+              properties:
+                switch:
+                  type: string
+                timer:
+                  type: integer
+                hook_state:
+                  type: integer
+                ast_status:
+                  type: string
+                is_dialing:
+                  type: boolean
+                dahdi_chan:
+                  type: integer 
+                calling_no:
+                  type: string
+
+    post:
+        operationId: line.create
+        tags:
+          - line
+        summary: Create a new instance of a line
+        description: Instantiate a line object
+        parameters:
+          - name: line
+            in: body
+            description: Virtual linee to create
+            required: True
+            schema:
+              type: object
+              properties:
+                switch:
+                  type: string
+                  description: Switch this line will call from
+                timer:
+                  type: integer
+                  description: Number of seconds remaining until next action
+                hook_state:
+                  type: integer
+                  description: 0 = On hook / 1 = Off hook
+                ast_status:
+                  type: string
+                  description: Status of the line in Asterisk
+                is_dialing:
+                  type: boolean
+                  description: Whether or not the line is currently holding a sender
+                dahdi_chan:
+                  type: integer
+                  description: DAHDI channel the line belongs to
+                calling_no:
+                  type: string
+                  description: Number the line will call
+        responses:
+          201:
+            description: Successfully created line
+
+  /line/{key}:
+    get:
+      operationId: line.read_one
+      tags:
+      - line
+      summary: Read one line from the lines list
+      description: Read one line from the lines list
+      parameters:
+      - name: key
+        in: path
+        description: Key of line to get from the list
+        type: string
+        required: True
+      responses:
+        200:
+          description: Successfully read line from lines list operation
+          schema:
+            properties:
+              switch:
+                type: string
+              timer:
+                type: integer
+              hook_state:
+                type: integer
+              ast_status:
+                type: string
+              is_dialing:
+                type: boolean
+              dahdi_chan:
+                type: integer
+              calling_no:
+                type: string
+    put:
+      operationId: line.update
+      tags:
+        - line
+      summary: Update a line in the lines list
+      description: Update a line in the lines list
+      parameters:
+        - name: key
+          in: path
+          description: Key of line to update in the list
+          type: string
+          required: True
+        - name: line
+          in: body
+          schema:
+            type: object
+            properties:
+              switch:
+                type: string
+              timer:
+                type: integer
+              hook_state:
+                type: integer
+              ast_status:
+                type: string
+              is_dialing:
+                type: boolean
+              dahdi_chan:
+                type: integer
+              calling_no:
+                type: string
+      responses:
+        200:
+          description: Successfully updated line in lines list
+
+    delete:
+      operationId: line.delete
+      tags:
+        - line
+      summary: Delete a line from the lines list
+      description: Delete a line
+      parameters:
+        - name: key
+          in: path
+          type: string
+          required: True
+      responses:
+        200:
+          description: Successfully deleted a line from lines list
+
