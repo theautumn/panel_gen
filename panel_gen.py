@@ -18,7 +18,8 @@ import logging
 import curses
 import re
 import threading
-import json
+#import json
+from marshmallow import Schema, fields
 from tabulate import tabulate
 from numpy import random
 from pathlib import Path
@@ -43,6 +44,9 @@ class Line():
         self.ident = ident                                          # Set an integer for identity.
         self.chan = '-'                                             # Set DAHDI channel to 0 to start
         self.ast_status = 'on_hook'
+
+    def __repr__(self):
+        return '<Line(name={self.ident!r})>'.format(self=self)
 
     def set_timer(self):
         self.timer = switch.newtimer
@@ -84,13 +88,13 @@ class Line():
         # Whenever possible, these values should be defined in the switch class, and pulled from there.
         # This makes it so we can change these values more easily.
         if term_office == 722 or term_office == 365:
-            term_station = random.randint(Rainier.linerange[0], Rainier.linerange[1])
+            term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
         elif term_office == 832:
-            term_station = "%04d" % random.choice(Lakeview.linerange)
+            term_station = "%04d" % random.choice(Lakeview.line_range)
         elif term_office == 232:
-            term_station = random.choice(Adams.linerange)
+            term_station = random.choice(Adams.line_range)
         elif term_office == 275:
-            term_station = random.randint(Step.linerange[0], Step.linerange[1])
+            term_station = random.randint(Step.line_range[0], Step.line_range[1])
         else:
             logging.error("No terminating line available for this office. Did you forget to add it to PickCalledLine?")
             assert False
@@ -158,13 +162,6 @@ class Line():
             self.term = self.pick_called_line(term_choices)       # Pick a new terminating line.
 
 
-    def get_line(self, key):
-        # Returns properties of specified line. Used by API.
-        n = int(key)
-        line_data = [line[n].kind]
-        return line_data
-
-
 # <----- END LINE CLASS THINGS -----> #
 
 # <----- BEGIN SWITCH CLASSES ------> #
@@ -193,7 +190,7 @@ class panel():
         self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
         self.nxx = [722, 365, 232]                              # Office codes that can be dialed.
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.linerange = [5000,5999]                            # Range of lines that can be chosen.
+        self.line_range = [5000,5999]                            # Range of lines that can be chosen.
 
     def newtimer(self):
         if args.v == 'light':
@@ -228,7 +225,7 @@ class xb1():
         self.max_nxx4 = 0
         self.nxx = [722, 832, 232]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.linerange = [105,107,108,109,110,111,112,113,114]
+        self.line_range = [105,107,108,109,110,111,112,113,114]
 
     def newtimer(self):
         if args.v == 'light':
@@ -264,7 +261,7 @@ class xb5():
         self.max_nxx4 = .1
         self.nxx = [722, 832, 232, 275]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
-        self.linerange = [1330,1009,1904,1435,9072,9073,1274,1485,1020,5678,5852,
+        self.line_range = [1330,1009,1904,1435,9072,9073,1274,1485,1020,5678,5852,
                         1003,6766,6564,1076,1026,5018,1137,9138,1165,1309,1440,9485,
                         9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,4057,1055,
                         1035,1126,9267,1381,1470,9512,1663,9743,1841,1921]
@@ -284,7 +281,7 @@ class step():
 
     def __init__(self):
         self.kind = "Step"
-        self.linerange = [4124,4199]
+        self.line_range = [4124,4199]
 
 
 # <----- BEGIN BOOKKEEPING STUFF -----> #
@@ -391,6 +388,55 @@ def parse_args():
             term_choices.append(365)
 
     return args
+
+class LineSchema(Schema):
+    ident  = fields.Integer()
+    kind = fields.Str()
+    timer = fields.Integer()
+    status = fields.Boolean()
+    ast_status = fields.Str()
+    chan = fields.Str()
+    term = fields.Str()
+
+class SwitchSchema(Schema):
+	kind = fields.Str()
+	max_dialing = fields.Integer()
+	is_dialing = fields.Integer()
+	max_calls = fields.Integer()
+	dahdi_group = fields.Str()
+	nxx = fields.Str()
+	trunk_load = fields.Dict()
+	line_range = fields.Dict()
+
+def get_switch(kind):
+	schema = SwitchSchema()
+	
+	if switch.kind == kind:
+		result = schema.dump(switch)
+		return result
+
+def get_line(key):
+    n = int(key)
+    schema = LineSchema()
+    result = schema.dump(line[n])
+    return result
+
+def get_all_lines():
+	schema = LineSchema()
+	for n in line:
+		result = schema.dump(line[n])
+		return result
+
+def create_switch(kind):
+	if kind == 'panel':
+		orig_switch.append(panel())
+	elif kind == '5xb':
+		orig_switch.append(xb5())
+	elif kind == '1xb':
+		orig_switch.append(xb1())
+	else:
+		print(nope)
+
 
 
 class Screen():
@@ -744,7 +790,9 @@ if __name__ == "__main__":
         logging.info('{0}'.format(e))
 
 
-# Here is where we actually make the lines.
+# The below gets run if this code is imported as a module.
+# It skips lots of setup steps.
+
 args = parse_args()
 
 # Connect to AMI

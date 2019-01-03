@@ -1,4 +1,5 @@
 from flask import make_response, abort
+import panel_gen
 
 # Data to serve with our API
 SWITCHES = {
@@ -43,18 +44,20 @@ def read_one(kind):
     :param kind:   kind of switch to find
     :return:        switch matching kind
     """
-    # Does the switch exist in switches?
-    if kind in SWITCHES:
-        switch = SWITCHES.get(kind)
+
+    return panel_gen.get_switch(kind)
+
+# Doese the switch exist in switches?
+#    if kind in SWITCHES:
+#        switch = SWITCHES.get(kind)
 
     # otherwise, nope, not found
-    else:
-        abort(
-            404, "Switch of type {kind} not found".format(kind=kind)
-        )
-    return switch
+#    else:
+#        abort(
+#            404, "Switch of type {kind} not found".format(kind=kind)
+#        )
 
-def create(switch):
+def create(kind):
     """
     This function creates a new switch in the switches structure
     based on the passed in switch data

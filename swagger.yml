@@ -31,7 +31,7 @@ paths:
                   type: string
                 running:
                   type: boolean
-                active_lines:
+                max_calls:
                   type: integer
                 max_dialing:
                   type: integer
@@ -41,7 +41,7 @@ paths:
                   type: string
                 nxx:
                   type: string
-                linerange:
+                line_range:
                   type: string
 
     post:
@@ -56,7 +56,7 @@ paths:
             description: Virtual switch to create
             required: True
             schema:
-              type: object
+              type: array
               properties:
                 kind:
                   type: string
@@ -64,7 +64,7 @@ paths:
                 running:
                   type: boolean
                   description: Whether or not the switch is actively processing calls
-                active_lines:
+                max_calls:
                   type: integer
                   description: Number of currently active lines
                 max_dialing:
@@ -79,7 +79,7 @@ paths:
                 nxx:
                   type: string
                   description: List of office codes we can dial from this switch 
-                linerange:
+                line_range:
                   type: string
                   description: Range of lines we can dial to this switch
         responses:
@@ -108,7 +108,7 @@ paths:
                 type: string
               running:
                 type: boolean
-              active_lines:
+              max_calls:
                 type: integer
               max_dialing:
                 type: integer
@@ -118,7 +118,7 @@ paths:
                 type: string
               nxx:
                 type: string
-              linerange:
+              line_range:
                 type: string
     put:
       operationId: switch.update
@@ -141,7 +141,7 @@ paths:
                 type: string
               running:
                 type: boolean
-              active_lines:
+              max_calls:
                 type: integer
               max_dialing:
                 type: integer
@@ -151,7 +151,7 @@ paths:
                 type: string
               nxx:
                 type: string
-              linerange:
+              line_range:
                 type: string
       responses:
         200:
@@ -194,8 +194,6 @@ paths:
                   type: integer
                 ast_status:
                   type: string
-                is_dialing:
-                  type: boolean
                 dahdi_chan:
                   type: integer 
                 calling_no:
