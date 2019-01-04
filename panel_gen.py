@@ -67,7 +67,7 @@ class Line():
                     self.status = 1
                 else:
                     self.timer = int(round(random.gamma(5,5)))
-                    logging.info("Exceeded sender limit: %s with %s calls dialing. Delaying call.", 
+                    logging.info("Exceeded sender limit: %s with %s calls dialing. Delaying call.",
 			self.switch.max_dialing, self.switch.is_dialing)
             elif self.status == 1:
                 self.hangup()
@@ -193,9 +193,12 @@ class panel():
         self.max_nxx3 = .2                              # Load for office 3 in self.trunk_load
         self.max_nxx4 = 0                               # Load for office 4 in self.trunk_load
         self.nxx = [722, 365, 232]                      # Office codes that can be dialed.
-        self.trunk_load = [self.max_nxx1, 
+        self.trunk_load = [self.max_nxx1,
             self.max_nxx2, self.max_nxx3]
         self.line_range = [5000,5999]                   # Range of lines that can be chosen.
+
+    def __repr__(self):
+        return '<panel(name={self.kind!r})>'.format(self=self)
 
     def newtimer(self):
         if args.v == 'light':
@@ -205,6 +208,11 @@ class panel():
         else:
             t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
+
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            print("{} is {}".format(key,value))
+
 
 class xb1():
     # This class is for the No. 1 Crossbar.
@@ -231,6 +239,9 @@ class xb1():
         self.nxx = [722, 832, 232]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
         self.line_range = [105,107,108,109,110,111,112,113,114]
+
+    def __repr__(self):
+        return '<xb1(name={self.kind!r})>'.format(self=self)
 
     def newtimer(self):
         if args.v == 'light':
@@ -270,6 +281,9 @@ class xb5():
                         1003,6766,6564,1076,1026,5018,1137,9138,1165,1309,1440,9485,
                         9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,4057,1055,
                         1035,1126,9267,1381,1470,9512,1663,9743,1841,1921]
+
+    def __repr__(self):
+        return '<xb5(name={self.kind!r})>'.format(self=self)
 
     def newtimer(self):
         if args.v == 'light':
@@ -432,15 +446,15 @@ class LineSchema(Schema):
     term = fields.Str()
 
 class SwitchSchema(Schema):
-	kind = fields.Str()
-	max_dialing = fields.Integer()
-	is_dialing = fields.Integer()
-	max_calls = fields.Integer()
-	dahdi_group = fields.Str()
-	nxx = fields.Str()
-	trunk_load = fields.Dict()
-	line_range = fields.Dict()
-        running = fields.Boolean()
+    kind = fields.Str()
+    max_dialing = fields.Integer()
+    is_dialing = fields.Integer()
+    max_calls = fields.Integer()
+    dahdi_group = fields.Str()
+    nxx = fields.Str()
+    trunk_load = fields.Dict()
+    line_range = fields.Dict()
+    running = fields.Boolean()
 
 def get_line(key):
     n = int(key)
@@ -464,9 +478,8 @@ def get_switch(kind):
 
     if result == []:
         return False
-    else:     
+    else:
         return result
-
 
 def get_all_switches():
     schema = SwitchSchema()
@@ -487,6 +500,21 @@ def create_switch(kind):
         return True
     else:
         return False
+
+def update_switch(**kwargs):
+    schema = SwitchSchema()
+
+    switch_type = kwargs.get("kind", "")
+    print switch_type
+    for i, o in enumerate(orig_switch):
+        if o.kind == switch_type:
+            print("We have a match!")
+        else:
+            print("NO MATCH")
+#            for key, value in kwargs.iteritems():
+                #print("{0} = {1}".format(key, value))
+#	result = schema.load(key, value)
+#	Rainier.update(result)
 
 def delete_switch(kind):
     for i, o in enumerate(orig_switch):

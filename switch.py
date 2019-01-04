@@ -46,21 +46,17 @@ def create(kind):
     else:
         abort(406,"Switch of kind {kind} was not created".format(kind=kind),)
 
-def update(kind):
-    """
-    This function updates an existing switch in the switches structure
-    :param kind:   kind of switch to update in the switches structure
-    :return:        updated switch structure
-    """
+def update(**kwargs):
+#    """
+#    This function updates an existing switch in the switches structure
+#    :param kind:   kind of switch to update in the switches structure
+#    :return:        updated switch structure
+#    """
     # Does the switch exist in switches?
-    if kind in SWITCHES:
-        SWITCHES[kind]["kind"] = SWITCHES.get("kind")
-
-        return SWITCHES[kind]
-
+    panel_gen.update_switch(**kwargs)
     # otherwise, nope, that's an error
-    else:
-        abort(404, "Switch {kind} not found".format(kind=kind))
+    #else:
+    #    abort(404, "Switch {kind} not found".format(kind=kind))
 
 def delete(kind):
 #    """

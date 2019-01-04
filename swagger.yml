@@ -121,7 +121,7 @@ paths:
           201:
             description: Successfully created switch
 
-    put:
+    patch:
       operationId: switch.update
       tags:
         - switch
@@ -138,8 +138,6 @@ paths:
           schema:
             type: object
             properties:
-              kind:
-                type: string
               running:
                 type: boolean
               max_calls:
