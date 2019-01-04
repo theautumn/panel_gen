@@ -408,14 +408,6 @@ class SwitchSchema(Schema):
 	trunk_load = fields.Dict()
 	line_range = fields.Dict()
 
-def get_switch(kind):
-    schema = SwitchSchema()
-    
-    for n in orig_switch:
-        if kind == n.kind:
-            result = schema.dump(n)
-            return result
-
 def get_line(key):
     n = int(key)
     schema = LineSchema()
@@ -424,19 +416,35 @@ def get_line(key):
 
 def get_all_lines():
     schema = LineSchema()
+    result = []
     for n in line:
-        result = schema.dump(line[n])
-        return result
+        result.append(schema.dump(n))
+    return result
+
+def get_switch(kind):
+    schema = SwitchSchema()
+    
+    for n in orig_switch:
+        if kind == n.kind:
+            result = schema.dump(n)
+            return result
+        else:
+            return False
+
+def get_all_switches():
+    schema = SwitchSchema()
+    result = []
+    for n in orig_switch:
+        result.append(schema.dump(n))
+    return result
 
 def create_switch(kind):
     schema = SwitchSchema
-    print kind
     if kind == 'panel':
         orig_switch.append(panel())
         return True
     elif kind == '5xb':
         orig_switch.append(xb5())
-        print orig_switch[1].kind
         return True
     elif kind == '1xb':
         orig_switch.append(xb1())

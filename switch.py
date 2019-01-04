@@ -45,17 +45,11 @@ def read_one(kind):
     :return:        switch matching kind
     """
 
-    return panel_gen.get_switch(kind)
-
-# Doese the switch exist in switches?
-#    if kind in SWITCHES:
-#        switch = SWITCHES.get(kind)
-
-    # otherwise, nope, not found
-#    else:
-#        abort(
-#            404, "Switch of type {kind} not found".format(kind=kind)
-#        )
+    result = panel_gen.get_switch(kind)
+    if result == False:
+        abort(404, "Switch of type {kind} not found".format(kind=kind))
+    else:
+        return result
 
 def create(kind):
     """
