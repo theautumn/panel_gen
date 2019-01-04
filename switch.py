@@ -1,31 +1,6 @@
 from flask import make_response, abort
 import panel_gen
 
-# Data to serve with our API
-SWITCHES = {
-    "panel": {
-        "kind": "panel",
-	"running": True,
-        "active_lines": 4,
-	"max_dialing": 6,
-        "is_dialing": 0,
-        "dahdi_group": "r6",
-        "nxx": "722, 365, 232",
-        "linerange": "5000, 5999",
-    },
-
-    "5xb": {
-        "kind": "5xb",
-	"running": True,
-        "active_lines": 8,
-	"max_dialing": 7,
-        "is_dialing": 0,
-        "dahdi_group": "r11",
-        "nxx": "722, 832, 232",
-        "linerange": "5000, 5999",
-    },
-}
-
 # Create a handler for our read (GET) switch
 def read_all():
     """
@@ -34,8 +9,12 @@ def read_all():
 
     :return:        sorted list of switches
     """
-    # Create the list of switches rom our data
-    return [SWITCHES[key] for key in sorted(SWITCHES.keys())]
+    result = panel_gen.get_all_switches()
+    
+    if result == False:
+        abort(404, "No switches found tho")
+    else:
+        return result
 
 def read_one(kind):
     """
@@ -46,6 +25,7 @@ def read_one(kind):
     """
 
     result = panel_gen.get_switch(kind)
+
     if result == False:
         abort(404, "Switch of type {kind} not found".format(kind=kind))
     else:
@@ -55,12 +35,12 @@ def create(kind):
     """
     This function creates a new switch in the switches structure
     based on the passed in switch data
-    :param switch:  person to create in switches structure
+    :param switch:  switch to create in switches structure
     :return:        201 on success, 406 on switch exists
     """
-#    kind = switch.get("kind", None)
 
     result = panel_gen.create_switch(kind)
+
     if result == True:
         return make_response("{kind} successfully created".format(kind=kind), 201)
     else:
@@ -92,14 +72,14 @@ def delete(kind):
     :return:        200 on successful delete, 404 if not found
     """
     # Does the switch to delete exist?
-    if kind in SWITCHES:
-        del SWITCHES[kind]
-        return make_response(
-            "{kind} successfully deleted".format(kind=kind), 200
-        )
-
-    # Otherwise, nope, switch to delete not found
-    else:
-        abort(
-            404, "Switch {kind} not found".format(kind=kind)
-        )
+    for n in panel_gen.orig_switch:
+	if kind == n.kind:
+	    result = panel_gen.delete_switch(kind)
+	    return make_response(
+		"{kind} successfully deleted".format(kind=kind), 200
+	    )
+	# Otherwise, nope, switch to delete not found
+	else:
+	    abort(
+		404, "Switch {kind} not found".format(kind=kind)
+	    )

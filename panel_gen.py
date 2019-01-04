@@ -423,13 +423,16 @@ def get_all_lines():
 
 def get_switch(kind):
     schema = SwitchSchema()
-    
+    result = []
     for n in orig_switch:
         if kind == n.kind:
-            result = schema.dump(n)
-            return result
-        else:
-            return False
+            result.append(schema.dump(n))
+
+    if result == []:
+        return False
+    else:     
+        return result
+
 
 def get_all_switches():
     schema = SwitchSchema()
@@ -452,7 +455,20 @@ def create_switch(kind):
     else:
         return False
 
+def delete_switch(kind):
+    schema = SwitchSchema
 
+    if kind == 'panel':
+        orig_switch.remove(panel())
+        return True
+    elif kind == '5xb':
+        orig_switch.remove(xb5())
+        return True
+    elif kind == '1xb':
+        orig_switch.remove(xb1())
+        return True
+    else:
+        return False
 
 class Screen():
     # Draw the screen, get user input.
