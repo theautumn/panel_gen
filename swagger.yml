@@ -44,48 +44,6 @@ paths:
                 line_range:
                   type: string
 
-    post:
-        operationId: switch.create
-        tags:
-          - switch
-        summary: Create a new instance of a switch
-        description: Instantiate a switch object
-        parameters:
-          - name: switch
-            in: body
-            description: Virtual switch to create
-            required: True
-            schema:
-              type: array
-              properties:
-                kind:
-                  type: string
-                  description: Type of switch to create
-                running:
-                  type: boolean
-                  description: Whether or not the switch is actively processing calls
-                max_calls:
-                  type: integer
-                  description: Number of currently active lines
-                max_dialing:
-                  type: integer
-                  description: Maximum number of calls that may be dialing at one time
-                is_dialing:
-                  type: integer
-                  description: Number of lines on switch that are currently dialing
-                dahdi_group:
-                  type: string
-                  description: DAHDI group to place calls on. Normally not needed
-                nxx:
-                  type: string
-                  description: List of office codes we can dial from this switch 
-                line_range:
-                  type: string
-                  description: Range of lines we can dial to this switch
-        responses:
-          201:
-            description: Successfully created switch
-
   /switch/{kind}:
     get:
       operationId: switch.read_one
@@ -120,6 +78,49 @@ paths:
                 type: string
               line_range:
                 type: string
+    post:
+        operationId: switch.create
+        tags:
+          - switch
+        summary: Create a new instance of a switch
+        description: Instantiate a switch object
+        parameters:
+          - name: kind
+            in: path
+            description: Virtual switch to create
+            type: string
+            required: True
+#            schema:
+#              type: array
+#              properties:
+#                kind:
+#                  type: string
+#                  description: Type of switch to create
+#                 running:
+#                 type: boolean
+#                 description: Whether or not the switch is actively processing calls
+#               max_calls:
+#                  type: integer
+#                  description: Number of currently active lines
+#                max_dialing:
+#                  type: integer
+#                  description: Maximum number of calls that may be dialing at one time
+#                is_dialing:
+#                  type: integer
+#                  description: Number of lines on switch that are currently dialing
+#                dahdi_group:
+#                  type: string
+#                  description: DAHDI group to place calls on. Normally not needed
+#                nxx:
+#                  type: string
+#                  description: List of office codes we can dial from this switch 
+#                line_range:
+#                  type: string
+#                  description: Range of lines we can dial to this switch
+        responses:
+          201:
+            description: Successfully created switch
+
     put:
       operationId: switch.update
       tags:

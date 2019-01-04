@@ -64,37 +64,13 @@ def create(kind):
     :param switch:  person to create in switches structure
     :return:        201 on success, 406 on switch exists
     """
-    kind = switch.get("kind", None)
-    running = switch.get("running", None)
-    active_lines = switch.get("active_lines", None)
-    max_dialing = switch.get("max_dialing", None)
-    is_dialing = switch.get("is_dialing", None)
-    dahdi_group = switch.get("dahdi_group", None)
-    nxx = switch.get("nxx", None)
-    linerange = switch.get("linerange", None)
+#    kind = switch.get("kind", None)
 
-    # Does the switch exist already?
-    if kind not in SWITCHES and kind is not None:
-        SWITCHES[kind] = {
-            "kind": kind,
-            "running": running,
-            "active_lines": active_lines,
-            "max_dialing": max_dialing,
-            "is_dialing": is_dialing,
-            "dahdi_group": dahdi_group,
-            "nxx": nxx,
-            "linerange": linerange,
-        }
-        return make_response(
-            "{kind} successfully created".format(kind=kind), 201
-        )
-
-    # Otherwise, they exist, that's an error
+    result = panel_gen.create_switch(kind)
+    if result == True:
+        return make_response("{kind} successfully created".format(kind=kind), 201)
     else:
-        abort(
-            406,
-            "Switch of kind {kind} already exists".format(kind=kind),
-        )
+        abort(406,"Switch of kind {kind} was not created".format(kind=kind),)
 
 def update(kind):
     """

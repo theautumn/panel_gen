@@ -242,7 +242,7 @@ class xb5():
     # For a description of these line, see the panel class, above.
 
     def __init__(self):
-        self.kind = "5XB"
+        self.kind = "5xb"
         self.max_dialing = 7
         self.is_dialing = 0
         self.dahdi_group = "r5"
@@ -409,11 +409,12 @@ class SwitchSchema(Schema):
 	line_range = fields.Dict()
 
 def get_switch(kind):
-	schema = SwitchSchema()
-	
-	if switch.kind == kind:
-		result = schema.dump(switch)
-		return result
+    schema = SwitchSchema()
+    
+    for n in orig_switch:
+        if kind == n.kind:
+            result = schema.dump(n)
+            return result
 
 def get_line(key):
     n = int(key)
@@ -422,20 +423,26 @@ def get_line(key):
     return result
 
 def get_all_lines():
-	schema = LineSchema()
-	for n in line:
-		result = schema.dump(line[n])
-		return result
+    schema = LineSchema()
+    for n in line:
+        result = schema.dump(line[n])
+        return result
 
 def create_switch(kind):
-	if kind == 'panel':
-		orig_switch.append(panel())
-	elif kind == '5xb':
-		orig_switch.append(xb5())
-	elif kind == '1xb':
-		orig_switch.append(xb1())
-	else:
-		print(nope)
+    schema = SwitchSchema
+    print kind
+    if kind == 'panel':
+        orig_switch.append(panel())
+        return True
+    elif kind == '5xb':
+        orig_switch.append(xb5())
+        print orig_switch[1].kind
+        return True
+    elif kind == '1xb':
+        orig_switch.append(xb1())
+        return True
+    else:
+        return False
 
 
 
@@ -808,8 +815,8 @@ Step = step()
 
 line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 
-w = work_thread()
-w.daemon = True
-w.start()
-sleep(.5)
+#w = work_thread()
+#w.daemon = True
+#w.start()
+#sleep(.5)
 
