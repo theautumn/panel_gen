@@ -18,7 +18,6 @@ import logging
 import curses
 import re
 import threading
-#import json
 from marshmallow import Schema, fields
 from tabulate import tabulate
 from numpy import random
@@ -68,7 +67,8 @@ class Line():
                     self.status = 1
                 else:
                     self.timer = int(round(random.gamma(5,5)))
-                    logging.info("Exceeded sender limit: %s with %s calls dialing. Delaying call.", self.switch.max_dialing, self.switch.is_dialing)
+                    logging.info("Exceeded sender limit: %s with %s calls dialing. Delaying call.", 
+			self.switch.max_dialing, self.switch.is_dialing)
             elif self.status == 1:
                 self.hangup()
         return self.timer
@@ -96,7 +96,7 @@ class Line():
         elif term_office == 275:
             term_station = random.randint(Step.line_range[0], Step.line_range[1])
         else:
-            logging.error("No terminating line available for this office. Did you forget to add it to PickCalledLine?")
+            logging.error("No terminating line available for this office.")
             assert False
 
 
@@ -105,6 +105,9 @@ class Line():
         return term
 
     def Call(self):
+	# Checks if we're in deterministic mode and sets duration
+	# accordingly. Also checks for wait time in -d mode.
+	#
         # Dialing takes ~10 to 12 seconds. We're going to set a timer
         # for call duration here, and then a few lines down,
         # we're gonna tell Asterisk to set its own wait timer to the same value - 10.
@@ -112,16 +115,16 @@ class Line():
         # Asterisk's wait timer (which itself begins when the call goes from
         # dialing to "UP").
 
-        if args.d:                                          # Are we in deterministic mode?
-            if args.z:                                      # args.z is call duration
-                self.timer = args.z                         # Set length of call to what user specified
+        if args.d:
+            if args.z:
+                self.timer = args.z
             else:
-                self.timer = 15                             # If no args.z, use default value for -d mode.
-        else:                                               # If we are in normal mode, then it's easy
-            self.timer = self.switch.newtimer()             # Reset the timer for the next go-around.
+                self.timer = 15
+        else:
+            self.timer = self.switch.newtimer()
 
-        wait = str(self.timer - 10)                         # Wait value to pass to Asterisk dialplan
-        vars = {'waittime': wait}                           # Set the vars to actually pass over
+        wait = str(self.timer - 10)       # Wait value to pass to Asterisk dialplan
+        vars = {'waittime': wait}         # Set the vars to actually pass over
 
         # Make the .call file amd throw it into the asterisk spool.
         # Pass control of the call to the sarah_callsim context in
@@ -162,7 +165,7 @@ class Line():
             self.term = self.pick_called_line(term_choices)       # Pick a new terminating line.
 
 
-# <----- END LINE CLASS THINGS -----> #
+# <----- END LINE CLASS -----> #
 
 # <----- BEGIN SWITCH CLASSES ------> #
 
@@ -171,26 +174,28 @@ class panel():
     # It should not normally need to be edited.
 
     def __init__(self):
-        self.kind = "panel"                                     # The kind of switch we're calling from.
+        self.kind = "panel"                             # The kind of switch we're calling from.
+        self.running = False                            # Not used yet.
         self.max_dialing = 6
         self.is_dialing = 0
-        self.dahdi_group = "r6"                                 # Which DAHDI group to originate from.
-        self.dcurve = self.newtimer()                           # Start a new timer when switch is instantiated.
+        self.dahdi_group = "r6"                         # Which DAHDI group to originate from.
+        self.dcurve = self.newtimer()                   # Start a new timer when switch is instantiated.
 
-        if args.d:                                              # If deterministic mode is set,
-            self.max_calls = 1                                  # Set the max calls to 1, to be super basic.
+        if args.d:                                      # If deterministic mode is set,
+            self.max_calls = 1                          # Set the max calls to 1, to be super basic.
         elif args.a:
-            self.max_calls = args.a                             # Else, use the value given with -a
+            self.max_calls = args.a                     # Else, use the value given with -a
         else:
-            self.max_calls = 3                                  # Finally, if no args are given, use this default.
+            self.max_calls = 3                          # Finally, if no args are given, use this default.
 
-        self.max_nxx1 = .6                                      # Load for office 1 in self.trunk_load
-        self.max_nxx2 = .2                                      # Load for office 2 in self.trunk_load
-        self.max_nxx3 = .2                                      # Load for office 3 in self.trunk_load
-        self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
-        self.nxx = [722, 365, 232]                              # Office codes that can be dialed.
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.line_range = [5000,5999]                            # Range of lines that can be chosen.
+        self.max_nxx1 = .6                              # Load for office 1 in self.trunk_load
+        self.max_nxx2 = .2                              # Load for office 2 in self.trunk_load
+        self.max_nxx3 = .2                              # Load for office 3 in self.trunk_load
+        self.max_nxx4 = 0                               # Load for office 4 in self.trunk_load
+        self.nxx = [722, 365, 232]                      # Office codes that can be dialed.
+        self.trunk_load = [self.max_nxx1, 
+            self.max_nxx2, self.max_nxx3]
+        self.line_range = [5000,5999]                   # Range of lines that can be chosen.
 
     def newtimer(self):
         if args.v == 'light':
@@ -284,7 +289,14 @@ class step():
         self.line_range = [4124,4199]
 
 
-# <----- BEGIN BOOKKEEPING STUFF -----> #
+# +-----------------------------------------------+
+# |                                               |
+# | # <----- BEGIN BOOKKEEPING STUFF -----> #     |
+# |   This is uncategorized bookkeeping for       |
+# |   the rest of the program. Includes           |
+# |   getting AMI events, and parsing args.       |
+# |                                               |
+# +-----------------------------------------------+
 
 def on_DialBegin(event, **kwargs):
     # This parses DialBegin notifications from the AMI.
@@ -332,22 +344,29 @@ def parse_args():
     # If no arguments are presented, the program will run with default
     # mostly sane options.
 
-    parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. Defaults to originate a sane amount of calls from the panel switch if no args are given.')
+    parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. '
+	'Defaults to originate a sane amount of calls from the panel switch if no args are given.')
     parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7,8,9,10],
             help='Maximum number of active lines.')
     parser.add_argument('-d', action='store_true',
-            help='Deterministic mode. Eliminate timing randomness. Places one call at a time. Ignores -a and -v options entirely. Use with -l.')
+            help='Deterministic mode. Eliminate timing randomness. Places one call at a time. '
+	'Ignores -a and -v options entirely. Use with -l.')
     parser.add_argument('-l', metavar='line', type=int,
-            help='Call only a particular line. Can be used with the -d option for placing test calls to a number over and over again.')
+            help='Call only a particular line. Can be used with the -d option for placing test '
+	'calls to a number over and over again.')
     parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],
             choices=['1xb','5xb','panel','all','722', '832', '232'],
-            help='Originate calls from a particular switch. Takes either 3 digit NXX values or switch name.  1xb, 5xb, panel, or all. Default is panel.')
+            help='Originate calls from a particular switch. Takes either 3 digit NXX values '
+	'or switch name.  1xb, 5xb, panel, or all. Default is panel.')
     parser.add_argument('-t', metavar='switch', type=str, nargs='?', action='append', default=[],
             choices=['1xb','5xb','panel','office','step', '722', '832', '232', '365', '275'],
-            help='Terminate calls only on a particular switch. Takes either 3 digit NXX values or switch name. Defaults to sane options for whichever switch you are originating from.')
+            help='Terminate calls only on a particular switch. Takes either 3 digit NXX values '
+	'or switch name. Defaults to sane options for whichever switch you are originating from.')
     parser.add_argument('-v', metavar='volume', type=str, default='normal',
-            help='Call volume is a proprietary blend of frequency and randomness. Can be light, normal, or heavy. Default is normal, which is good for average load.')
-    parser.add_argument('-w', metavar='seconds', type=int, help='Use with -d option to specify wait time between calls.')
+            help='Call volume is a proprietary blend of frequency and randomness. Can be light, '
+	'normal, or heavy. Default is normal, which is good for average load.')
+    parser.add_argument('-w', metavar='seconds', type=int, help='Use with -d option to specify '
+	'wait time between calls.')
     parser.add_argument('-z', metavar='seconds', type=int,
             help='Use with -d option to specify call duration.')
     parser.add_argument('-log', metavar='loglevel', type=str, default='INFO',
@@ -389,6 +408,20 @@ def parse_args():
 
     return args
 
+
+# +----------------------------------------------------+
+# |                                                    |
+# | The following chunk of code is for the             |
+# | panel_gen API, currently run from http_server.py   |
+# | The http server starts Flask, Connexion, which     |
+# | reads the API from swagger.yml, and executes HTTP  |
+# | requests using the code in switch.py and line.py   |
+# |                                                    |
+# | These functions return values to those two .py's   |
+# | when panel_gen is imported as a module.            |
+# |                                                    |
+# +----------------------------------------------------+
+
 class LineSchema(Schema):
     ident  = fields.Integer()
     kind = fields.Str()
@@ -407,6 +440,7 @@ class SwitchSchema(Schema):
 	nxx = fields.Str()
 	trunk_load = fields.Dict()
 	line_range = fields.Dict()
+        running = fields.Boolean()
 
 def get_line(key):
     n = int(key)
@@ -442,7 +476,6 @@ def get_all_switches():
     return result
 
 def create_switch(kind):
-    schema = SwitchSchema
     if kind == 'panel':
         orig_switch.append(panel())
         return True
@@ -456,19 +489,22 @@ def create_switch(kind):
         return False
 
 def delete_switch(kind):
-    schema = SwitchSchema
-
-    if kind == 'panel':
-        orig_switch.remove(panel())
-        return True
-    elif kind == '5xb':
-        orig_switch.remove(xb5())
-        return True
-    elif kind == '1xb':
-        orig_switch.remove(xb1())
-        return True
+    for i, o in enumerate(orig_switch):
+        if o.kind == kind:
+            del orig_switch[i]
+            return True
     else:
         return False
+
+
+# +-----------------------------------------------+
+# |                                               |
+# |  Below is the class for the screen. These     |
+# |  methods are called by the UI thread when     |
+# |  it needs to interact with the user, either   |
+# |  by getting keys, or drawing things.          |
+# |                                               |
+# +-----------------------------------------------+
 
 class Screen():
     # Draw the screen, get user input.

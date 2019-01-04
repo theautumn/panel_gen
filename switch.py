@@ -60,22 +60,19 @@ def update(kind):
 
     # otherwise, nope, that's an error
     else:
-        abort(
-            404, "Switch {kind} not found".format(kind=kind)
-        )
-
+        abort(404, "Switch {kind} not found".format(kind=kind))
 
 def delete(kind):
-    """
-    This function deletes a switch from the switches structure
-    :param kind:   last name of switch to delete
-    :return:        200 on successful delete, 404 if not found
-    """
-    # Does the switch to delete exist?
-    for n in panel_gen.orig_switch:
-	if kind == n.kind:
-	    result = panel_gen.delete_switch(kind)
-	    return make_response(
+#    """
+#    This function deletes a switch from the switches structure
+#    :param kind:   last name of switch to delete
+#    :return:        200 on successful delete, 404 if not found
+#    """
+
+	result = panel_gen.delete_switch(kind)
+
+	if result == True:
+		return make_response(
 		"{kind} successfully deleted".format(kind=kind), 200
 	    )
 	# Otherwise, nope, switch to delete not found
