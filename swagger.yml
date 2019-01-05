@@ -42,7 +42,7 @@ paths:
                 nxx:
                   type: string
                 line_range:
-                  type: string
+                  type: array
 
   /switch/{kind}:
     get:
@@ -77,7 +77,7 @@ paths:
               nxx:
                 type: string
               line_range:
-                type: string
+                type: array
     post:
         operationId: switch.create
         tags:
@@ -151,7 +151,7 @@ paths:
               nxx:
                 type: string
               line_range:
-                type: string
+                type: array
       responses:
         200:
           description: Successfully updated switch in switches list

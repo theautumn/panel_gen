@@ -209,11 +209,13 @@ class panel():
             t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
 
-    def update(self, **kwargs):
-        for key, value in kwargs.items():
-            print("{} is {}".format(key,value))
-
-
+    def update(self, arg):
+        for (key, value) in arg['switch'].items():
+            print key, value
+            
+            if key == 'line_range':
+               self.line_range = value
+               print self.line_range
 class xb1():
     # This class is for the No. 1 Crossbar.
     # For a description of each of these lines, see the panel class above.
@@ -446,6 +448,7 @@ class LineSchema(Schema):
     term = fields.Str()
 
 class SwitchSchema(Schema):
+    switch = fields.Dict()
     kind = fields.Str()
     max_dialing = fields.Integer()
     is_dialing = fields.Integer()
@@ -453,7 +456,7 @@ class SwitchSchema(Schema):
     dahdi_group = fields.Str()
     nxx = fields.Str()
     trunk_load = fields.Dict()
-    line_range = fields.Dict()
+    line_range = fields.List(fields.Str())
     running = fields.Boolean()
 
 def get_line(key):
@@ -504,17 +507,23 @@ def create_switch(kind):
 def update_switch(**kwargs):
     schema = SwitchSchema()
 
+    # Pull the switch type out of the dict the API passed in.
     switch_type = kwargs.get("kind", "")
     print switch_type
+
+    # Enumerate our local orig_switch and see if the switch
+    # that the API asked for matches an existing switch.
     for i, o in enumerate(orig_switch):
         if o.kind == switch_type:
             print("We have a match!")
         else:
             print("NO MATCH")
-#            for key, value in kwargs.iteritems():
-                #print("{0} = {1}".format(key, value))
-#	result = schema.load(key, value)
-#	Rainier.update(result)
+
+    parameters = kwargs
+    del parameters['kind']
+    result = schema.load(parameters)
+#    print result
+    Rainier.update(result)
 
 def delete_switch(kind):
     for i, o in enumerate(orig_switch):
@@ -812,9 +821,10 @@ if __name__ == "__main__":
         raise Exception(str(future.response))
 
     try:
-        t = ui_thread()
-        t.daemon = True
-        t.start()
+        if not args.http:
+            t = ui_thread()
+            t.daemon = True
+            t.start()
         w = work_thread()
         w.daemon = True
         w.start()
