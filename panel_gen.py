@@ -216,6 +216,10 @@ class panel():
             if key == 'line_range':
                self.line_range = value
                print self.line_range
+            if key == 'nxx':
+                self.nxx = value
+                print self.nxx
+
 class xb1():
     # This class is for the No. 1 Crossbar.
     # For a description of each of these lines, see the panel class above.
@@ -454,7 +458,7 @@ class SwitchSchema(Schema):
     is_dialing = fields.Integer()
     max_calls = fields.Integer()
     dahdi_group = fields.Str()
-    nxx = fields.Str()
+    nxx = fields.List(fields.Str())
     trunk_load = fields.Dict()
     line_range = fields.List(fields.Str())
     running = fields.Boolean()

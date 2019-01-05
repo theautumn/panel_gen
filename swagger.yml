@@ -40,7 +40,7 @@ paths:
                 dahdi_group:
                   type: string
                 nxx:
-                  type: string
+                  type: array
                 line_range:
                   type: array
 
@@ -75,7 +75,7 @@ paths:
               dahdi_group:
                 type: string
               nxx:
-                type: string
+                type: array
               line_range:
                 type: array
     post:
@@ -149,7 +149,7 @@ paths:
               dahdi_group:
                 type: string
               nxx:
-                type: string
+                type: array
               line_range:
                 type: array
       responses:
