@@ -43,6 +43,8 @@ paths:
                   type: array
                 line_range:
                   type: array
+                trunk_load:
+                  type: array
 
   /switch/{kind}:
     get:
@@ -78,6 +80,9 @@ paths:
                 type: array
               line_range:
                 type: array
+              trunk_load:
+                type: array
+
     post:
         operationId: switch.create
         tags:
@@ -151,6 +156,8 @@ paths:
               nxx:
                 type: array
               line_range:
+                type: array
+              trunk_load:
                 type: array
       responses:
         200:

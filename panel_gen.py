@@ -211,14 +211,23 @@ class panel():
 
     def update(self, arg):
         for (key, value) in arg['switch'].items():
-            print key, value
             
             if key == 'line_range':
                self.line_range = value
-               print self.line_range
             if key == 'nxx':
                 self.nxx = value
-                print self.nxx
+            if key == 'is_dialing':
+                self.is_dialing = value
+            if key == 'running':
+                self.running = value
+            if key == 'max_dialing':
+                self.max_dialing = value
+            if key == 'max_calls':
+                self.max_calls = value
+            if key == 'dahdi_group':
+                self.dahdi_group = value
+            if key == 'trunk_load':
+                self.trunk_load = value
 
 class xb1():
     # This class is for the No. 1 Crossbar.
@@ -258,6 +267,25 @@ class xb1():
             t = int(round(random.gamma(5,10)))                  # Medium Traffic
         return t
 
+    def update(self, arg):
+        for (key, value) in arg['switch'].items():
+            
+            if key == 'line_range':
+               self.line_range = value
+            if key == 'nxx':
+                self.nxx = value
+            if key == 'is_dialing':
+                self.is_dialing = value
+            if key == 'running':
+                self.running = value
+            if key == 'max_dialing':
+                self.max_dialing = value
+            if key == 'max_calls':
+                self.max_calls = value
+            if key == 'dahdi_group':
+                self.dahdi_group = value
+            if key == 'trunk_load':
+                self.trunk_load = value
 
 class xb5():
     # This class is for the No. 5 Crossbar.
@@ -299,6 +327,26 @@ class xb5():
         else:
             t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
+
+    def update(self, arg):
+        for (key, value) in arg['switch'].items():
+            
+            if key == 'line_range':
+               self.line_range = value
+            if key == 'nxx':
+                self.nxx = value
+            if key == 'is_dialing':
+                self.is_dialing = value
+            if key == 'running':
+                self.running = value
+            if key == 'max_dialing':
+                self.max_dialing = value
+            if key == 'max_calls':
+                self.max_calls = value
+            if key == 'dahdi_group':
+                self.dahdi_group = value
+            if key == 'trunk_load':
+                self.trunk_load = value
 
 class step():
     # This class is for the SxS office. It's very minimal, as we are not currently
@@ -473,7 +521,7 @@ class SwitchSchema(Schema):
     max_calls = fields.Integer()
     dahdi_group = fields.Str()
     nxx = fields.List(fields.Str())
-    trunk_load = fields.Dict()
+    trunk_load = fields.List(fields.Str())
     line_range = fields.List(fields.Str())
     running = fields.Boolean()
 
@@ -527,22 +575,17 @@ def update_switch(**kwargs):
 
     # Pull the switch type out of the dict the API passed in.
     switch_type = kwargs.get("kind", "")
-    print switch_type
 
     # Enumerate our local orig_switch and see if the switch
     # that the API asked for matches an existing switch.
     for i, o in enumerate(orig_switch):
         if o.kind == switch_type:
-            print("We have a match!")
             if o.kind == "panel":
                 switch = Rainier
             elif o.kind == "5xb":
                 switch = Adams
             elif o.kind == "1xb":
                 switch = Lakeview
-        else:
-            print("NO MATCH")
-
     parameters = kwargs
     del parameters['kind']
     result = schema.load(parameters)
@@ -925,8 +968,11 @@ if future.response.is_error():
 
 line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 
-#w = work_thread()
-#w.daemon = True
-#w.start()
-#sleep(.5)
+w = work_thread()
+w.daemon = True
+w.start()
+t = ui_thread()
+t.daemon = True
+t.start()
 
+sleep(.5)
