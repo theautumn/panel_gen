@@ -10,8 +10,8 @@ requires = [
     'pathlib',
     'pycall',
     'asterisk-ami',
-    'connexion'
-    'marshmallow-code'
+    'connexion',
+    'marshmallow-code',
 ]
 
 setup(
