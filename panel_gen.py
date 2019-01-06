@@ -215,19 +215,27 @@ class panel():
             if key == 'line_range':
                self.line_range = value
             if key == 'nxx':
-                self.nxx = value
+                for i in value:
+                    if len(i) !=3:
+                        return "Fail: bad_nxx"
+                    else:
+                        self.nxx = value
             if key == 'is_dialing':
                 self.is_dialing = value
             if key == 'running':
                 self.running = value
             if key == 'max_dialing':
-                self.max_dialing = value
+                if value >=10:
+                    return "Fail: bad_max"
+                else:
+                    self.max_dialing = value
             if key == 'max_calls':
                 self.max_calls = value
             if key == 'dahdi_group':
                 self.dahdi_group = value
             if key == 'trunk_load':
                 self.trunk_load = value
+            return Trie
 
 class xb1():
     # This class is for the No. 1 Crossbar.
@@ -589,8 +597,12 @@ def update_switch(**kwargs):
     parameters = kwargs
     del parameters['kind']
     result = schema.load(parameters)
-    switch.update(result)
-    return schema.dump(switch)
+    outcome = switch.update(result)
+    if outcome == False:
+        return False
+    else:
+        return schema.dump(switch)
+
 
 def delete_switch(kind):
     for i, o in enumerate(orig_switch):
