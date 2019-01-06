@@ -53,10 +53,12 @@ def update(**kwargs):
 #    :return:        updated switch structure
 #    """
     # Does the switch exist in switches?
-    panel_gen.update_switch(**kwargs)
-    # otherwise, nope, that's an error
-    #else:
-    #    abort(404, "Switch {kind} not found".format(kind=kind))
+    result = panel_gen.update_switch(**kwargs)
+
+    if result == False:
+        abort(406, "Sarah broke something.")
+    else:
+        return result
 
 def delete(kind):
 #    """

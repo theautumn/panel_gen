@@ -396,6 +396,20 @@ def parse_args():
 
     global args
     args = parser.parse_args()
+    make_switch(args)
+
+def make_switch(args):
+
+    # Instantiate some switches. This is so we can ask to get their parameters later.
+    global Rainier
+    global Adams
+    global Lakeview
+    global Step
+
+    Rainier = panel()
+    Adams = xb5()
+    Lakeview = xb1()
+    Step = step()
 
     global orig_switch
     orig_switch = []
@@ -405,13 +419,13 @@ def parse_args():
 
     for o in args.o:
         if o == 'panel' or o == '722':
-            orig_switch.append(panel())
+            orig_switch.append(Rainier)
         elif o == '5xb' or o == '232':
-            orig_switch.append(xb5())
+            orig_switch.append(Adams)
         elif o == '1xb' or o == '832':
-            orig_switch.append(xb1())
+            orig_switch.append(Lakeview)
         elif o == 'all':
-            orig_switch.extend((xb1(), xb5(), panel()))
+            orig_switch.extend((Lakeview, Adams, Rainier))
 
     global term_choices
     term_choices = []
@@ -497,13 +511,13 @@ def get_all_switches():
 
 def create_switch(kind):
     if kind == 'panel':
-        orig_switch.append(panel())
+        orig_switch.append(Rainier)
         return True
     elif kind == '5xb':
-        orig_switch.append(xb5())
+        orig_switch.append(Adams)
         return True
     elif kind == '1xb':
-        orig_switch.append(xb1())
+        orig_switch.append(Lakeview)
         return True
     else:
         return False
@@ -520,14 +534,20 @@ def update_switch(**kwargs):
     for i, o in enumerate(orig_switch):
         if o.kind == switch_type:
             print("We have a match!")
+            if o.kind == "panel":
+                switch = Rainier
+            elif o.kind == "5xb":
+                switch = Adams
+            elif o.kind == "1xb":
+                switch = Lakeview
         else:
             print("NO MATCH")
 
     parameters = kwargs
     del parameters['kind']
     result = schema.load(parameters)
-#    print result
-    Rainier.update(result)
+    switch.update(result)
+    return schema.dump(switch)
 
 def delete_switch(kind):
     for i, o in enumerate(orig_switch):
@@ -808,12 +828,6 @@ if __name__ == "__main__":
         logging.info('Deterministic Mode set!')
     logging.info('Call volume set to %s', args.v)
 
-    # Instantiate some switches. This is so we can ask to get their parameters later.
-    Rainier = panel()
-    Adams = xb5()
-    Lakeview = xb1()
-    Step = step()
-
     # Here is where we actually make the lines.
     global line
     line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
@@ -901,19 +915,13 @@ if __name__ == "__main__":
 
 # The below gets run if this code is imported as a module.
 # It skips lots of setup steps.
-
-args = parse_args()
+parse_args()
 
 # Connect to AMI
 client = AMIClient(address='127.0.0.1',port=5038)
 future = client.login(username='panel_gen',secret='t431434')
 if future.response.is_error():
     raise Exception(str(future.response))
-
-Rainier = panel()
-Adams = xb5()
-Lakeview = xb1()
-Step = step()
 
 line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 
