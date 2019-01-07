@@ -149,8 +149,6 @@ paths:
                 type: integer
               max_dialing:
                 type: integer
-              is_dialing:
-                type: integer
               dahdi_group:
                 type: string
               nxx:
@@ -276,7 +274,7 @@ paths:
                 type: integer
               calling_no:
                 type: string
-    put:
+    patch:
       operationId: line.update
       tags:
         - line
@@ -326,3 +324,67 @@ paths:
         200:
           description: Successfully deleted a line from lines list
 
+  /app:
+    get:
+      operationId: app.read_status
+      tags:
+        - app
+      summary: Get general app status information
+      description: Gets high-level app status
+      responses:
+        200:
+          description: Successful app read operation
+          schema:
+            type: string
+            items:
+              properties:
+                running:
+                  type: boolean
+
+  /app/operate:
+    post:
+      operationId: app.operate
+      tags:
+        - app
+      summary: Start execution of the work thread. 
+      description: Starts all existing switches. Name is a joke on Bell System terminology.
+
+      responses:
+        201:
+          description: Successfully started work thread
+
+  /app/nonoperate:
+    post:
+      operationId: app.nonoperate
+      tags:
+        - app
+      summary: Stop execution of the work thread.
+      description: Stop all actions and release lines. Another Bell System in-joke.
+
+      responses:
+        201:
+          description: Successfully killed app
+
+  /app/paused:
+    post:
+      operationId: app.api_pause
+      tags:
+        - app
+      summary: Pause execution but leave app running to unpause later.
+      description: Pause app but leave things in a resumable state.
+
+      responses:
+        201:
+          description: Successfully paused work thread
+
+  /app/resumed:
+    post:
+      operationId: app.api_resume
+      tags:
+        - app
+      summary: Resume from paused state. Picks up where it left off.
+      description: Resume from last state.
+
+      responses:
+        201:
+          description: Successfully resumed work thread

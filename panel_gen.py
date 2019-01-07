@@ -210,32 +210,38 @@ class panel():
         return t
 
     def update(self, arg):
-        for (key, value) in arg['switch'].items():
-            
+        for (key, value) in arg["switch"].items():
             if key == 'line_range':
-               self.line_range = value
+                # Line range must be a tuple from 1000-9999
+                self.line_range = value
             if key == 'nxx':
+                # nxx must be 3 digits, matching codes we can dial
+		# number of values in nxx must also match trunk_load
                 for i in value:
-                    if len(i) !=3:
-                        return "Fail: bad_nxx"
-                    else:
-                        self.nxx = value
+                    self.nxx = value
             if key == 'is_dialing':
+		# should not normally need to be changed. remove?
                 self.is_dialing = value
             if key == 'running':
+		# Can be used to start and stop a particular switch.
+		# This feature is not yet implemented fully.
                 self.running = value
             if key == 'max_dialing':
+		# Must be <= 10
                 if value >=10:
                     return "Fail: bad_max"
                 else:
                     self.max_dialing = value
             if key == 'max_calls':
+		# Must be <= 10
                 self.max_calls = value
             if key == 'dahdi_group':
+		# Must be a group that we have hooked in to panel_gen
                 self.dahdi_group = value
             if key == 'trunk_load':
+		# Total of all values must add up to 1
+		# Number of values must equal number of NXXs
                 self.trunk_load = value
-            return Trie
 
 class xb1():
     # This class is for the No. 1 Crossbar.
@@ -528,11 +534,18 @@ class SwitchSchema(Schema):
     is_dialing = fields.Integer()
     max_calls = fields.Integer()
     dahdi_group = fields.Str()
-    nxx = fields.List(fields.Str())
+    nxx = fields.List(fields.Int())
     trunk_load = fields.List(fields.Str())
     line_range = fields.List(fields.Str())
     running = fields.Boolean()
 
+def operate():
+    #Work thread go!
+    w.resume()    
+
+def nonoperate():
+    #Work thread pause!
+    w.pause()
 def get_line(key):
     n = int(key)
     schema = LineSchema()
@@ -582,26 +595,30 @@ def update_switch(**kwargs):
     schema = SwitchSchema()
 
     # Pull the switch type out of the dict the API passed in.
-    switch_type = kwargs.get("kind", "")
+    api_switch_type = kwargs.get("kind", "")
 
     # Enumerate our local orig_switch and see if the switch
     # that the API asked for matches an existing switch.
     for i, o in enumerate(orig_switch):
-        if o.kind == switch_type:
+        # If the type of switch matches the type we're trying to edit
+        if o.kind == api_switch_type:
+            # Make sure we're editing the instance of the switch
             if o.kind == "panel":
                 switch = Rainier
+                print switch
             elif o.kind == "5xb":
                 switch = Adams
             elif o.kind == "1xb":
                 switch = Lakeview
+    #Pull in the parameters
     parameters = kwargs
+    # Wipe out the top parameter, because I said so
     del parameters['kind']
     result = schema.load(parameters)
     outcome = switch.update(result)
-    if outcome == False:
-        return False
-    else:
-        return schema.dump(switch)
+
+    # >>> !! Should return the switch, or a specific error that the user can act upon.
+    return schema.dump(switch)
 
 
 def delete_switch(kind):
@@ -983,8 +1000,8 @@ line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_call
 w = work_thread()
 w.daemon = True
 w.start()
-t = ui_thread()
-t.daemon = True
-t.start()
+#t = ui_thread()
+#t.daemon = True
+#t.start()
 
 sleep(.5)
