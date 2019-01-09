@@ -283,7 +283,7 @@ class xb1():
 
     def update(self, arg):
         for (key, value) in arg['switch'].items():
-            
+
             if key == 'line_range':
                self.line_range = value
             if key == 'nxx':
@@ -344,7 +344,7 @@ class xb5():
 
     def update(self, arg):
         for (key, value) in arg['switch'].items():
-            
+
             if key == 'line_range':
                self.line_range = value
             if key == 'nxx':
@@ -540,12 +540,58 @@ class SwitchSchema(Schema):
     running = fields.Boolean()
 
 def operate():
-    #Work thread go!
-    w.resume()    
+    # Work thread go!
+    if w.is_alive != True:
+        w.start()
+    else:
+       return "Work thread already running."
 
 def nonoperate():
-    #Work thread pause!
-    w.pause()
+    # This should pause execution and immediately hang up all calls, just
+    # as though we were exiting the program. Of course, we can't actually
+    # exit, as this function is only called if we're running as a module,
+    # and a module can not just exit. 
+
+    try:
+        if w.paused == False:
+            w.pause()
+        elif w.paused == True:
+            pass
+
+        # >>> Should we also reset the run state of panel_gen, too? Probs.
+
+        # Hang up and clean up spool.
+        system("asterisk -rx \"channel request hangup all\"")
+        system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+    except Exception as e:
+        logging.info(e)
+        return False
+
+    return True
+    
+
+def api_pause():
+    # Should we draw a pause screen if UI thread is running?
+    # All of these functions should probably return something meaningful.
+    # They're mostly just placeholders for now.
+    # WE CAN ONLY SEND THIS ONCE, OTHERWISE EVERYTHING WILL BLOCK. FIX ME PLEASE!
+
+    if w.paused == False:
+        w.pause()
+        if ui_thread.screen.started == True:
+            ui_thread.screen.pausedscreen(stdscr)
+    elif w.paused == True:
+        return "Already paused"
+
+
+def api_resume():
+    if w.paused == True:
+        w.resume()
+        if ui_thread.screen.started == True:
+            ui_thread.screen.resumescreen(stdscr)
+    else:
+        return "Already running"
+
 def get_line(key):
     n = int(key)
     schema = LineSchema()
@@ -661,9 +707,7 @@ class Screen():
             paused = self.pausedscreen(stdscr)
             key = stdscr.getch()
             if key == ord(' '):
-                stdscr.nodelay(1)
-                w.resume()
-                stdscr.erase()
+                paused = self.resumescreen(stdscr)
         # h: Help
         if key == ord('h'):
             self.helpscreen(stdscr)
@@ -701,13 +745,20 @@ class Screen():
         y_start_col = half_cols - half_cols / 2
 
         stdscr.nodelay(0)
-        pause_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
+        pause_scr = itdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
         pause_scr.box()
         pause_scr.addstr(2, half_cols/2 - 5, "P A U S E D", curses.color_pair(1))
         pause_scr.bkgd(' ', curses.color_pair(2))
         stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
         pause_scr.refresh()
         w.pause()
+        return True
+
+    def resumescreen(self, stdscr):
+        stdscr.nodelay(1)
+        w.resume()
+        stdscr.erase()
+        return False
 
     def helpscreen(self, stdscr):
         # Draw the help screen when 'h' is pressed. Then, control goes back to
@@ -781,6 +832,7 @@ class ui_thread(threading.Thread):
 
         threading.Thread.__init__(self)
         self.shutdown_flag = threading.Event()
+        self.started = True
 
     def run(self):
         try:
@@ -791,22 +843,22 @@ class ui_thread(threading.Thread):
     def ui_main(self, stdscr):
 
         # Instantiate a screen, so we can play with it later.
-        screen = Screen(stdscr)
+        self.screen = Screen(stdscr)
 
         while not self.shutdown_flag.is_set():
             try:
                 # Handle user input.
-                screen.getkey(stdscr)
+                self.screen.getkey(stdscr)
 
                 # Check if screen has been resized. Handle it.
                 y, x = stdscr.getmaxyx()
                 resized = curses.is_term_resized(y, x)
                 if resized is True:
                     y, x = stdscr.getmaxyx()
-                    screen.is_resized(stdscr, y, x)
+                    self.screen.is_resized(stdscr, y, x)
 
                 # Draw the window
-                screen.draw(stdscr, line, y, x)
+                self.screen.draw(stdscr, line, y, x)
 
             except Exception as e:
                 logging.info(e)
@@ -838,6 +890,7 @@ class work_thread(threading.Thread):
     def run(self):
 
         while not self.shutdown_flag.is_set():
+            self.is_alive = True
             with self.paused_flag:
                 while self.paused:
                     self.paused_flag.wait()
@@ -931,9 +984,9 @@ if __name__ == "__main__":
     # Exception handler for console-based shutdown.
 
         t.shutdown_flag.set()
-        t.join()
+        t.join(2)
         w.shutdown_flag.set()
-        w.join()
+        w.join(2)
 #        h.shutdown_server()
 #        h.shutdown_flag.set()
 #        h.join()
@@ -956,7 +1009,7 @@ if __name__ == "__main__":
         # leads us here.
 
         w.shutdown_flag.set()
-        w.join()
+        w.join(2)
 
         logging.info("Exited due to web interface shutdown")
 
@@ -973,11 +1026,11 @@ if __name__ == "__main__":
         # Exception for any other errors that I'm not explicitly handling.
 
 	t.shutdown_flag.set()
-	t.join()
+	t.join(2)
         w.shutdown_flag.set()
-        w.join()
+        w.join(2)
         h.shutdown_flag.set()
-	h.join()
+	h.join(2)
 
 
         print("\nOS error {0}".format(e))
@@ -995,13 +1048,25 @@ future = client.login(username='panel_gen',secret='t431434')
 if future.response.is_error():
     raise Exception(str(future.response))
 
+# If logfile does not exist, create it so logging can write to it.
+try:
+    with open('/var/log/panel_gen/calls.log', 'a') as file:
+        logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
+        filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+except IOError:
+    with open('/var/log/panel_gen/calls.log', 'w') as file:
+        logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
+        filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+
 line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+logging.info('Starting panel_gen as thread from http_server')
 
 w = work_thread()
 w.daemon = True
-w.start()
-#t = ui_thread()
-#t.daemon = True
-#t.start()
+# operate()
+# w.start()
+t = ui_thread()
+t.daemon = True
+t.start()
 
 sleep(.5)
