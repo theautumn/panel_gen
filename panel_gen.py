@@ -571,24 +571,30 @@ def nonoperate():
     
 
 def api_pause():
-    # Should we draw a pause screen if UI thread is running?
     # All of these functions should probably return something meaningful.
     # They're mostly just placeholders for now.
     # WE CAN ONLY SEND THIS ONCE, OTHERWISE EVERYTHING WILL BLOCK. FIX ME PLEASE!
 
     if w.paused == False:
-        w.pause()
-        if ui_thread.screen.started == True:
-            ui_thread.screen.pausedscreen(stdscr)
+        if t.started == True:
+            w.pause()
+            t.draw_paused()
+        elif t.started ==False:
+            w.pause()
+            return " PAUSED: UI thread not running"
     elif w.paused == True:
         return "Already paused"
 
 
 def api_resume():
+    # This works, but only sort of. Need to fix!
     if w.paused == True:
-        w.resume()
-        if ui_thread.screen.started == True:
-            ui_thread.screen.resumescreen(stdscr)
+        if t.started == True:
+            w.resume()
+            t.draw_resumed()
+        elif t.started == False:
+            w.resume()
+            return "UI Thread not running"
     else:
         return "Already running"
 
@@ -666,7 +672,6 @@ def update_switch(**kwargs):
     # >>> !! Should return the switch, or a specific error that the user can act upon.
     return schema.dump(switch)
 
-
 def delete_switch(kind):
     for i, o in enumerate(orig_switch):
         if o.kind == kind:
@@ -695,8 +700,9 @@ class Screen():
         curses.use_default_colors()
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
         curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
-        y, x = stdscr.getmaxyx()
+        self.y, self.x = stdscr.getmaxyx()
         stdscr.nodelay(1)
+        self.stdscr = stdscr
 
     def getkey(self, stdscr):
         #Handles user input.
@@ -704,18 +710,21 @@ class Screen():
         key = stdscr.getch()
 
         if key == ord(' '):
-            paused = self.pausedscreen(stdscr)
-            key = stdscr.getch()
-            if key == ord(' '):
-                paused = self.resumescreen(stdscr)
+            if w.paused == False:
+                self.pausescreen()
+                key = stdscr.getch()
+                if key == ord(' '):
+                    self.resumescreen()
+            elif w.paused == True:
+                w.resume()
         # h: Help
         if key == ord('h'):
             self.helpscreen(stdscr)
             key = stdscr.getch()
             if key:
-                stdscr.nodelay(1)
-                stdscr.erase()
-                stdscr.refresh()
+                self.stdscr.nodelay(1)
+                self.stdscr.erase()
+                self.stdscr.refresh()
         # u: add a line to the first switch.
         if key == ord('u'):
             line.append(Line(7, orig_switch[0]))
@@ -726,41 +735,46 @@ class Screen():
             elif len(line) > 1:
                 del line[0]
 
-    def is_resized(self, stdscr, y, x):
+    def update_size(self, stdscr, y, x):
         # This gets called if the screen is resized. Makes it happy so exceptions don't get thrown.
 
-        stdscr.clear()
+        self.stdscr.clear()
         curses.resizeterm(y, x)
-        stdscr.refresh()
+        self.stdscr.refresh()
 
-    def pausedscreen(self, stdscr):
+    def pausescreen(self):
         # Draw the PAUSED notification when execution is paused.
         # Just as importantly, pause the worker thread. Control goes back to
         # getkey(), which waits for another <spacebar> then resumes.
 
-        y, x = stdscr.getmaxyx()
+        y, x = self.stdscr.getmaxyx()
         half_cols = x/2
         rows_size = 5
         x_start_row = y - 9
         y_start_col = half_cols - half_cols / 2
 
-        stdscr.nodelay(0)
-        pause_scr = itdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
+        self.stdscr.nodelay(0)
+        pause_scr = self.stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
         pause_scr.box()
         pause_scr.addstr(2, half_cols/2 - 5, "P A U S E D", curses.color_pair(1))
         pause_scr.bkgd(' ', curses.color_pair(2))
-        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
+        self.stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
         pause_scr.refresh()
-        w.pause()
         return True
 
-    def resumescreen(self, stdscr):
-        stdscr.nodelay(1)
-        w.resume()
-        stdscr.erase()
+    def resumescreen(self):
+        # This should erase the paused window and refresh the screen.
+        # It erases the window ok, but drawing doesn't resume unless the user
+        # hits a key in the console window. I don't know why, and I've
+        # tried a bunch of different things. The work thread appears to
+        # resume OK.
+
+        self.stdscr.nodelay(1)
+        self.stdscr.refresh()
+        self.draw(self.stdscr, line, self.y, self.x)
         return False
 
-    def helpscreen(self, stdscr):
+    def helpscreen(self):
         # Draw the help screen when 'h' is pressed. Then, control goes back to
         # getkey(), which waits for any key, and goes back to drawing the UI.
 
@@ -769,6 +783,7 @@ class Screen():
         rows_size = 20
         x_start_row = y - 40
         y_start_col = half_cols - half_cols / 2
+        w
         stdscr.nodelay(0)
         stdscr.clear()
         help_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
@@ -841,30 +856,36 @@ class ui_thread(threading.Thread):
             print(e)
 
     def ui_main(self, stdscr):
-
+        
+        global screen
         # Instantiate a screen, so we can play with it later.
-        self.screen = Screen(stdscr)
+        screen = Screen(stdscr)
 
         while not self.shutdown_flag.is_set():
             try:
                 # Handle user input.
-                self.screen.getkey(stdscr)
+                screen.getkey(stdscr)
 
                 # Check if screen has been resized. Handle it.
                 y, x = stdscr.getmaxyx()
                 resized = curses.is_term_resized(y, x)
                 if resized is True:
                     y, x = stdscr.getmaxyx()
-                    self.screen.is_resized(stdscr, y, x)
+                    screen.update_size(stdscr, y, x)
 
                 # Draw the window
-                self.screen.draw(stdscr, line, y, x)
+                screen.draw(stdscr, line, y, x)
 
             except Exception as e:
                 logging.info(e)
 
         stdscr.refresh()
 
+    def draw_paused(self):
+        screen.pausescreen()
+
+    def draw_resumed(self):
+        screen.resumescreen()
 
 class work_thread(threading.Thread):
     # Does all the work! Can be paused and resumed. Handles all of
@@ -972,11 +993,6 @@ if __name__ == "__main__":
         w.daemon = True
         w.start()
 
-#        if args.http == True:
-#            h = http_thread()
-#            h.daemon = True
-#            h.start()
-
         while True:
             sleep(0.5)
 
@@ -987,9 +1003,6 @@ if __name__ == "__main__":
         t.join(2)
         w.shutdown_flag.set()
         w.join(2)
-#        h.shutdown_server()
-#        h.shutdown_flag.set()
-#        h.join()
 
         logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
@@ -1061,12 +1074,52 @@ except IOError:
 line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 logging.info('Starting panel_gen as thread from http_server')
 
-w = work_thread()
-w.daemon = True
-# operate()
-# w.start()
-t = ui_thread()
-t.daemon = True
-t.start()
+try:
+    w = work_thread()
+    w.daemon = True
+    # operate()
+    w.start()
+    t = ui_thread()
+    t.daemon = True
+    t.start()
 
-sleep(.5)
+    sleep(.5)
+except (KeyboardInterrupt, ServiceExit):
+# Exception handler for console-based shutdown.
+
+    t.shutdown_flag.set()
+    t.join(2)
+    w.shutdown_flag.set()
+    w.join(2)
+
+    logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
+
+    # Hang up and clean up spool.
+    system("asterisk -rx \"channel request hangup all\"")
+    system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+
+    # Log out of AMI
+    client.logoff()
+
+    print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
+    print("Thank you for playing Wing Commander!\n\n")
+
+except WebShutdown:
+    # Exception handler for http-server shutdown. The http-server
+    # passes SIGALRM, which calls web_shutdown and eventually
+    # leads us here.
+
+    w.shutdown_flag.set()
+    w.join(2)
+
+    logging.info("Exited due to web interface shutdown")
+
+    # Hang up and clean up spool.
+    system("asterisk -rx \"channel request hangup all\"")
+    system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+
+    # Log out of AMI
+    client.logoff()
+
+    print("panel_gen web shutdown complete.\n")
+
