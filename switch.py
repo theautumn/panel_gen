@@ -41,7 +41,7 @@ def create(kind):
 
     result = panel_gen.create_switch(kind)
 
-    if result == True:
+    if result != False:
         return make_response("{kind} successfully created".format(kind=kind), 201)
     else:
         abort(406,"Switch of kind {kind} was not created".format(kind=kind),)
@@ -69,7 +69,7 @@ def delete(kind):
 
 	result = panel_gen.delete_switch(kind)
 
-	if result == True:
+	if result != False:
 		return make_response(
 		"{kind} successfully deleted".format(kind=kind), 200
 	    )

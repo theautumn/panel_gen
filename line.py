@@ -115,10 +115,10 @@ def delete(ident):
     :return:      200 on successful delete, 404 if not found
     """
     # Does the line to delete exist?
-    if ident in LINES:
-        del LINES[ident]
+    line = panel_gen.delete_line(ident)
+    if line != False:
         return make_response(
-            "{key} successfully deleted".format(ident=ident), 200
+            "Line {ident} successfully deleted".format(ident=ident), 200
         )
 
     # Otherwise, nope, line to delete not found

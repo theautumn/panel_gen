@@ -611,24 +611,41 @@ def api_resume():
     else:
         return "Already running"
 
-def get_line(ident):
-    # Check if ident passed in via API exists in lines.
-    # If so, send back that line. Else, return False..
-    api_ident = int(ident)
-    schema = LineSchema()
-    for n in lines:
-        if api_ident == n.ident:
-            result = schema.dump(lines[api_ident])
-            return result
-        else:
-            return False
-
 def get_all_lines():
     schema = LineSchema()
     result = []
     for n in lines:
         result.append(schema.dump(n))
     return result
+
+def get_line(ident):
+    # Check if ident passed in via API exists in lines.
+    # If so, send back that line. Else, return False..
+    api_ident = int(ident)
+    schema = LineSchema()
+    result = []
+    for n in lines:
+        if api_ident == n.ident:
+            result.append(schema.dump(lines[api_ident]))
+
+    if result == []:
+        return False
+    else:
+        return result
+
+def delete_line(ident):
+    api_ident = int(ident)
+    schema = LineSchema()
+    result = []
+    for n in lines:
+        if api_ident == n.ident:
+            logging.info("API requested delete line %s", n.ident)
+            del lines[api_ident]
+            result = api_ident
+    if result == []:
+        return False
+    else:
+        return result
 
 def get_switch(kind):
     schema = SwitchSchema()
@@ -652,13 +669,13 @@ def get_all_switches():
 def create_switch(kind):
     if kind == 'panel':
         orig_switch.append(Rainier)
-        return True
+        return orig_switch
     elif kind == '5xb':
         orig_switch.append(Adams)
-        return True
+        return orig_switch
     elif kind == '1xb':
         orig_switch.append(Lakeview)
-        return True
+        return orig_switch
     else:
         return False
 
@@ -692,13 +709,23 @@ def update_switch(**kwargs):
     return schema.dump(switch)
 
 def delete_switch(kind):
+    # This "works" but it actually doesn't cause calls to stop on a switch.
+    # orig_switch is only used with line creation at the start of execution.
+    # after that, lines already have the property of their switch, so
+    # I need to find a way to actually stop calls to a switch when it 
+    # no longer exists.
+
+    result = []
     for i, o in enumerate(orig_switch):
         if o.kind == kind:
             del orig_switch[i]
-            return True
-    else:
-        return False
+            result.append(o.kind)
+            logging.info("API requested delete switch %s", o.kind)
 
+    if result == []:
+        return False
+    else:
+        return result
 
 # +-----------------------------------------------+
 # |                                               |
