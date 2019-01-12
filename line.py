@@ -35,18 +35,21 @@ def read_all():
     # Create the list of linees rom our data
     return panel_gen.get_all_lines() 
 
-def read_one(key):
+def read_one(ident):
     """
     This function responds to a request for /api/line/{key}
     with one matching line from linees
     :param key:   key of line to find
     :return:        line matching key
     """
-#    else:
-#        abort(
-#            404, "Line with {key{ not found".format(key=key)
-#        )
-    return panel_gen.get_line(key)
+    line = panel_gen.get_line(ident)
+    if line != False:
+        return line
+    else:
+        abort(
+            404, "Line number {ident} does not exist".format(ident=ident)
+        )
+
 
 def create(line):
     """
@@ -55,7 +58,7 @@ def create(line):
     :param line:  line to create in lines structure
     :return:        201 on success, 406 on line exists
     """
-    key = line.get("key", None)
+    line_number= line.get("line_number", None)
     switch = line.get("switch", None)
     timer = line.get("timer", None)
     hook_state = line.get("hook_state", None)
@@ -65,7 +68,7 @@ def create(line):
     calling_no = line.get("calling_no", None)
 
     # Does the line exist already?
-    if key not in LINES and key is not None:
+    if line_number not in LINES and line_number is not None:
         LINES[key] = {
             "switch": switch,
             "timer": timer,
@@ -86,7 +89,7 @@ def create(line):
             "Line number {key} already exists".format(key=key),
         )
 
-def update(key):
+def update(ident):
     """
     This function updates an existing line in the lines structure
     :param key:   key of line to update in the lines structure
@@ -94,32 +97,32 @@ def update(key):
     """
     # Does the line exist in linees?
     if key in LINES:
-        LINES[key]["key"] = LINES.get("key")
+        LINES[ident]["ident"] = LINES.get("ident")
 
-        return LINES[key]
+        return LINES[ident]
 
     # otherwise, nope, that's an error
     else:
         abort(
-            404, "Line {key} not found".format(key=key)
+            404, "Line {ident} not found".format(ident=ident)
         )
 
 
-def delete(key):
+def delete(ident):
     """
     This function deletes a line from the linees structure
     :param key:   key of line to delete
     :return:      200 on successful delete, 404 if not found
     """
     # Does the line to delete exist?
-    if key in LINES:
-        del LINES[key]
+    if ident in LINES:
+        del LINES[ident]
         return make_response(
-            "{key} successfully deleted".format(key=key), 200
+            "{key} successfully deleted".format(ident=ident), 200
         )
 
     # Otherwise, nope, line to delete not found
     else:
         abort(
-            404, "Line {key} not found".format(key=key)
+            404, "Line {ident} not found".format(ident=ident)
         )

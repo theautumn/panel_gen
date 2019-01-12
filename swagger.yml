@@ -190,6 +190,8 @@ paths:
             type: array
             items:
               properties:
+                ident:
+                  type: string
                 switch:
                   type: string
                 timer:
@@ -217,6 +219,9 @@ paths:
             schema:
               type: object
               properties:
+                ident: 
+                  type: string
+                  description: Number of this line in list.
                 switch:
                   type: string
                   description: Switch this line will call from
@@ -242,7 +247,7 @@ paths:
           201:
             description: Successfully created line
 
-  /line/{key}:
+  /line/{ident}:
     get:
       operationId: line.read_one
       tags:
@@ -250,7 +255,7 @@ paths:
       summary: Read one line from the lines list
       description: Read one line from the lines list
       parameters:
-      - name: key
+      - name: ident
         in: path
         description: Key of line to get from the list
         type: string
@@ -260,6 +265,8 @@ paths:
           description: Successfully read line from lines list operation
           schema:
             properties:
+              ident:
+                type: string
               switch:
                 type: string
               timer:
@@ -281,9 +288,9 @@ paths:
       summary: Update a line in the lines list
       description: Update a line in the lines list
       parameters:
-        - name: key
+        - name: ident
           in: path
-          description: Key of line to update in the list
+          description: Number of line to update in the list
           type: string
           required: True
         - name: line
@@ -316,7 +323,7 @@ paths:
       summary: Delete a line from the lines list
       description: Delete a line
       parameters:
-        - name: key
+        - name: ident
           in: path
           type: string
           required: True

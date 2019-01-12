@@ -164,7 +164,20 @@ class Line():
         else:                                                   # Else,
             self.term = self.pick_called_line(term_choices)       # Pick a new terminating line.
 
-
+    def update(self, api):
+        for (key, value) in api["line"].items():
+            if key == 'switch':
+                # Would this even work? Can you change a switch without breaking it?
+                self.switch = value
+            if key == 'timer':
+                # Change the current timer of the line.
+                self.timer = value
+            if key == 'dahdi_chan':
+                # Change which channel a line belongs to. Also might break everything.
+                self.dahdi_chan = value
+            if key == 'calling_no':
+                self.term = value
+ 
 # <----- END LINE CLASS -----> #
 
 # <----- BEGIN SWITCH CLASSES ------> #
@@ -209,8 +222,8 @@ class panel():
             t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
 
-    def update(self, arg):
-        for (key, value) in arg["switch"].items():
+    def update(self, api):
+        for (key, value) in api["switch"].items():
             if key == 'line_range':
                 # Line range must be a tuple from 1000-9999
                 self.line_range = value
@@ -399,7 +412,7 @@ def on_DialBegin(event, **kwargs):
     #logging.info('%s', DialString)
     #logging.info('%s', DestChannel)
 
-    for n in line:
+    for n in lines:
         if DialString[0] == str(n.term) and n.ast_status == 'on_hook':
             # logging.info('DialString match %s and %s', DialString[0], str(n.term))
             n.chan = DB_DestChannel[0]
@@ -415,7 +428,7 @@ def on_DialEnd(event, **kwargs):
     DE_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
     DE_DestChannel = DE_DestChannel.findall(output)
 
-    for n in line:
+    for n in lines:
         if DE_DestChannel[0] == str(n.chan) and n.ast_status == 'Dialing':
             n.ast_status = 'Ringing'
             n.switch.is_dialing -= 1
@@ -598,16 +611,22 @@ def api_resume():
     else:
         return "Already running"
 
-def get_line(key):
-    n = int(key)
+def get_line(ident):
+    # Check if ident passed in via API exists in lines.
+    # If so, send back that line. Else, return False..
+    api_ident = int(ident)
     schema = LineSchema()
-    result = schema.dump(line[n])
-    return result
+    for n in lines:
+        if api_ident == n.ident:
+            result = schema.dump(lines[api_ident])
+            return result
+        else:
+            return False
 
 def get_all_lines():
     schema = LineSchema()
     result = []
-    for n in line:
+    for n in lines:
         result.append(schema.dump(n))
     return result
 
@@ -727,13 +746,13 @@ class Screen():
                 self.stdscr.refresh()
         # u: add a line to the first switch.
         if key == ord('u'):
-            line.append(Line(7, orig_switch[0]))
+            lines.append(Line(7, orig_switch[0]))
         # d: delete the 0th line.
         if key == ord('d'):
-            if len(line) <=1:
+            if len(lines) <=1:
                 logging.info("Tried to delete last remaining line. No.")
-            elif len(line) > 1:
-                del line[0]
+            elif len(lines) > 1:
+                del lines[0]
 
     def update_size(self, stdscr, y, x):
         # This gets called if the screen is resized. Makes it happy so exceptions don't get thrown.
@@ -771,7 +790,7 @@ class Screen():
 
         self.stdscr.nodelay(1)
         self.stdscr.refresh()
-        self.draw(self.stdscr, line, self.y, self.x)
+        self.draw(self.stdscr, lines, self.y, self.x)
         return False
 
     def helpscreen(self):
@@ -796,9 +815,9 @@ class Screen():
         help_scr.addstr(7, 5, "Ctrl + C         Quit")
 
 
-    def draw(self, stdscr, line, y, x):
+    def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
-        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.ast_status] for n in line]
+        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.ast_status] for n in lines]
         stdscr.erase()
         stdscr.addstr(0,5," __________________________________________")
         stdscr.addstr(1,5,"|                                          |")
@@ -825,7 +844,7 @@ class Screen():
 
         stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
         stdscr.addstr(y-1,x-20,"Lines:",curses.A_BOLD)
-        stdscr.addstr(y-1,x-13, str(len(line)),curses.A_BOLD)
+        stdscr.addstr(y-1,x-13, str(len(lines)),curses.A_BOLD)
 
         # Refresh the screen.
         stdscr.refresh()
@@ -874,7 +893,7 @@ class ui_thread(threading.Thread):
                     screen.update_size(stdscr, y, x)
 
                 # Draw the window
-                screen.draw(stdscr, line, y, x)
+                screen.draw(stdscr, lines, y, x)
 
             except Exception as e:
                 logging.info(e)
@@ -917,7 +936,7 @@ class work_thread(threading.Thread):
                     self.paused_flag.wait()
 
             # The main loop that kicks everything into gear.
-                for n in line:
+                for n in lines:
                     n.tick()
                 sleep(1)
 
@@ -975,8 +994,8 @@ if __name__ == "__main__":
     logging.info('Call volume set to %s', args.v)
 
     # Here is where we actually make the lines.
-    global line
-    line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+    global lines
+    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 
     # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
@@ -1071,7 +1090,7 @@ except IOError:
         logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
         filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
 
-line = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 logging.info('Starting panel_gen as thread from http_server')
 
 try:
