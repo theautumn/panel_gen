@@ -205,47 +205,6 @@ paths:
                 calling_no:
                   type: string
 
-    post:
-        operationId: line.create
-        tags:
-          - line
-        summary: Create a new instance of a line
-        description: Instantiate a line object
-        parameters:
-          - name: line
-            in: body
-            description: Virtual linee to create
-            required: True
-            schema:
-              type: object
-              properties:
-                ident: 
-                  type: string
-                  description: Number of this line in list.
-                switch:
-                  type: string
-                  description: Switch this line will call from
-                timer:
-                  type: integer
-                  description: Number of seconds remaining until next action
-                hook_state:
-                  type: integer
-                  description: 0 = On hook / 1 = Off hook
-                ast_status:
-                  type: string
-                  description: Status of the line in Asterisk
-                is_dialing:
-                  type: boolean
-                  description: Whether or not the line is currently holding a sender
-                dahdi_chan:
-                  type: integer
-                  description: DAHDI channel the line belongs to
-                calling_no:
-                  type: string
-                  description: Number the line will call
-        responses:
-          201:
-            description: Successfully created line
 
   /line/{ident}:
     get:
@@ -330,6 +289,50 @@ paths:
       responses:
         200:
           description: Successfully deleted a line from lines list
+
+  /line/{switch}:
+    post:
+        operationId: line.create
+        tags:
+          - line
+        summary: Create a new instance of a line
+        description: Instantiate a line object
+        parameters:
+          - name: switch
+            in: path
+            description: Virtual line to create
+            type: string
+            required: True
+#            schema:
+#              type: object
+#              properties:
+#                ident: 
+#                  type: string
+#                  description: Number of this line in list.
+#                switch:
+#                  type: string
+#                  description: Switch this line will call from
+#                timer:
+#                  type: integer
+#                  description: Number of seconds remaining until next action
+#                hook_state:
+#                  type: integer
+#                  description: 0 = On hook / 1 = Off hook
+#                ast_status:
+#                  type: string
+#                  description: Status of the line in Asterisk
+#                is_dialing:
+#                  type: boolean
+#                  description: Whether or not the line is currently holding a sender
+#                dahdi_chan:
+#                  type: integer
+#                  description: DAHDI channel the line belongs to
+#                calling_no:
+#                  type: string
+#                  description: Number the line will call
+        responses:
+          201:
+            description: Successfully created line
 
   /app:
     get:

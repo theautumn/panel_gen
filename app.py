@@ -6,7 +6,15 @@ def read_status():
     return "App Status Message"
 
 def operate():
-    panel_gen.operate()    
+    result = panel_gen.operate()    
+    if result != False:
+        return result
+    else:
+        abort(
+            406,
+            "panel_gen is already running",
+        )
+
     return "App OPERATE"
 
 def nonoperate():

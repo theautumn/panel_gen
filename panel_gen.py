@@ -556,8 +556,9 @@ def operate():
     # Work thread go!
     if w.is_alive != True:
         w.start()
+        logging.info("API requested start")
     else:
-       return "Work thread already running."
+        return False
 
 def nonoperate():
     # This should pause execution and immediately hang up all calls, just
@@ -627,6 +628,28 @@ def get_line(ident):
     for n in lines:
         if api_ident == n.ident:
             result.append(schema.dump(lines[api_ident]))
+
+    if result == []:
+        return False
+    else:
+        return result
+
+def create_line(switch):
+    # Creates a new line using default parameters.
+    # lines.append uses the current number of lines in list
+    # to create the ident value for the new line.
+    schema = LineSchema()
+    result = []
+
+    if switch == 'panel':
+        lines.append(Line(len(lines), Rainier))  
+        result =  len(lines) - 1
+    if switch == '5xb':
+        lines.append(Line(len(lines), Adams))  
+        result = len(lines) - 1
+    if switch == '1xb':
+        lines.append(Line(len(lines), Lakeview))  
+        result = len(lines) - 1
 
     if result == []:
         return False

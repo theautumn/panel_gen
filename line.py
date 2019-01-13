@@ -51,42 +51,25 @@ def read_one(ident):
         )
 
 
-def create(line):
+def create(switch):
     """
     This function creates a new line in the linees structure
     based on the passed in line data
     :param line:  line to create in lines structure
     :return:        201 on success, 406 on line exists
     """
-    line_number= line.get("line_number", None)
-    switch = line.get("switch", None)
-    timer = line.get("timer", None)
-    hook_state = line.get("hook_state", None)
-    ast_state = line.get("ast_state", None)
-    is_dialing = line.get("is_dialing", None)
-    dahdi_chan = line.get("dahdi_chan", None)
-    calling_no = line.get("calling_no", None)
 
-    # Does the line exist already?
-    if line_number not in LINES and line_number is not None:
-        LINES[key] = {
-            "switch": switch,
-            "timer": timer,
-            "hook_state": hook_state,
-            "ast_state": ast_state,
-            "is_dialing": is_dialing,
-            "dahdi_chan": dahdi_chan,
-            "calling_no": calling_no,
-        }
+    line_ident = panel_gen.create_line(switch)
+    if line_ident != False:
         return make_response(
-            "{key} successfully created".format(key=key), 201
+            "New line index {line_ident} successfully created".format(line_ident=line_ident), 201
         )
 
     # Otherwise, they exist, that's an error
     else:
         abort(
             406,
-            "Line number {key} already exists".format(key=key),
+            "Line could not be created",
         )
 
 def update(ident):
