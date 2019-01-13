@@ -52,13 +52,12 @@ def update(**kwargs):
 #    :param kind:   kind of switch to update in the switches structure
 #    :return:        updated switch structure
 #    """
-    # Does the switch exist in switches?
     result = panel_gen.update_switch(**kwargs)
 
-    if result == False:
-        abort(406, "Sarah broke something.")
-    else:
+    if result != False:
         return result
+    else:
+        abort(406, "Sarah broke something.")
 
 def delete(kind):
 #    """

@@ -670,6 +670,14 @@ def delete_line(ident):
     else:
         return result
 
+def update_line(**kwargs):
+    schema = LineSchema()
+
+    # Pull the line ident out of the dict the API passed in.
+    print kwargs
+#    api_ident = kwargs.get("ident", "")
+
+
 def get_switch(kind):
     schema = SwitchSchema()
     result = []
@@ -1148,9 +1156,9 @@ try:
     w.daemon = True
     # operate()
     w.start()
-    t = ui_thread()
-    t.daemon = True
-    t.start()
+#    t = ui_thread()
+#    t.daemon = True
+#    t.start()
 
     sleep(.5)
 except (KeyboardInterrupt, ServiceExit):
