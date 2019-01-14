@@ -19,7 +19,7 @@ paths:
       tags:
         - switch
       summary: Read all switch objects
-      description: Read all switch objects
+      description: Read current status of all switches
       responses:
         200:
           description: Successful read switch operation
@@ -52,7 +52,7 @@ paths:
       tags:
       - switch
       summary: Read one switch from the switches list
-      description: Read one switch from the switches list
+      description: Read current status of a particular switch
       parameters:
       - name: kind
         in: path
@@ -131,7 +131,7 @@ paths:
       tags:
         - switch
       summary: Update a switch in the switches list
-      description: Update a switch in the switches list
+      description: Update an already existing switch in the switches list
       parameters:
         - name: kind
           in: path
@@ -182,7 +182,7 @@ paths:
       tags:
         - line
       summary: Read all line objects
-      description: Read all line objects
+      description: Read all lines and have a party
       responses:
         200:
           description: Successful read line operation
@@ -202,7 +202,7 @@ paths:
                   type: string
                 dahdi_chan:
                   type: string
-                calling_no:
+                called_no:
                   type: string
 
 
@@ -238,18 +238,18 @@ paths:
                 type: boolean
               dahdi_chan:
                 type: string
-              calling_no:
+              called_no:
                 type: string
     patch:
       operationId: line.update
       tags:
         - line
       summary: Update a line in the lines list
-      description: Update a line in the lines list
+      description: Update an already existing line in the lines list
       parameters:
         - name: ident
           in: path
-          description: Number of line to update in the list
+          description: Identity of line to update in the list. Normally an integer, starting at 0
           type: string
           required: True
         - name: line
@@ -269,11 +269,11 @@ paths:
                 type: boolean
               dahdi_chan:
                 type: string
-              calling_no:
+              called_no:
                 type: string
       responses:
         200:
-          description: Successfully updated line in lines list
+          description: Successfully updated line
 
     delete:
       operationId: line.delete
@@ -288,19 +288,19 @@ paths:
           required: True
       responses:
         200:
-          description: Successfully deleted a line from lines list
+          description: Successfully deleted a line
 
   /line/{switch}:
     post:
         operationId: line.create
         tags:
           - line
-        summary: Create a new instance of a line
-        description: Instantiate a line object
+        summary: Create a new line
+        description: Instantiate a line object belonging to a particular switch.
         parameters:
           - name: switch
             in: path
-            description: Virtual line to create
+            description: Switch that the line will originate from
             type: string
             required: True
 #            schema:
@@ -327,7 +327,7 @@ paths:
 #                dahdi_chan:
 #                  type: integer
 #                  description: DAHDI channel the line belongs to
-#                calling_no:
+#                called_no:
 #                  type: string
 #                  description: Number the line will call
         responses:
@@ -398,3 +398,26 @@ paths:
       responses:
         201:
           description: Successfully resumed work thread
+
+  /call/{switch}/{destination}:
+    post:
+      operationId: app.call
+      tags:
+        - app
+      summary: Place a call now.
+      description: Place a call immediately.
+      parameters:
+        - name: switch
+          in: path
+          description: Switch to originate call from
+          type: string
+          required: True
+        - name: destination
+          in: path
+          description: Destination line to call
+          type: string
+          required: True
+
+      responses:
+        201:
+          description: Successfully placed call

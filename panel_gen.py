@@ -43,6 +43,8 @@ class Line():
         self.ident = ident                                          # Set an integer for identity.
         self.chan = '-'                                             # Set DAHDI channel to 0 to start
         self.ast_status = 'on_hook'
+        self.is_api = False                                         # Used for temporary lines from API
+        self.api_indicator = ""                                     # For drawing the table in the UI
 
     def __repr__(self):
         return '<Line(name={self.ident!r})>'.format(self=self)
@@ -65,7 +67,7 @@ class Line():
         if self.timer <= 0:
             if self.status == 0:
                 if self.switch.is_dialing < self.switch.max_dialing:
-                    self.Call()
+                    self.call()
                     self.status = 1
                 else:
                     self.timer = int(round(random.gamma(5,5)))
@@ -106,7 +108,7 @@ class Line():
         #logging.info('Terminating line selected: %s', term)
         return term
 
-    def Call(self):
+    def call(self, **kwargs):
 	# Checks if we're in deterministic mode and sets duration
 	# accordingly. Also checks for wait time in -d mode.
 	#
@@ -125,8 +127,29 @@ class Line():
         else:
             self.timer = self.switch.newtimer()
 
-        wait = str(self.timer - 10)       # Wait value to pass to Asterisk dialplan
-        vars = {'waittime': wait}         # Set the vars to actually pass over
+            # Wait value to pass to Asterisk dialplan if not using API to start call
+            wait = str(self.timer - 10)
+
+            # The kwargs come in from the API. The following lines handle them and set up
+            # the special call case outside of the normal program flow.
+            for key, value in kwargs.items():
+                if key == 'orig_switch':
+                    switch = value
+                if key == 'line':
+                    line = value
+                if key == 'timer':
+                    self.timer = value
+                    wait = str(value)
+
+            # If the line comes from the API /call/{switch}/{line} then this line is temporary.
+            # This sets up special handling so that the status starts at "1", which will cause 
+            # hangup() to hang up the call and delete the line when the call is done. 
+            if self.is_api == True:
+                self.status = 1
+                self.api_indicator = "***"
+
+            # Set the vars to actually pass to call file
+            vars = {'waittime': wait}
 
         # Make the .call file amd throw it into the asterisk spool.
         # Pass control of the call to the sarah_callsim context in
@@ -153,6 +176,11 @@ class Line():
         self.chan = '-'
         self.ast_status = 'on_hook'
 
+        # Delete the line if we are just doing a one-shot call from the API.
+        if self.is_api == True:
+            logging.info("Deleted API one-shot line.")
+            del lines[self.ident]
+
         if args.d:                                              # Are we in deterministic mode?
             if args.w:                                          # args.w is wait time between calls
                self.timer = args.w                              # Set length of the wait time before next call
@@ -163,10 +191,12 @@ class Line():
 
         if args.l:                                              # If user specified a line
             self.term = args.l                                  # Set term line to user specified
-        else:                                                   # Else,
-            self.term = self.pick_called_line(term_choices)       # Pick a new terminating line.
+        else:
+            self.term = self.pick_called_line(term_choices)     # Pick a new terminating line.
 
     def update(self, api):
+        # Used by the API PATCH method to update line parameters.
+
         for (key, value) in api.items():
             if key == 'switch':
                 # Would this even work? Can you change a switch without breaking it?
@@ -182,7 +212,7 @@ class Line():
             if key == 'dahdi_chan':
                 # Change which channel a line belongs to. Also might break everything.
                 self.dahdi_chan = value
-            if key == 'calling_no':
+            if key == 'called_no':
                 self.term = value
  
 # <----- END LINE CLASS -----> #
@@ -230,6 +260,8 @@ class panel():
         return t
 
     def update(self, api):
+        # Used by the API PATCH method to update switch parameters.
+
         for (key, value) in api["switch"].items():
             if key == 'line_range':
                 # Line range must be a tuple from 1000-9999
@@ -239,9 +271,6 @@ class panel():
 		# number of values in nxx must also match trunk_load
                 for i in value:
                     self.nxx = value
-            if key == 'is_dialing':
-		# should not normally need to be changed. remove?
-                self.is_dialing = value
             if key == 'running':
 		# Can be used to start and stop a particular switch.
 		# This feature is not yet implemented fully.
@@ -254,7 +283,10 @@ class panel():
                     self.max_dialing = value
             if key == 'max_calls':
 		# Must be <= 10
-                self.max_calls = value
+                if value >= 10:
+                    return "Fail: must be less than 10 max dialing"
+                else:
+                    self.max_calls = value
             if key == 'dahdi_group':
 		# Must be a group that we have hooked in to panel_gen
                 self.dahdi_group = value
@@ -483,8 +515,8 @@ def parse_args():
     make_switch(args)
 
 def make_switch(args):
-
     # Instantiate some switches. This is so we can ask to get their parameters later.
+
     global Rainier
     global Adams
     global Lakeview
@@ -556,7 +588,7 @@ class LineSchema(Schema):
     is_dialing = fields.Boolean()
     ast_status = fields.Str()
     dahdi_chan = fields.Str()
-    calling_no = fields.Str()
+    called_no = fields.Str()
     hook_state = fields.Integer()
 
 class SwitchSchema(Schema):
@@ -570,6 +602,11 @@ class SwitchSchema(Schema):
     trunk_load = fields.List(fields.Str())
     line_range = fields.List(fields.Str())
     running = fields.Boolean()
+
+class CallSchema(Schema):
+    orig_switch = fields.Str()
+    called_no = fields.Str()
+    timer = fields.Integer()
 
 def get_info():
     # API can get general info about running state.
@@ -647,7 +684,35 @@ def api_resume():
     else:
         return "Already running"
 
+def call_now(switch, term_line):
+    # This is called when a POST is sent to /api/{switch}/{line}
+    # and immediately places a call from SWITCH to LINE. The line
+    # is deleted when the call is done.
+
+    schema = LineSchema()
+
+    if switch == 'panel':
+        switch = Rainier
+    if switch == '5xb':
+        switch = Adams
+    if switch == '1xb':
+        switch = Lakeview
+    
+    on_call_time = 18
+
+    lines.append(Line(len(lines), switch))
+    calling_line = len(lines) - 1
+    lines[calling_line].is_api = True
+    lines[calling_line].timer = 1
+    lines[calling_line].term = term_line
+    lines[calling_line].call(orig_switch=switch, timer=on_call_time)
+    
+    result = schema.dump(lines[calling_line])
+    return result
+
 def get_all_lines():
+    # From API. Gets all active lines.
+
     schema = LineSchema()
     result = []
     for n in lines:
@@ -657,6 +722,7 @@ def get_all_lines():
 def get_line(ident):
     # Check if ident passed in via API exists in lines.
     # If so, send back that line. Else, return False..
+
     api_ident = int(ident)
     schema = LineSchema()
     result = []
@@ -673,6 +739,9 @@ def create_line(switch):
     # Creates a new line using default parameters.
     # lines.append uses the current number of lines in list
     # to create the ident value for the new line.
+
+    # Should eventually accept optional parameters.
+
     schema = LineSchema()
     result = []
 
@@ -918,13 +987,13 @@ class Screen():
 
     def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
-        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.ast_status] for n in lines]
+        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.ast_status, n.api_indicator] for n in lines]
         stdscr.erase()
         stdscr.addstr(0,5," __________________________________________")
         stdscr.addstr(1,5,"|                                          |")
         stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
         stdscr.addstr(3,5,"|__________________________________________|")
-        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk"],
+        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk", "api"],
         tablefmt="pipe", stralign = "right" ))
 
         # Print asterisk channels below the table so we can see what its actually doing.

@@ -22,8 +22,6 @@ def start():
             "panel_gen is already running",
         )
 
-    return "App OPERATE"
-
 def stop():
     panel_gen.nonoperate()
     return "App NONOPERATE"
@@ -35,3 +33,15 @@ def api_pause():
 def api_resume():
     panel_gen.api_resume()
     return "RESUMED"
+
+def call(**kwargs):
+    switch = kwargs.get("switch", "")
+    destination = kwargs.get("destination", "")
+    result = panel_gen.call_now(switch, destination)
+    if result != False:
+        return result
+    else:
+        abort(
+            406,
+            "Call failed for some reason. This message is very unhelpful",
+        )
