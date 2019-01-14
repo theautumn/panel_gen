@@ -351,9 +351,9 @@ paths:
                 running:
                   type: boolean
 
-  /app/operate:
+  /app/start:
     post:
-      operationId: app.operate
+      operationId: app.start
       tags:
         - app
       summary: Start execution of the work thread. 
@@ -363,9 +363,9 @@ paths:
         201:
           description: Successfully started work thread
 
-  /app/nonoperate:
+  /app/stop:
     post:
-      operationId: app.nonoperate
+      operationId: app.stop
       tags:
         - app
       summary: Stop execution of the work thread.
@@ -375,7 +375,7 @@ paths:
         201:
           description: Successfully killed app
 
-  /app/paused:
+  /app/pause:
     post:
       operationId: app.api_pause
       tags:
@@ -387,7 +387,7 @@ paths:
         201:
           description: Successfully paused work thread
 
-  /app/resumed:
+  /app/resume:
     post:
       operationId: app.api_resume
       tags:

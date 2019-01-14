@@ -59,6 +59,8 @@ class Line():
         # a "reasonable number of seconds" and try again.
         # If self.status is "1", we simply call hangup(), which takes care of the cleanup.
 
+        if self.switch.running == False:
+            self.switch.running = True
         self.timer -= 1
         if self.timer <= 0:
             if self.status == 0:
@@ -267,6 +269,7 @@ class xb1():
 
     def __init__(self):
         self.kind = "1xb"
+        self.running = False
         self.max_dialing = 2
         self.is_dialing = 0
         self.dahdi_group = "r11"
@@ -325,6 +328,7 @@ class xb5():
 
     def __init__(self):
         self.kind = "5xb"
+        self.running = False
         self.max_dialing = 7
         self.is_dialing = 0
         self.dahdi_group = "r5"
@@ -536,6 +540,14 @@ def make_switch(args):
 # |                                                    |
 # +----------------------------------------------------+
 
+class AppSchema(Schema):
+    name = fields.Str()
+    app_running = fields.Boolean()
+    is_paused = fields.Boolean()
+    ui_running = fields.Boolean()
+    paused = fields.Boolean()
+    num_lines = fields.Integer()
+
 class LineSchema(Schema):
     line = fields.Dict()
     ident = fields.Integer()
@@ -559,11 +571,27 @@ class SwitchSchema(Schema):
     line_range = fields.List(fields.Str())
     running = fields.Boolean()
 
+def get_info():
+    # API can get general info about running state.
+    schema = AppSchema()
+    result = dict([
+        ('name', __name__),
+        ('app_running', w.is_alive),
+        ('is_paused', w.paused),
+        ('ui_running', t.started),
+        ('num_lines', len(lines))
+        ])
+    logging.info(schema.dump(result))
+    return schema.dump(result)
+
 def operate():
     # Work thread go!
     if w.is_alive != True:
         w.start()
         logging.info("API requested start")
+        result = []
+        result.append(w.is_alive)
+        return result
     else:
         return False
 
@@ -665,7 +693,6 @@ def create_line(switch):
 
 def delete_line(ident):
     api_ident = int(ident)
-    schema = LineSchema()
     result = []
     for n in lines:
         if api_ident == n.ident:
@@ -695,7 +722,12 @@ def get_switch(kind):
     result = []
     for n in orig_switch:
         if kind == n.kind:
-            result.append(schema.dump(n))
+            if n.kind == 'panel':
+                result.append(schema.dump(Rainier))
+            if n.kind == '5xb':
+                result.append(schema.dump(Adams))
+            if n.kind == '1xb':
+                result.append(schema.dump(Lakeview))
 
     if result == []:
         return False

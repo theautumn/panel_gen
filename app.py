@@ -3,9 +3,16 @@ import panel_gen
 
 # Handler for /app GET
 def read_status():
-    return "App Status Message"
+   result = panel_gen.get_info() 
+   if result != False:
+       return result
+   else:
+       abort(
+            406,
+            "Failed to get info",
+        )
 
-def operate():
+def start():
     result = panel_gen.operate()    
     if result != False:
         return result
@@ -17,7 +24,7 @@ def operate():
 
     return "App OPERATE"
 
-def nonoperate():
+def stop():
     panel_gen.nonoperate()
     return "App NONOPERATE"
 
