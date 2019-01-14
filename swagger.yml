@@ -201,7 +201,7 @@ paths:
                 ast_status:
                   type: string
                 dahdi_chan:
-                  type: integer 
+                  type: string
                 calling_no:
                   type: string
 
@@ -237,7 +237,7 @@ paths:
               is_dialing:
                 type: boolean
               dahdi_chan:
-                type: integer
+                type: string
               calling_no:
                 type: string
     patch:
@@ -268,7 +268,7 @@ paths:
               is_dialing:
                 type: boolean
               dahdi_chan:
-                type: integer
+                type: string
               calling_no:
                 type: string
       responses:

@@ -165,10 +165,15 @@ class Line():
             self.term = self.pick_called_line(term_choices)       # Pick a new terminating line.
 
     def update(self, api):
-        for (key, value) in api["line"].items():
+        for (key, value) in api.items():
             if key == 'switch':
                 # Would this even work? Can you change a switch without breaking it?
-                self.switch = value
+                if value == 'panel':
+                    self.switch = Rainier
+                if value == '5xb':
+                    self.switch = Adams
+                if value == '1xb':
+                    self.switch = Lakeivew
             if key == 'timer':
                 # Change the current timer of the line.
                 self.timer = value
@@ -532,13 +537,15 @@ def make_switch(args):
 # +----------------------------------------------------+
 
 class LineSchema(Schema):
-    ident  = fields.Integer()
-    kind = fields.Str()
+    line = fields.Dict()
+    ident = fields.Integer()
+    switch = fields.Str()
     timer = fields.Integer()
-    status = fields.Boolean()
+    is_dialing = fields.Boolean()
     ast_status = fields.Str()
-    chan = fields.Str()
-    term = fields.Str()
+    dahdi_chan = fields.Str()
+    calling_no = fields.Str()
+    hook_state = fields.Integer()
 
 class SwitchSchema(Schema):
     switch = fields.Dict()
@@ -673,10 +680,15 @@ def delete_line(ident):
 def update_line(**kwargs):
     schema = LineSchema()
 
+    api_ident = kwargs.get("ident", "")
     # Pull the line ident out of the dict the API passed in.
-    print kwargs
-#    api_ident = kwargs.get("ident", "")
+    for i, o in enumerate(lines):
+        if o.ident == int(api_ident):
+           parameters = kwargs['line']
+           result = schema.load(parameters)
+           outcome = o.update(result)
 
+           return schema.dump(o)
 
 def get_switch(kind):
     schema = SwitchSchema()
@@ -724,7 +736,6 @@ def update_switch(**kwargs):
             # Make sure we're editing the instance of the switch
             if o.kind == "panel":
                 switch = Rainier
-                print switch
             elif o.kind == "5xb":
                 switch = Adams
             elif o.kind == "1xb":
@@ -1156,9 +1167,9 @@ try:
     w.daemon = True
     # operate()
     w.start()
-#    t = ui_thread()
-#    t.daemon = True
-#    t.start()
+    t = ui_thread()
+    t.daemon = True
+    t.start()
 
     sleep(.5)
 except (KeyboardInterrupt, ServiceExit):
