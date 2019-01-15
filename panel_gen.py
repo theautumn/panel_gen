@@ -128,7 +128,7 @@ class Line():
             self.timer = self.switch.newtimer()
 
             # Wait value to pass to Asterisk dialplan if not using API to start call
-            wait = str(self.timer - 10)
+            wait = self.timer - 10
 
             # The kwargs come in from the API. The following lines handle them and set up
             # the special call case outside of the normal program flow.
@@ -139,7 +139,7 @@ class Line():
                     line = value
                 if key == 'timer':
                     self.timer = value
-                    wait = str(value)
+                    wait = value
 
             # If the line comes from the API /call/{switch}/{line} then this line is temporary.
             # This sets up special handling so that the status starts at "1", which will cause 
@@ -618,7 +618,6 @@ def get_info():
         ('ui_running', t.started),
         ('num_lines', len(lines))
         ])
-    logging.info(schema.dump(result))
     return schema.dump(result)
 
 def operate():
@@ -655,7 +654,6 @@ def nonoperate():
 
     return True
     
-
 def api_pause():
     # All of these functions should probably return something meaningful.
     # They're mostly just placeholders for now.
@@ -663,7 +661,6 @@ def api_pause():
 
     if w.paused == False:
         if t.started == True:
-            w.pause()
             t.draw_paused()
         elif t.started ==False:
             w.pause()
@@ -671,12 +668,10 @@ def api_pause():
     elif w.paused == True:
         return "Already paused"
 
-
 def api_resume():
     # This works, but only sort of. Need to fix!
     if w.paused == True:
         if t.started == True:
-            w.resume()
             t.draw_resumed()
         elif t.started == False:
             w.resume()
@@ -691,24 +686,32 @@ def call_now(switch, term_line):
 
     schema = LineSchema()
 
+    # Validates switch input.
     if switch == 'panel':
         switch = Rainier
-    if switch == '5xb':
+    elif switch == '5xb':
         switch = Adams
-    if switch == '1xb':
+    elif switch == '1xb':
         switch = Lakeview
+    else:
+        return False
     
     on_call_time = 18
 
-    lines.append(Line(len(lines), switch))
-    calling_line = len(lines) - 1
-    lines[calling_line].is_api = True
-    lines[calling_line].timer = 1
-    lines[calling_line].term = term_line
-    lines[calling_line].call(orig_switch=switch, timer=on_call_time)
-    
-    result = schema.dump(lines[calling_line])
-    return result
+    # Validates line input. If sane, set up line for
+    # immediate calling.
+    if len(term_line) == 7:
+        lines.append(Line(len(lines), switch))
+        calling_line = len(lines) - 1
+        lines[calling_line].is_api = True
+        lines[calling_line].timer = 1
+        lines[calling_line].term = term_line
+        lines[calling_line].call(orig_switch=switch, timer=on_call_time)
+        
+        result = schema.dump(lines[calling_line])
+        return result
+    else:
+        return False
 
 def get_all_lines():
     # From API. Gets all active lines.
@@ -747,13 +750,13 @@ def create_line(switch):
 
     if switch == 'panel':
         lines.append(Line(len(lines), Rainier))  
-        result =  len(lines) - 1
+        result.append(len(lines) - 1)
     if switch == '5xb':
         lines.append(Line(len(lines), Adams))  
-        result = len(lines) - 1
+        result.append(len(lines) - 1)
     if switch == '1xb':
         lines.append(Line(len(lines), Lakeview))  
-        result = len(lines) - 1
+        result.append(len(lines) - 1)
 
     if result == []:
         return False
@@ -766,8 +769,8 @@ def delete_line(ident):
     for n in lines:
         if api_ident == n.ident:
             logging.info("API requested delete line %s", n.ident)
-            del lines[api_ident]
-            result = api_ident
+            del lines[n.ident]
+            result.append(api_ident)
     if result == []:
         return False
     else:
@@ -783,7 +786,6 @@ def update_line(**kwargs):
            parameters = kwargs['line']
            result = schema.load(parameters)
            outcome = o.update(result)
-
            return schema.dump(o)
 
 def get_switch(kind):
@@ -942,6 +944,7 @@ class Screen():
         x_start_row = y - 9
         y_start_col = half_cols - half_cols / 2
 
+        w.pause()
         self.stdscr.nodelay(0)
         pause_scr = self.stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
         pause_scr.box()
@@ -949,7 +952,6 @@ class Screen():
         pause_scr.bkgd(' ', curses.color_pair(2))
         self.stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
         pause_scr.refresh()
-        return True
 
     def resumescreen(self):
         # This should erase the paused window and refresh the screen.
@@ -958,10 +960,10 @@ class Screen():
         # tried a bunch of different things. The work thread appears to
         # resume OK.
 
+        w.resume()
         self.stdscr.nodelay(1)
         self.stdscr.refresh()
         self.draw(self.stdscr, lines, self.y, self.x)
-        return False
 
     def helpscreen(self):
         # Draw the help screen when 'h' is pressed. Then, control goes back to
@@ -1042,7 +1044,7 @@ class ui_thread(threading.Thread):
         try:
             curses.wrapper(self.ui_main)
         except Exception as e:
-            print(e)
+            logging.infoo(e)
 
     def ui_main(self, stdscr):
         
@@ -1051,24 +1053,21 @@ class ui_thread(threading.Thread):
         screen = Screen(stdscr)
 
         while not self.shutdown_flag.is_set():
-            try:
-                # Handle user input.
-                screen.getkey(stdscr)
 
-                # Check if screen has been resized. Handle it.
+            # Handle user input.
+            screen.getkey(stdscr)
+
+            # Check if screen has been resized. Handle it.
+            y, x = stdscr.getmaxyx()
+            resized = curses.is_term_resized(y, x)
+            if resized is True:
                 y, x = stdscr.getmaxyx()
-                resized = curses.is_term_resized(y, x)
-                if resized is True:
-                    y, x = stdscr.getmaxyx()
-                    screen.update_size(stdscr, y, x)
+                screen.update_size(stdscr, y, x)
 
-                # Draw the window
-                screen.draw(stdscr, lines, y, x)
+            # Draw the window
+            screen.draw(stdscr, lines, y, x)
 
-            except Exception as e:
-                logging.info(e)
-
-        stdscr.refresh()
+            stdscr.refresh()
 
     def draw_paused(self):
         screen.pausescreen()
@@ -1121,7 +1120,7 @@ class work_thread(threading.Thread):
 
 
 class ServiceExit(Exception):
-	pass
+    pass
 
 class WebShutdown(Exception):
     pass
@@ -1189,9 +1188,9 @@ if __name__ == "__main__":
     # Exception handler for console-based shutdown.
 
         t.shutdown_flag.set()
-        t.join(2)
+        t.join()
         w.shutdown_flag.set()
-        w.join(2)
+        w.join()
 
         logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
@@ -1211,7 +1210,7 @@ if __name__ == "__main__":
         # leads us here.
 
         w.shutdown_flag.set()
-        w.join(2)
+        w.join()
 
         logging.info("Exited due to web interface shutdown")
 
@@ -1228,87 +1227,65 @@ if __name__ == "__main__":
         # Exception for any other errors that I'm not explicitly handling.
 
 	t.shutdown_flag.set()
-	t.join(2)
+	t.join()
         w.shutdown_flag.set()
-        w.join(2)
-        h.shutdown_flag.set()
-	h.join(2)
-
+        w.join()
 
         print("\nOS error {0}".format(e))
         logging.info('**** OS Error ****')
         logging.info('{0}'.format(e))
 
+if __name__ == "panel_gen":
+    # The below gets run if this code is imported as a module.
+    # It skips lots of setup steps.
+    parse_args()
 
-# The below gets run if this code is imported as a module.
-# It skips lots of setup steps.
-parse_args()
+    # Connect to AMI
+    client = AMIClient(address='127.0.0.1',port=5038)
+    future = client.login(username='panel_gen',secret='t431434')
+    if future.response.is_error():
+        raise Exception(str(future.response))
 
-# Connect to AMI
-client = AMIClient(address='127.0.0.1',port=5038)
-future = client.login(username='panel_gen',secret='t431434')
-if future.response.is_error():
-    raise Exception(str(future.response))
+    # If logfile does not exist, create it so logging can write to it.
+    try:
+        with open('/var/log/panel_gen/calls.log', 'a') as file:
+            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
+            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+    except IOError:
+        with open('/var/log/panel_gen/calls.log', 'w') as file:
+            logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
+            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
 
-# If logfile does not exist, create it so logging can write to it.
-try:
-    with open('/var/log/panel_gen/calls.log', 'a') as file:
-        logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-        filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
-except IOError:
-    with open('/var/log/panel_gen/calls.log', 'w') as file:
-        logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-        filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+    logging.info('Starting panel_gen as thread from http_server')
 
-lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
-logging.info('Starting panel_gen as thread from http_server')
+    try:
+        w = work_thread()
+        w.daemon = True
+        w.start()
+        t = ui_thread()
+        t.daemon = True
+        t.start()
 
-try:
-    w = work_thread()
-    w.daemon = True
-    # operate()
-    w.start()
-    t = ui_thread()
-    t.daemon = True
-    t.start()
+        sleep(.5)
 
-    sleep(.5)
-except (KeyboardInterrupt, ServiceExit):
-# Exception handler for console-based shutdown.
+    except Exception:
+        # Exception handler for any exception
 
-    t.shutdown_flag.set()
-    t.join(2)
-    w.shutdown_flag.set()
-    w.join(2)
+        t.shutdown_flag.set()
+        t.join()
+        w.shutdown_flag.set()
+        w.join()
 
-    logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
+        logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
 
-    # Hang up and clean up spool.
-    system("asterisk -rx \"channel request hangup all\"")
-    system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+        # Hang up and clean up spool.
+        system("asterisk -rx \"channel request hangup all\"")
+        system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
 
-    # Log out of AMI
-    client.logoff()
+        # Log out of AMI
+        client.logoff()
 
-    print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
-    print("Thank you for playing Wing Commander!\n\n")
-
-except WebShutdown:
-    # Exception handler for http-server shutdown. The http-server
-    # passes SIGALRM, which calls web_shutdown and eventually
-    # leads us here.
-
-    w.shutdown_flag.set()
-    w.join(2)
-
-    logging.info("Exited due to web interface shutdown")
-
-    # Hang up and clean up spool.
-    system("asterisk -rx \"channel request hangup all\"")
-    system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-
-    # Log out of AMI
-    client.logoff()
-
-    print("panel_gen web shutdown complete.\n")
+        print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
+        print("Thank you for playing Wing Commander!\n\n")
 

@@ -419,5 +419,5 @@ paths:
           required: True
 
       responses:
-        201:
+        200:
           description: Successfully placed call
