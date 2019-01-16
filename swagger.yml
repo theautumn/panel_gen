@@ -13,11 +13,11 @@ basePath: /api
 
 # Paths supported by the server application
 paths:
-  /switch:
+  /switches:
     get:
-      operationId: switch.read_all
+      operationId: switches.read_all
       tags:
-        - switch
+        - switches
       summary: Read all switch objects
       description: Read current status of all switches
       responses:
@@ -46,11 +46,11 @@ paths:
                 trunk_load:
                   type: array
 
-  /switch/{kind}:
+  /switches/{kind}:
     get:
-      operationId: switch.read_one
+      operationId: switches.read_one
       tags:
-      - switch
+      - switches
       summary: Read one switch from the switches list
       description: Read current status of a particular switch
       parameters:
@@ -82,11 +82,13 @@ paths:
                 type: array
               trunk_load:
                 type: array
+              traffic_load:
+                type: string
 
     post:
-        operationId: switch.create
+        operationId: switches.create
         tags:
-          - switch
+          - switches
         summary: Create a new instance of a switch
         description: Instantiate a switch object
         parameters:
@@ -127,9 +129,9 @@ paths:
             description: Successfully created switch
 
     patch:
-      operationId: switch.update
+      operationId: switches.update
       tags:
-        - switch
+        - switches
       summary: Update a switch in the switches list
       description: Update an already existing switch in the switches list
       parameters:
@@ -157,14 +159,16 @@ paths:
                 type: array
               trunk_load:
                 type: array
+              traffic_load:
+                type: string
       responses:
         200:
           description: Successfully updated switch in switches list
 
     delete:
-      operationId: switch.delete
+      operationId: switches.delete
       tags:
-        - switch
+        - switches
       summary: Delete a switch from the switches list
       description: Delete a switch
       parameters:
@@ -173,14 +177,14 @@ paths:
           type: string
           required: True
       responses:
-        200:
+        204:
           description: Successfully deleted a switch from switches list
 
-  /line:
+  /lines:
     get:
-      operationId: line.read_all
+      operationId: lines.read_all
       tags:
-        - line
+        - lines
       summary: Read all line objects
       description: Read all lines and have a party
       responses:
@@ -206,11 +210,11 @@ paths:
                   type: string
 
 
-  /line/{ident}:
+  /lines/{ident}:
     get:
-      operationId: line.read_one
+      operationId: lines.read_one
       tags:
-      - line
+      - lines
       summary: Read one line from the lines list
       description: Read one line from the lines list
       parameters:
@@ -241,9 +245,9 @@ paths:
               called_no:
                 type: string
     patch:
-      operationId: line.update
+      operationId: lines.update
       tags:
-        - line
+        - lines
       summary: Update a line in the lines list
       description: Update an already existing line in the lines list
       parameters:
@@ -278,7 +282,7 @@ paths:
     delete:
       operationId: line.delete
       tags:
-        - line
+        - lines
       summary: Delete a line from the lines list
       description: Delete a line
       parameters:
@@ -287,14 +291,14 @@ paths:
           type: string
           required: True
       responses:
-        200:
+        204:
           description: Successfully deleted a line
 
-  /line/{switch}:
+  /lines/{switch}:
     post:
-        operationId: line.create
+        operationId: lines.create
         tags:
-          - line
+          - lines
         summary: Create a new line
         description: Instantiate a line object belonging to a particular switch.
         parameters:

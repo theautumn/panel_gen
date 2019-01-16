@@ -229,7 +229,8 @@ class panel():
         self.max_dialing = 6
         self.is_dialing = 0
         self.dahdi_group = "r6"                         # Which DAHDI group to originate from.
-        self.dcurve = self.newtimer()                   # Start a new timer when switch is instantiated.
+        self.api_tl = ""
+        self.traffic_load = self.newtimer()             # Start a new timer when switch is instantiated.
 
         if args.d:                                      # If deterministic mode is set,
             self.max_calls = 1                          # Set the max calls to 1, to be super basic.
@@ -251,13 +252,26 @@ class panel():
         return '<panel(name={self.kind!r})>'.format(self=self)
 
     def newtimer(self):
-        if args.v == 'light':
-            t = int(round(random.gamma(20,8)))                  # Low Traffic
-        elif args.v == 'heavy':
-            t = int(round(random.gamma(5,7)))                   # Heavy Traffic
-        else:
-            t = int(round(random.gamma(4,14)))                  # Medium Traffic
-        return t
+        # First checks to see if args.v is specified.
+        # If we're running as module, ignore args, and use API value.
+
+        if __name__ == '__main__':
+            if args.v == 'light':
+                traffic = int(round(random.gamma(20,8)))
+            elif args.v == 'heavy':
+                traffic = int(round(random.gamma(5,7)))
+            elif args.v == 'normal':
+                traffic = int(round(random.gamma(4,14)))
+
+        if __name__ == 'panel_gen':
+            if self.api_tl == 'heavy':
+                traffic = int(round(random.gamma(5,7)))
+            elif self.api_tl == 'light':
+                traffic = int(round(random.gamma(20,8)))
+            else:
+                traffic = int(round(random.gamma(4,14)))
+
+        return traffic
 
     def update(self, api):
         # Used by the API PATCH method to update switch parameters.
@@ -294,6 +308,8 @@ class panel():
 		# Total of all values must add up to 1
 		# Number of values must equal number of NXXs
                 self.trunk_load = value
+            if key == 'traffic_load':
+                self.api_tl = value
 
 class xb1():
     # This class is for the No. 1 Crossbar.
@@ -305,7 +321,7 @@ class xb1():
         self.max_dialing = 2
         self.is_dialing = 0
         self.dahdi_group = "r11"
-        self.dcurve = self.newtimer()
+        self.traffic_load = self.newtimer()
 
         if args.d:
             self.max_calls = 1
@@ -364,7 +380,7 @@ class xb5():
         self.max_dialing = 7
         self.is_dialing = 0
         self.dahdi_group = "r5"
-        self.dcurve = self.newtimer()
+        self.traffic_load = self.newtimer()
 
         if args.d:
             self.max_calls = 1
@@ -587,8 +603,8 @@ class LineSchema(Schema):
     timer = fields.Integer()
     is_dialing = fields.Boolean()
     ast_status = fields.Str()
-    dahdi_chan = fields.Str()
-    called_no = fields.Str()
+    chan = fields.Str()
+    term = fields.Str()
     hook_state = fields.Integer()
 
 class SwitchSchema(Schema):
@@ -602,6 +618,8 @@ class SwitchSchema(Schema):
     trunk_load = fields.List(fields.Str())
     line_range = fields.List(fields.Str())
     running = fields.Boolean()
+    traffic_load = fields.Str()
+    api_tl = fields.Str()
 
 class CallSchema(Schema):
     orig_switch = fields.Str()
@@ -626,8 +644,7 @@ def operate():
         w.start()
         logging.info("API requested start")
         result = []
-        result.append(w.is_alive)
-        return result
+        return True
     else:
         return False
 
@@ -638,10 +655,13 @@ def nonoperate():
     # and a module can not just exit. 
 
     try:
-        if w.paused == False:
-            w.pause()
-        elif w.paused == True:
-            pass
+        if w.is_alive == True:
+            w.shutdown_flag.set()
+            w.join()
+            w.is_alive = False
+            return True
+        elif w.is_alive == False:
+            return False
 
         # >>> Should we also reset the run state of panel_gen, too? Probs.
 
@@ -1044,7 +1064,7 @@ class ui_thread(threading.Thread):
         try:
             curses.wrapper(self.ui_main)
         except Exception as e:
-            logging.infoo(e)
+            logging.info(e)
 
     def ui_main(self, stdscr):
         
@@ -1257,6 +1277,7 @@ if __name__ == "panel_gen":
             filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
 
     lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+#    lines = []
     logging.info('Starting panel_gen as thread from http_server')
 
     try:
