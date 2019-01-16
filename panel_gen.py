@@ -350,25 +350,43 @@ class xb1():
             t = int(round(random.gamma(5,10)))                  # Medium Traffic
         return t
 
-    def update(self, arg):
-        for (key, value) in arg['switch'].items():
+    def update(self, api):
+        # Used by the API PATCH method to update switch parameters.
 
+        for (key, value) in api["switch"].items():
             if key == 'line_range':
-               self.line_range = value
+                # Line range must be a tuple from 1000-9999
+                self.line_range = value
             if key == 'nxx':
-                self.nxx = value
-            if key == 'is_dialing':
-                self.is_dialing = value
+                # nxx must be 3 digits, matching codes we can dial
+		# number of values in nxx must also match trunk_load
+                for i in value:
+                    self.nxx = value
             if key == 'running':
+		# Can be used to start and stop a particular switch.
+		# This feature is not yet implemented fully.
                 self.running = value
             if key == 'max_dialing':
-                self.max_dialing = value
+		# Must be <= 10
+                if value >=10:
+                    return "Fail: bad_max"
+                else:
+                    self.max_dialing = value
             if key == 'max_calls':
-                self.max_calls = value
+		# Must be <= 10
+                if value >= 10:
+                    return "Fail: must be less than 10 max dialing"
+                else:
+                    self.max_calls = value
             if key == 'dahdi_group':
+		# Must be a group that we have hooked in to panel_gen
                 self.dahdi_group = value
             if key == 'trunk_load':
+		# Total of all values must add up to 1
+		# Number of values must equal number of NXXs
                 self.trunk_load = value
+            if key == 'traffic_load':
+                self.api_tl = value
 
 class xb5():
     # This class is for the No. 5 Crossbar.
@@ -412,25 +430,43 @@ class xb5():
             t = int(round(random.gamma(4,14)))                  # Medium Traffic
         return t
 
-    def update(self, arg):
-        for (key, value) in arg['switch'].items():
+    def update(self, api):
+        # Used by the API PATCH method to update switch parameters.
 
+        for (key, value) in api["switch"].items():
             if key == 'line_range':
-               self.line_range = value
+                # Line range must be a tuple from 1000-9999
+                self.line_range = value
             if key == 'nxx':
-                self.nxx = value
-            if key == 'is_dialing':
-                self.is_dialing = value
+                # nxx must be 3 digits, matching codes we can dial
+		# number of values in nxx must also match trunk_load
+                for i in value:
+                    self.nxx = value
             if key == 'running':
+		# Can be used to start and stop a particular switch.
+		# This feature is not yet implemented fully.
                 self.running = value
             if key == 'max_dialing':
-                self.max_dialing = value
+		# Must be <= 10
+                if value >=10:
+                    return "Fail: bad_max"
+                else:
+                    self.max_dialing = value
             if key == 'max_calls':
-                self.max_calls = value
+		# Must be <= 10
+                if value >= 10:
+                    return "Fail: must be less than 10 max dialing"
+                else:
+                    self.max_calls = value
             if key == 'dahdi_group':
+		# Must be a group that we have hooked in to panel_gen
                 self.dahdi_group = value
             if key == 'trunk_load':
+		# Total of all values must add up to 1
+		# Number of values must equal number of NXXs
                 self.trunk_load = value
+            if key == 'traffic_load':
+                self.api_tl = value
 
 class step():
     # This class is for the SxS office. It's very minimal, as we are not currently
@@ -438,7 +474,7 @@ class step():
 
     def __init__(self):
         self.kind = "Step"
-        self.line_range = [4124,4199]
+        self.line_range = [4124,4129]
 
 
 # +-----------------------------------------------+
@@ -639,7 +675,12 @@ def get_info():
     return schema.dump(result)
 
 def operate():
-    # Work thread go!
+    # Should do the opposite of nonoperate(). 
+    # Should read in switch to start on, and
+    # create lines from a DB using preset defaults
+    # similar to how things work if you start via
+    # the command line. Currently THIS DOES NOT WORK.
+
     if w.is_alive != True:
         w.start()
         logging.info("API requested start")
@@ -648,25 +689,20 @@ def operate():
     else:
         return False
 
-def nonoperate():
+def nonoperate(*args):
     # This should pause execution and immediately hang up all calls, just
     # as though we were exiting the program. Of course, we can't actually
     # exit, as this function is only called if we're running as a module,
     # and a module can not just exit. 
 
     try:
-        if w.is_alive == True:
-            w.shutdown_flag.set()
-            w.join()
-            w.is_alive = False
-            return True
-        elif w.is_alive == False:
-            return False
+        # First, delete all the lines.
+        delete_all_lines()
 
         # >>> Should we also reset the run state of panel_gen, too? Probs.
 
         # Hang up and clean up spool.
-        system("asterisk -rx \"channel request hangup all\"")
+        system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
         system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
     except Exception as e:
         logging.info(e)
@@ -783,7 +819,21 @@ def create_line(switch):
     else:
         return result
 
+def delete_all_lines():
+    # This feels like a really dirty way to do this, but here it is.
+    # Deletes all lines immediately.
+
+    logging.info("API requested delete all lines.")
+    while len(lines) > 0:
+        del lines[0]
+    if len(lines) == 0:
+        return True
+    else:
+        return False
+
 def delete_line(ident):
+    # Deletes a specific line passed in via ident.
+
     api_ident = int(ident)
     result = []
     for n in lines:
@@ -808,7 +858,19 @@ def update_line(**kwargs):
            outcome = o.update(result)
            return schema.dump(o)
 
+def get_all_switches():
+    # Return all switches that exist in orig_switch. Sort of
+    # broken because I don't use orig_switch properly.
+
+    schema = SwitchSchema()
+    result = []
+    for n in orig_switch:
+        result.append(schema.dump(n))
+    return result
+
 def get_switch(kind):
+    # Gets the parameters for a particular switch object.
+
     schema = SwitchSchema()
     result = []
     for n in orig_switch:
@@ -824,13 +886,6 @@ def get_switch(kind):
         return False
     else:
         return result
-
-def get_all_switches():
-    schema = SwitchSchema()
-    result = []
-    for n in orig_switch:
-        result.append(schema.dump(n))
-    return result
 
 def create_switch(kind):
     if kind == 'panel':

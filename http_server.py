@@ -22,13 +22,9 @@ import panel_gen
 #log = logging.getLogger('werkzeug')
 #log.setLevel(logging.ERROR)
 
-try:
-    #app = Flask(__name__)
-    app = connexion.App(__name__, specification_dir='./')
-    app.add_api('swagger.yml')
-except Exception:
-    # This doesn't even work like its supposed to.
-    panel_gen.web_shutdown(14, 0)
+#app = Flask(__name__)
+app = connexion.App(__name__, specification_dir='./')
+app.add_api('swagger.yml')
 
 class bcolors:
     HEADER = '\033[95m'

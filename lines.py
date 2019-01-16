@@ -68,11 +68,10 @@ def update(**kwargs):
 
 def delete(ident):
     """
-    This function deletes a line from the linees structure
+    This function deletes a line from the lines structure
     :param key:   key of line to delete
     :return:      200 on successful delete, 404 if not found
     """
-    # Does the line to delete exist?
     line = panel_gen.delete_line(ident)
     if line != False:
         return make_response(
@@ -83,4 +82,19 @@ def delete(ident):
     else:
         abort(
             404, "Line {ident} not found".format(ident=ident)
+        )
+
+def delete_all():
+    """
+    This function deletes all lines
+    :return:    200 on success, 406 if delete fails
+    """
+    result = panel_gen.delete_all_lines()
+    if result != False:
+        return make_response(
+            "All lines successfully deleted.", 200
+        )
+    else:
+        abort(
+            406, "Failed to delete lines."
         )

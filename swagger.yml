@@ -165,28 +165,13 @@ paths:
         200:
           description: Successfully updated switch in switches list
 
-    delete:
-      operationId: switches.delete
-      tags:
-        - switches
-      summary: Delete a switch from the switches list
-      description: Delete a switch
-      parameters:
-        - name: kind
-          in: path
-          type: string
-          required: True
-      responses:
-        204:
-          description: Successfully deleted a switch from switches list
-
   /lines:
     get:
       operationId: lines.read_all
       tags:
         - lines
-      summary: Read all line objects
-      description: Read all lines and have a party
+      summary: Represents line objects
+      description: Read all lines
       responses:
         200:
           description: Successful read line operation
@@ -209,6 +194,15 @@ paths:
                 called_no:
                   type: string
 
+    delete:
+      operationId: lines.delete_all
+      tags:
+        - lines
+      summary: Represents line objects
+      description: Deletes all lines
+      responses:
+        204:
+          description: Successful delete line operation
 
   /lines/{ident}:
     get:
@@ -280,7 +274,7 @@ paths:
           description: Successfully updated line
 
     delete:
-      operationId: line.delete
+      operationId: lines.delete
       tags:
         - lines
       summary: Delete a line from the lines list
