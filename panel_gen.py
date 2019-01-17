@@ -225,7 +225,7 @@ class panel():
 
     def __init__(self):
         self.kind = "panel"                             # The kind of switch we're calling from.
-        self.running = False                            # Not used yet.
+        self.running = False
         self.max_dialing = 6
         self.is_dialing = 0
         self.dahdi_group = "r6"                         # Which DAHDI group to originate from.
@@ -249,7 +249,7 @@ class panel():
         self.line_range = [5000,5999]                   # Range of lines that can be chosen.
 
     def __repr__(self):
-        return '<panel(name={self.kind!r})>'.format(self=self)
+        return("{}('{}')".format(self.__class__.__name__, self.running))
 
     def newtimer(self):
         # First checks to see if args.v is specified.
@@ -339,7 +339,7 @@ class xb1():
         self.line_range = [105,107,108,109,110,111,112,113,114]
 
     def __repr__(self):
-        return '<xb1(name={self.kind!r})>'.format(self=self)
+        return("{}('{}')".format(self.__class__.__name__, self.running))
 
     def newtimer(self):
         if args.v == 'light':
@@ -419,7 +419,7 @@ class xb5():
                         1035,1126,9267,1381,1470,9512,1663,9743,1841,1921]
 
     def __repr__(self):
-        return '<xb5(name={self.kind!r})>'.format(self=self)
+        return("{}('{}')".format(self.__class__.__name__, self.running))
 
     def newtimer(self):
         if args.v == 'light':
@@ -582,18 +582,24 @@ def make_switch(args):
     global orig_switch
     orig_switch = []
 
-    if args.o == []:                                    # If no args provided, just assume panel switch.
-        args.o = ['panel']
+    if __name__ == 'panel_gen':
+        orig_switch.append(Rainier)
+        orig_switch.append(Adams)
+        orig_switch.append(Lakeview)
 
-    for o in args.o:
-        if o == 'panel' or o == '722':
-            orig_switch.append(Rainier)
-        elif o == '5xb' or o == '232':
-            orig_switch.append(Adams)
-        elif o == '1xb' or o == '832':
-            orig_switch.append(Lakeview)
-        elif o == 'all':
-            orig_switch.extend((Lakeview, Adams, Rainier))
+    if __name__ == '__main__':
+        if args.o == []:                # If no args provided, just assume panel switch.
+            args.o = ['panel']
+
+        for o in args.o:
+            if o == 'panel' or o == '722':
+                orig_switch.append(Rainier)
+            elif o == '5xb' or o == '232':
+                orig_switch.append(Adams)
+            elif o == '1xb' or o == '832':
+                orig_switch.append(Lakeview)
+            elif o == 'all':
+                orig_switch.extend((Lakeview, Adams, Rainier))
 
     global term_choices
     term_choices = []
@@ -674,32 +680,52 @@ def get_info():
         ])
     return schema.dump(result)
 
-def operate():
-    # Should do the opposite of nonoperate(). 
+def operate(switch):
+    # Should do the opposite of start(). 
     # Should read in switch to start on, and
     # create lines from a DB using preset defaults
     # similar to how things work if you start via
     # the command line. Currently THIS DOES NOT WORK.
 
+    logging.info("API requested start on %s", switch)
     if w.is_alive != True:
         w.start()
-        logging.info("API requested start")
-        result = []
-        return True
-    else:
-        return False
+    if w.is_alive == True:
 
-def nonoperate(*args):
+        global lines
+        if switch == 'panel':
+            switch = Rainier
+        if switch == '5xb':
+            switch = Adams
+        if switch == '1xb':
+            switch = Lakeview
+
+        if switch.running == True:
+            logging.info("%s is running. Can't start twice.", switch)
+        elif switch.running == False:
+            logging.info("Appending lines to %s", switch)
+            new_lines = [Line(n, switch) for n in range(switch.max_calls)]
+            for n in new_lines:
+                lines.append(n)
+            switch.running = True
+
+    result = get_info()
+    return result
+    
+def stop(*args):
     # This should pause execution and immediately hang up all calls, just
     # as though we were exiting the program. Of course, we can't actually
     # exit, as this function is only called if we're running as a module,
     # and a module can not just exit. 
 
+
     try:
         # First, delete all the lines.
         delete_all_lines()
 
-        # >>> Should we also reset the run state of panel_gen, too? Probs.
+        # Set all switches to False
+        for n in orig_switch:
+            n.running = False
 
         # Hang up and clean up spool.
         system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
@@ -888,14 +914,16 @@ def get_switch(kind):
         return result
 
 def create_switch(kind):
-    if kind == 'panel':
-        orig_switch.append(Rainier)
-        return orig_switch
-    elif kind == '5xb':
-        orig_switch.append(Adams)
-        return orig_switch
-    elif kind == '1xb':
-        orig_switch.append(Lakeview)
+    if 'panel' not in orig_switch:
+        if kind == 'panel':
+            orig_switch.append(Rainier)
+    if '5xb' not in orig_switch:
+        if kind == '5xb':
+            orig_switch.append(Adams)
+    if '1xb' not in orig_switch:
+        if kind == '1xb':
+            orig_switch.append(Lakeview)
+    if orig_switch != []:    
         return orig_switch
     else:
         return False
@@ -1331,8 +1359,8 @@ if __name__ == "panel_gen":
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
             filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
 
-    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
-#    lines = []
+#    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+    lines = []
     logging.info('Starting panel_gen as thread from http_server')
 
     try:

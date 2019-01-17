@@ -12,8 +12,9 @@ def read_status():
             "Failed to get info",
         )
 
-def start():
-    result = panel_gen.operate()    
+def start(**kwargs):
+    switch = kwargs.get("switch", "")
+    result = panel_gen.operate(switch)    
     if result != False:
         return result
     else:
@@ -23,8 +24,8 @@ def start():
         )
 
 def stop():
-    panel_gen.nonoperate()
-    return "App NONOPERATE"
+    panel_gen.stop()
+    return "App Stop"
 
 def api_pause():
     panel_gen.api_pause()

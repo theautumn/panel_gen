@@ -349,13 +349,19 @@ paths:
                 running:
                   type: boolean
 
-  /app/start:
+  /app/start/{switch}:
     post:
       operationId: app.start
       tags:
         - app
       summary: Start execution of the work thread. 
-      description: Starts all existing switches. Name is a joke on Bell System terminology.
+      description: Starts a particular switch.
+      parameters:
+        - name: switch
+          in: path
+          description: Switch to originate call from
+          type: string
+          required: True
 
       responses:
         201:
@@ -367,11 +373,11 @@ paths:
       tags:
         - app
       summary: Stop execution of the work thread.
-      description: Stop all actions and release lines. Another Bell System in-joke.
+      description: Stop all actions and release lines.
 
       responses:
         201:
-          description: Successfully killed app
+          description: Successfully stopped processing calls
 
   /app/pause:
     post:
