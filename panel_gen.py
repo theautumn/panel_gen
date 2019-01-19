@@ -721,24 +721,21 @@ def api_stop(switch):
     logging.info("API requested STOP on %s", switch)
 
     if switch == 'panel':
-        switch = Rainier
-    if switch == '5xb':
-        switch = Adams
-    if switch == '1xb':
-        switch = Lakeview
+        instance = Rainier
+    elif switch == '5xb':
+        instance = Adams
+    elif switch == '1xb':
+        instance = Lakeview
+    else: 
+        return False
 
-    #if switch.running == True:
-#    logging.info("%s is running", switch)
-    for i, o in enumerate(lines):
-        print i,o
-                        # for some reason this always deletes
-                        # elements 0=0, 1=2, 2=4
-                        # 0=1
-                        # 0=3
-                        # when given 5 lines to iterate over, 0-4
-#        if switch == o.switch:
-        del lines[i]
-#    switch.running = False
+    if instance.running == True:
+        print("instance running %s", switch)
+        for n in sorted(lines, reverse=True):
+            if switch == n.kind:
+                print('switch equals')
+                del lines[n.ident]
+    instance.running = False
 
     try:
         # Hang up and clean up spool.
@@ -1391,8 +1388,8 @@ if __name__ == "panel_gen":
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
             filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
 
-#    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
-    lines = []
+    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+#    lines = []
     logging.info('Starting panel_gen as thread from http_server')
 
 
