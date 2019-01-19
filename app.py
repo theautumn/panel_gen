@@ -14,7 +14,7 @@ def read_status():
 
 def start(**kwargs):
     switch = kwargs.get("switch", "")
-    result = panel_gen.operate(switch)    
+    result = panel_gen.api_start(switch)    
     if result != False:
         return result
     else:
@@ -23,9 +23,16 @@ def start(**kwargs):
             "panel_gen is already running",
         )
 
-def stop():
-    panel_gen.stop()
-    return "App Stop"
+def stop(**kwargs):
+    switch = kwargs.get("switch", "")
+    result = panel_gen.api_stop(switch)
+    if result != False:
+        return result
+    else:
+        abort(
+            406,
+            "Failed to stop switch. Maybe already stopped.",
+        )
 
 def api_pause():
     panel_gen.api_pause()

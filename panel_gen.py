@@ -680,14 +680,14 @@ def get_info():
         ])
     return schema.dump(result)
 
-def operate(switch):
+def api_start(switch):
     # Should do the opposite of start(). 
     # Should read in switch to start on, and
     # create lines from a DB using preset defaults
     # similar to how things work if you start via
     # the command line. Currently THIS DOES NOT WORK.
 
-    logging.info("API requested start on %s", switch)
+    logging.info("API requested START on %s", switch)
     if w.is_alive != True:
         w.start()
     if w.is_alive == True:
@@ -703,30 +703,44 @@ def operate(switch):
         if switch.running == True:
             logging.info("%s is running. Can't start twice.", switch)
         elif switch.running == False:
-            logging.info("Appending lines to %s", switch)
             new_lines = [Line(n, switch) for n in range(switch.max_calls)]
             for n in new_lines:
                 lines.append(n)
             switch.running = True
+            logging.info("Appending lines to %s", switch)
 
     result = get_info()
     return result
     
-def stop(*args):
+def api_stop(switch):
     # This should pause execution and immediately hang up all calls, just
     # as though we were exiting the program. Of course, we can't actually
     # exit, as this function is only called if we're running as a module,
     # and a module can not just exit. 
 
+    logging.info("API requested STOP on %s", switch)
+
+    if switch == 'panel':
+        switch = Rainier
+    if switch == '5xb':
+        switch = Adams
+    if switch == '1xb':
+        switch = Lakeview
+
+    #if switch.running == True:
+#    logging.info("%s is running", switch)
+    for i, o in enumerate(lines):
+        print i,o
+                        # for some reason this always deletes
+                        # elements 0=0, 1=2, 2=4
+                        # 0=1
+                        # 0=3
+                        # when given 5 lines to iterate over, 0-4
+#        if switch == o.switch:
+        del lines[i]
+#    switch.running = False
 
     try:
-        # First, delete all the lines.
-        delete_all_lines()
-
-        # Set all switches to False
-        for n in orig_switch:
-            n.running = False
-
         # Hang up and clean up spool.
         system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
         system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
@@ -734,7 +748,8 @@ def stop(*args):
         logging.info(e)
         return False
 
-    return True
+    result = get_info()
+    return result
     
 def api_pause():
     # All of these functions should probably return something meaningful.
@@ -799,9 +814,7 @@ def get_all_lines():
     # From API. Gets all active lines.
 
     schema = LineSchema()
-    result = []
-    for n in lines:
-        result.append(schema.dump(n))
+    result = [schema.dump(n) for n in lines]
     return result
 
 def get_line(ident):
@@ -810,7 +823,6 @@ def get_line(ident):
 
     api_ident = int(ident)
     schema = LineSchema()
-    result = []
     for n in lines:
         if api_ident == n.ident:
             result.append(schema.dump(lines[api_ident]))
@@ -889,9 +901,7 @@ def get_all_switches():
     # broken because I don't use orig_switch properly.
 
     schema = SwitchSchema()
-    result = []
-    for n in orig_switch:
-        result.append(schema.dump(n))
+    result = [schema.dump(n) for n in orig_switch]
     return result
 
 def get_switch(kind):
@@ -974,6 +984,28 @@ def delete_switch(kind):
         return False
     else:
         return result
+
+def filterpanel(lines):
+    switch = 'panel'
+    for n in lines:
+        if(switch in n.switch):
+            return True
+        else:
+            return False
+
+def filter5xb(lines):
+    switch = '5xb'
+    if(lines.switch in switch):
+        return True
+    else:
+        return False
+
+def filter1xb(lines):
+    switch = '1xb'
+    if(lines.switch in switch):
+        return True
+    else:
+        return False
 
 # +-----------------------------------------------+
 # |                                               |
@@ -1363,13 +1395,14 @@ if __name__ == "panel_gen":
     lines = []
     logging.info('Starting panel_gen as thread from http_server')
 
+
     try:
         w = work_thread()
         w.daemon = True
         w.start()
         t = ui_thread()
         t.daemon = True
-        t.start()
+#        t.start()
 
         sleep(.5)
 

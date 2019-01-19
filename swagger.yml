@@ -354,8 +354,8 @@ paths:
       operationId: app.start
       tags:
         - app
-      summary: Start execution of the work thread. 
-      description: Starts a particular switch.
+      summary: Start calls on a switch..
+      description: Starts calls on a particular switch.
       parameters:
         - name: switch
           in: path
@@ -367,17 +367,23 @@ paths:
         201:
           description: Successfully started work thread
 
-  /app/stop:
+  /app/stop/{switch}:
     post:
       operationId: app.stop
       tags:
         - app
-      summary: Stop execution of the work thread.
-      description: Stop all actions and release lines.
+      summary: Stop calls on a switch..
+      description: Stop all actions and release lines. Use /stop/all to stop everything.
+      parameters:
+        - name: switch
+          in: path
+          description: Switch to stop. 'all' for all switches.
+          type: string
+          required: True
 
       responses:
         201:
-          description: Successfully stopped processing calls
+          description: Successfully stopped processing calls.
 
   /app/pause:
     post:
