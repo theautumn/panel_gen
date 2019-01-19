@@ -670,6 +670,8 @@ class CallSchema(Schema):
 
 def get_info():
     # API can get general info about running state.
+    # Will likely add more functionality here.
+
     schema = AppSchema()
     result = dict([
         ('name', __name__),
@@ -681,11 +683,10 @@ def get_info():
     return schema.dump(result)
 
 def api_start(switch):
-    # Should do the opposite of start(). 
     # Should read in switch to start on, and
     # create lines from a DB using preset defaults
     # similar to how things work if you start via
-    # the command line. Currently THIS DOES NOT WORK.
+    # the command line.
 
     logging.info("API requested START on %s", switch)
     if w.is_alive != True:
@@ -713,13 +714,12 @@ def api_start(switch):
     return result
     
 def api_stop(switch):
-    # This should pause execution and immediately hang up all calls, just
-    # as though we were exiting the program. Of course, we can't actually
-    # exit, as this function is only called if we're running as a module,
-    # and a module can not just exit. 
+    # This reads 'switch' and immediately hang up all calls, and
+    # destroy all lines. 
 
     logging.info("API requested STOP on %s", switch)
 
+    # Validate switch input.
     if switch == 'panel':
         instance = Rainier
     elif switch == '5xb':
@@ -730,10 +730,9 @@ def api_stop(switch):
         return False
 
     if instance.running == True:
-        print("instance running %s", switch)
+        print("instance running %s", instance)
         for n in sorted(lines, reverse=True):
             if switch == n.kind:
-                print('switch equals')
                 del lines[n.ident]
     instance.running = False
 
@@ -749,9 +748,10 @@ def api_stop(switch):
     return result
     
 def api_pause():
-    # All of these functions should probably return something meaningful.
-    # They're mostly just placeholders for now.
-    # WE CAN ONLY SEND THIS ONCE, OTHERWISE EVERYTHING WILL BLOCK. FIX ME PLEASE!
+    # Checks to see if the work thread is paused. If it's NOT paused,
+    # we will pause it. If the UI thread is running, we draw a paused
+    # notification on screen. This particular part is somewhat broken.
+    # I think I need to make the return more sensible as well.
 
     if w.paused == False:
         if t.started == True:
@@ -763,7 +763,9 @@ def api_pause():
         return "Already paused"
 
 def api_resume():
-    # This works, but only sort of. Need to fix!
+    # This checks to see if we are paused. If so, then resume.
+    # Should probably return something more sensible.
+
     if w.paused == True:
         if t.started == True:
             t.draw_resumed()
@@ -808,7 +810,7 @@ def call_now(switch, term_line):
         return False
 
 def get_all_lines():
-    # From API. Gets all active lines.
+    # From API. Returns all active lines.
 
     schema = LineSchema()
     result = [schema.dump(n) for n in lines]
@@ -856,7 +858,7 @@ def create_line(switch):
 
 def delete_all_lines():
     # This feels like a really dirty way to do this, but here it is.
-    # Deletes all lines immediately.
+    # Deletes all lines immediately. Lists are hard.
 
     logging.info("API requested delete all lines.")
     while len(lines) > 0:
@@ -882,6 +884,8 @@ def delete_line(ident):
         return result
 
 def update_line(**kwargs):
+    # Updates a given line with new parameters.
+
     schema = LineSchema()
 
     api_ident = kwargs.get("ident", "")
@@ -981,28 +985,6 @@ def delete_switch(kind):
         return False
     else:
         return result
-
-def filterpanel(lines):
-    switch = 'panel'
-    for n in lines:
-        if(switch in n.switch):
-            return True
-        else:
-            return False
-
-def filter5xb(lines):
-    switch = '5xb'
-    if(lines.switch in switch):
-        return True
-    else:
-        return False
-
-def filter1xb(lines):
-    switch = '1xb'
-    if(lines.switch in switch):
-        return True
-    else:
-        return False
 
 # +-----------------------------------------------+
 # |                                               |
