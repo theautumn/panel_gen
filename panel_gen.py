@@ -18,6 +18,8 @@ import logging
 import curses
 import re
 import threading
+import sqlite3
+from sqlite3 import Error
 from marshmallow import Schema, fields
 from tabulate import tabulate
 from numpy import random
@@ -502,8 +504,6 @@ def on_DialBegin(event, **kwargs):
 
     DialString = DialString.findall(output)
     DB_DestChannel = DB_DestChannel.findall(output)
-    #logging.info('%s', DialString)
-    #logging.info('%s', DestChannel)
 
     for n in lines:
         if DialString[0] == str(n.term) and n.ast_status == 'on_hook':
@@ -986,6 +986,27 @@ def delete_switch(kind):
     else:
         return result
 
+
+
+#  +-----------------------------------+
+#  |                                   |
+#  |  SQLite database things here.     |
+#  |  This allows for persistence,     |
+#  |  and for loading states, such as  |
+#  |  demo modes for tours.            |
+#  |                                   |
+#  +-----------------------------------+
+
+def create_connection(db_file):
+    """ create a database connection to a SQLite database """
+    try:
+        conn = sqlite3.connect(db_file)
+        print(sqlite3.version)
+	return conn
+    except Error as e:
+        print(e)
+
+
 # +-----------------------------------------------+
 # |                                               |
 # |  Below is the class for the screen. These     |
@@ -1360,6 +1381,11 @@ if __name__ == "panel_gen":
     if future.response.is_error():
         raise Exception(str(future.response))
 
+    conn = create_connection("./db/macros.db")
+
+    if conn is not None:
+	pass
+
     # If logfile does not exist, create it so logging can write to it.
     try:
         with open('/var/log/panel_gen/calls.log', 'a') as file:
@@ -1398,6 +1424,9 @@ if __name__ == "panel_gen":
         # Hang up and clean up spool.
         system("asterisk -rx \"channel request hangup all\"")
         system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+
+	# Close SQLite DB connection.
+        conn.close()
 
         # Log out of AMI
         client.logoff()
