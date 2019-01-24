@@ -18,8 +18,6 @@ import logging
 import curses
 import re
 import threading
-import sqlite3
-from sqlite3 import Error
 from marshmallow import Schema, fields
 from tabulate import tabulate
 from numpy import random
@@ -56,16 +54,17 @@ class Line():
         return self.timer
 
     def tick(self):
-        # Decrement timers by 1 every second until it reaches 0
-        # At 0, we're going to check a few things. First, status. If line is on hook "0",
-        # and if we haven't maxed out the senders, then call and set the status of the line to "1".
-        # If we have more dialing than we have sender capacity, then we reset the timer to
-        # a "reasonable number of seconds" and try again.
-        # If self.status is "1", we simply call hangup(), which takes care of the cleanup.
-
+        """
+        Decrement timers by 1 every second until it reaches 0
+        At 0, we're going to check a few things. First, status. If line is on hook "0",
+        and if we haven't maxed out the senders, then call and set the status of the line to "1".
+        If we have more dialing than we have sender capacity, then we reset the timer to
+        a "reasonable number of seconds" and try again.
+        If self.status is "1", we simply call hangup(), which takes care of the cleanup.
+        """
         if self.switch.running == False:
             self.switch.running = True
-        self.timer -= 1
+            self.timer -= 1
         if self.timer <= 0:
             if self.status == 0:
                 if self.switch.is_dialing < self.switch.max_dialing:
@@ -74,7 +73,7 @@ class Line():
                 else:
                     self.timer = int(round(random.gamma(5,5)))
                     logging.info("Exceeded sender limit: %s with %s calls dialing. Delaying call.",
-			self.switch.max_dialing, self.switch.is_dialing)
+                        self.switch.max_dialing, self.switch.is_dialing)
             elif self.status == 1:
                 self.hangup()
         return self.timer
@@ -111,15 +110,17 @@ class Line():
         return term
 
     def call(self, **kwargs):
-	# Checks if we're in deterministic mode and sets duration
-	# accordingly. Also checks for wait time in -d mode.
-	#
-        # Dialing takes ~10 to 12 seconds. We're going to set a timer
-        # for call duration here, and then a few lines down,
-        # we're gonna tell Asterisk to set its own wait timer to the same value - 10.
-        # This should give us a reasonable buffer between the program's counter and
-        # Asterisk's wait timer (which itself begins when the call goes from
-        # dialing to "UP").
+        """
+	Checks if we're in deterministic mode and sets duration
+	accordingly. Also checks for wait time in -d mode.
+
+        Dialing takes ~10 to 12 seconds. We're going to set a timer
+        for call duration here, and then a few lines down,
+        we're gonna tell Asterisk to set its own wait timer to the same value - 10.
+        This should give us a reasonable buffer between the program's counter and
+        Asterisk's wait timer (which itself begins when the call goes from
+        dialing to "UP").
+        """
 
         if args.d:
             if args.z:
@@ -216,7 +217,7 @@ class Line():
                 self.dahdi_chan = value
             if key == 'called_no':
                 self.term = value
- 
+
 # <----- END LINE CLASS -----> #
 
 # <----- BEGIN SWITCH CLASSES ------> #
@@ -226,29 +227,29 @@ class panel():
     # It should not normally need to be edited.
 
     def __init__(self):
-        self.kind = "panel"                             # The kind of switch we're calling from.
-        self.running = False
+        self.kind = "panel"                     # The kind of switch we're calling from.
+        self.running = False                    # Whether or not the switch is running.
         self.max_dialing = 6
         self.is_dialing = 0
-        self.dahdi_group = "r6"                         # Which DAHDI group to originate from.
+        self.dahdi_group = "r6"                  # Which DAHDI group to originate from.
         self.api_tl = ""
-        self.traffic_load = self.newtimer()             # Start a new timer when switch is instantiated.
+        self.traffic_load = self.newtimer()      # Start a new timer when switch is instantiated.
 
-        if args.d:                                      # If deterministic mode is set,
-            self.max_calls = 1                          # Set the max calls to 1, to be super basic.
+        if args.d:                               # If deterministic mode is set,
+            self.max_calls = 1                   # Set the max calls to 1, to be super basic.
         elif args.a:
-            self.max_calls = args.a                     # Else, use the value given with -a
+            self.max_calls = args.a              # Else, use the value given with -a
         else:
-            self.max_calls = 3                          # Finally, if no args are given, use this default.
+            self.max_calls = 3                   # Finally, if no args are given, use this default.
 
-        self.max_nxx1 = .6                              # Load for office 1 in self.trunk_load
-        self.max_nxx2 = .2                              # Load for office 2 in self.trunk_load
-        self.max_nxx3 = .2                              # Load for office 3 in self.trunk_load
-        self.max_nxx4 = 0                               # Load for office 4 in self.trunk_load
-        self.nxx = [722, 365, 232]                      # Office codes that can be dialed.
+        self.max_nxx1 = .6                       # Load for office 1 in self.trunk_load
+        self.max_nxx2 = .2                       # Load for office 2 in self.trunk_load
+        self.max_nxx3 = .2                       # Load for office 3 in self.trunk_load
+        self.max_nxx4 = 0                        # Load for office 4 in self.trunk_load
+        self.nxx = [722, 365, 232]               # Office codes that can be dialed.
         self.trunk_load = [self.max_nxx1,
             self.max_nxx2, self.max_nxx3]
-        self.line_range = [5000,5999]                   # Range of lines that can be chosen.
+        self.line_range = [5000,5999]            # Range of lines that can be chosen.
 
     def __repr__(self):
         return("{}('{}')".format(self.__class__.__name__, self.running))
@@ -273,7 +274,7 @@ class panel():
             else:
                 traffic = int(round(random.gamma(4,14)))
 
-        return traffic
+            return traffic
 
     def update(self, api):
         # Used by the API PATCH method to update switch parameters.
@@ -505,13 +506,13 @@ def on_DialBegin(event, **kwargs):
     DialString = DialString.findall(output)
     DB_DestChannel = DB_DestChannel.findall(output)
 
-    for n in lines:
+    for l in lines:
         if DialString[0] == str(n.term) and n.ast_status == 'on_hook':
             # logging.info('DialString match %s and %s', DialString[0], str(n.term))
-            n.chan = DB_DestChannel[0]
-            n.ast_status = 'Dialing'
-            n.switch.is_dialing += 1
-            logging.info('Calling %s on DAHDI/%s from %s', n.term, n.chan, n.switch.kind)
+            l.chan = DB_DestChannel[0]
+            l.ast_status = 'Dialing'
+            l.switch.is_dialing += 1
+            logging.info('Calling %s on DAHDI/%s from %s', l.term, l.chan, l.switch.kind)
 
 def on_DialEnd(event, **kwargs):
     # Same thing as above, except catches DialEnd and sets the state of the call
@@ -521,10 +522,10 @@ def on_DialEnd(event, **kwargs):
     DE_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
     DE_DestChannel = DE_DestChannel.findall(output)
 
-    for n in lines:
-        if DE_DestChannel[0] == str(n.chan) and n.ast_status == 'Dialing':
-            n.ast_status = 'Ringing'
-            n.switch.is_dialing -= 1
+    for l in lines:
+        if DE_DestChannel[0] == str(l.chan) and l.ast_status == 'Dialing':
+            l.ast_status = 'Ringing'
+            l.switch.is_dialing -= 1
             # logging.info('on_DialEnd with %s calls dialing', n.switch.is_dialing)
 
 def parse_args():
@@ -616,6 +617,31 @@ def make_switch(args):
 
     return args
 
+def make_lines(**kwargs):
+    """ 
+    Takes several kwargs:
+    source:         the origin of the call to this function
+    switch:         the switch where the lines will originate on
+    orig_switch:    list of originating switches passed in from args
+    traffic_volume: light, medium, or heavy
+    source:         whether this is called from main, or from somewhere else
+    numlines:       number of lines we should create
+    """
+
+    source = kwargs.get('source', '')
+    switch = kwargs.get('switch', '')
+    traffic_volume = kwargs.get('traffic_volume', '')
+    orig_switch = kwargs.get('orig_switch','')
+    source = kwargs.get('source','')
+    numlines = kwargs.get('numlines', '')
+
+    global lines
+    if source == 'main':
+        lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+    else:
+        lines = [Line(n, switch) for n in range(numlines)]
+    return lines
+
 
 # +----------------------------------------------------+
 # |                                                    |
@@ -682,18 +708,21 @@ def get_info():
         ])
     return schema.dump(result)
 
-def api_start(switch):
+def api_start(switch, **kwargs):
     # Should read in switch to start on, and
     # create lines from a DB using preset defaults
     # similar to how things work if you start via
     # the command line.
 
+    global lines
+
+    mode = kwargs.get('mode', '')
     logging.info("API requested START on %s", switch)
-    if w.is_alive != True:
-        w.start()
+
+#    if w.is_alive != True:
+#        w.start()
     if w.is_alive == True:
 
-        global lines
         if switch == 'panel':
             switch = Rainier
         if switch == '5xb':
@@ -704,14 +733,21 @@ def api_start(switch):
         if switch.running == True:
             logging.info("%s is running. Can't start twice.", switch)
         elif switch.running == False:
-            new_lines = [Line(n, switch) for n in range(switch.max_calls)]
-            for n in new_lines:
-                lines.append(n)
-            switch.running = True
-            logging.info("Appending lines to %s", switch)
+            if mode == 'demo':
+                if switch == Rainier:
+                    new_lines = make_lines(switch=switch, numlines=4)
+                elif switch == Adams:
+                    new_lines = make_lines(switch=switch, numlines=8, traffic_volume='heavy') 
+            else:
+                new_lines = [Line(n, switch) for n in range(switch.max_calls)]
+        for n in new_lines:
+            lines.append(n)
+            print lines
+        switch.running = True
+        logging.info("Appending lines to %s", switch)
 
-    result = get_info()
-    return result
+        result = get_info()
+        return result
     
 def api_stop(switch):
     # This reads 'switch' and immediately hang up all calls, and
@@ -746,7 +782,21 @@ def api_stop(switch):
 
     result = get_info()
     return result
-    
+
+
+def api_demo(demo): # >>>>>>>>>>>>>>>>>>>>>> Delete me #####
+    global lines
+    if demo == 'panel':
+        lines.extend([(Line(n, Rainier)) for n in range(4)])
+        print lines
+        if Rainier.running == False:
+            Rainier.running = True
+    if demo == '5xb':
+        lines = [Line(n, Adams) for n in range(9)]
+        print lines
+        Adams.traffic_load == 'heavy'
+    return "Demo Started"
+
 def api_pause():
     # Checks to see if the work thread is paused. If it's NOT paused,
     # we will pause it. If the UI thread is running, we draw a paused
@@ -813,7 +863,7 @@ def get_all_lines():
     # From API. Returns all active lines.
 
     schema = LineSchema()
-    result = [schema.dump(n) for n in lines]
+    result = [schema.dump(l) for l in lines]
     return result
 
 def get_line(ident):
@@ -822,8 +872,8 @@ def get_line(ident):
 
     api_ident = int(ident)
     schema = LineSchema()
-    for n in lines:
-        if api_ident == n.ident:
+    for l in lines:
+        if api_ident == l.ident:
             result.append(schema.dump(lines[api_ident]))
 
     if result == []:
@@ -873,10 +923,10 @@ def delete_line(ident):
 
     api_ident = int(ident)
     result = []
-    for n in lines:
-        if api_ident == n.ident:
-            logging.info("API requested delete line %s", n.ident)
-            del lines[n.ident]
+    for l in lines:
+        if api_ident == l.ident:
+            logging.info("API requested delete line %s", l.ident)
+            del lines[l.ident]
             result.append(api_ident)
     if result == []:
         return False
@@ -890,7 +940,7 @@ def update_line(**kwargs):
 
     api_ident = kwargs.get("ident", "")
     # Pull the line ident out of the dict the API passed in.
-    for i, o in enumerate(lines):
+    for  o in enumerate(lines):
         if o.ident == int(api_ident):
            parameters = kwargs['line']
            result = schema.load(parameters)
@@ -985,26 +1035,6 @@ def delete_switch(kind):
         return False
     else:
         return result
-
-
-
-#  +-----------------------------------+
-#  |                                   |
-#  |  SQLite database things here.     |
-#  |  This allows for persistence,     |
-#  |  and for loading states, such as  |
-#  |  demo modes for tours.            |
-#  |                                   |
-#  +-----------------------------------+
-
-def create_connection(db_file):
-    """ create a database connection to a SQLite database """
-    try:
-        conn = sqlite3.connect(db_file)
-        print(sqlite3.version)
-	return conn
-    except Error as e:
-        print(e)
 
 
 # +-----------------------------------------------+
@@ -1240,8 +1270,8 @@ class work_thread(threading.Thread):
                     self.paused_flag.wait()
 
             # The main loop that kicks everything into gear.
-                for n in lines:
-                    n.tick()
+                for l in lines:
+                    l.tick()
                 sleep(1)
 
     def pause(self):
@@ -1267,7 +1297,7 @@ def web_shutdown(signum, frame):
     raise WebShutdown
 
 
-if __name__ == "__main__":
+if __name__ == "__mai__":
     # Init a bunch of things if we're running as a standalone app.
 
     # Set up signal handlers so we can shutdown cleanly later.
@@ -1298,9 +1328,8 @@ if __name__ == "__main__":
     logging.info('Call volume set to %s', args.v)
 
     # Here is where we actually make the lines.
-    global lines
+#    lines = make_lines(source='main',orig_switch=orig_switch)
     lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
-
     # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
     future = client.login(username='panel_gen',secret='t431434')
@@ -1381,11 +1410,6 @@ if __name__ == "panel_gen":
     if future.response.is_error():
         raise Exception(str(future.response))
 
-    conn = create_connection("./db/macros.db")
-
-    if conn is not None:
-	pass
-
     # If logfile does not exist, create it so logging can write to it.
     try:
         with open('/var/log/panel_gen/calls.log', 'a') as file:
@@ -1396,10 +1420,10 @@ if __name__ == "panel_gen":
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
             filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
 
-    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
-#    lines = []
+    lines = []
+#    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+#    lines = make_lines(source='main',orig_switch=orig_switch)
     logging.info('Starting panel_gen as thread from http_server')
-
 
     try:
         w = work_thread()
@@ -1424,9 +1448,6 @@ if __name__ == "panel_gen":
         # Hang up and clean up spool.
         system("asterisk -rx \"channel request hangup all\"")
         system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-
-	# Close SQLite DB connection.
-        conn.close()
 
         # Log out of AMI
         client.logoff()

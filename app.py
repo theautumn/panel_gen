@@ -14,7 +14,11 @@ def read_status():
 
 def start(**kwargs):
     switch = kwargs.get("switch", "")
-    result = panel_gen.api_start(switch)    
+    mode = kwargs.get("mode", "")
+    if mode == "demo":
+        result = panel_gen.api_start(switch, mode="demo")
+    elif mode != "demo":
+        result = panel_gen.api_start(switch)    
     if result != False:
         return result
     else:

@@ -13,6 +13,110 @@ basePath: /api
 
 # Paths supported by the server application
 paths:
+  /app:
+    get:
+      operationId: app.read_status
+      tags:
+        - app
+      summary: Get general app status information
+      description: Gets high-level app status
+      responses:
+        200:
+          description: Successful app read operation
+          schema:
+            type: string
+            items:
+              properties:
+                running:
+                  type: boolean
+
+  /app/start/{switch}:
+    post:
+      operationId: app.start
+      tags:
+        - app
+      summary: Start calls on a switch.
+      description: Starts calls on a particular switch.
+      parameters:
+        - name: switch
+          in: path
+          description: Switch to originate call from
+          type: string
+          required: True
+        - name: mode
+          in: query
+          description: Allows starting demo mode
+          type: string
+
+      responses:
+        201:
+          description: Successfully started processing calls on switch.
+
+  /app/stop/{switch}:
+    post:
+      operationId: app.stop
+      tags:
+        - app
+      summary: Stop calls on a switch..
+      description: Stop all actions and release lines. Use /stop/all to stop everything.
+      parameters:
+        - name: switch
+          in: path
+          description: Switch to stop. 'all' for all switches.
+          type: string
+          required: True
+
+      responses:
+        201:
+          description: Successfully stopped processing calls.
+
+  /app/pause:
+    post:
+      operationId: app.api_pause
+      tags:
+        - app
+      summary: Pause execution but leave app running to unpause later.
+      description: Pause app but leave things in a resumable state.
+
+      responses:
+        201:
+          description: Successfully paused work thread
+
+  /app/resume:
+    post:
+      operationId: app.api_resume
+      tags:
+        - app
+      summary: Resume from paused state. Picks up where it left off.
+      description: Resume from last state.
+
+      responses:
+        201:
+          description: Successfully resumed work thread
+
+  /call/{switch}/{destination}:
+    post:
+      operationId: app.call
+      tags:
+        - app
+      summary: Place a call now.
+      description: Place a call immediately.
+      parameters:
+        - name: switch
+          in: path
+          description: Switch to originate call from
+          type: string
+          required: True
+        - name: destination
+          in: path
+          description: Destination line to call
+          type: string
+          required: True
+
+      responses:
+        200:
+          description: Successfully placed call
+
   /switches:
     get:
       operationId: switches.read_all
@@ -331,103 +435,3 @@ paths:
         responses:
           201:
             description: Successfully created line
-
-  /app:
-    get:
-      operationId: app.read_status
-      tags:
-        - app
-      summary: Get general app status information
-      description: Gets high-level app status
-      responses:
-        200:
-          description: Successful app read operation
-          schema:
-            type: string
-            items:
-              properties:
-                running:
-                  type: boolean
-
-  /app/start/{switch}:
-    post:
-      operationId: app.start
-      tags:
-        - app
-      summary: Start calls on a switch..
-      description: Starts calls on a particular switch.
-      parameters:
-        - name: switch
-          in: path
-          description: Switch to originate call from
-          type: string
-          required: True
-
-      responses:
-        201:
-          description: Successfully started work thread
-
-  /app/stop/{switch}:
-    post:
-      operationId: app.stop
-      tags:
-        - app
-      summary: Stop calls on a switch..
-      description: Stop all actions and release lines. Use /stop/all to stop everything.
-      parameters:
-        - name: switch
-          in: path
-          description: Switch to stop. 'all' for all switches.
-          type: string
-          required: True
-
-      responses:
-        201:
-          description: Successfully stopped processing calls.
-
-  /app/pause:
-    post:
-      operationId: app.api_pause
-      tags:
-        - app
-      summary: Pause execution but leave app running to unpause later.
-      description: Pause app but leave things in a resumable state.
-
-      responses:
-        201:
-          description: Successfully paused work thread
-
-  /app/resume:
-    post:
-      operationId: app.api_resume
-      tags:
-        - app
-      summary: Resume from paused state. Picks up where it left off.
-      description: Resume from last state.
-
-      responses:
-        201:
-          description: Successfully resumed work thread
-
-  /call/{switch}/{destination}:
-    post:
-      operationId: app.call
-      tags:
-        - app
-      summary: Place a call now.
-      description: Place a call immediately.
-      parameters:
-        - name: switch
-          in: path
-          description: Switch to originate call from
-          type: string
-          required: True
-        - name: destination
-          in: path
-          description: Destination line to call
-          type: string
-          required: True
-
-      responses:
-        200:
-          description: Successfully placed call
