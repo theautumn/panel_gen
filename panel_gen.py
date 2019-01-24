@@ -182,10 +182,10 @@ class panel():
 
         self.max_nxx1 = .6                                      # Load for office 1 in self.trunk_load
         self.max_nxx2 = .2                                      # Load for office 2 in self.trunk_load
-        self.max_nxx3 = .2                                      # Load for office 3 in self.trunk_load
-        self.max_nxx4 = 0                                       # Load for office 4 in self.trunk_load
-        self.nxx = [722, 365, 232]                              # Office codes that can be dialed.
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
+        self.max_nxx3 = .1                                      # Load for office 3 in self.trunk_load
+        self.max_nxx4 = .1                                       # Load for office 4 in self.trunk_load
+        self.nxx = [722, 365, 232, 832]                         # Office codes that can be dialed.
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
         self.linerange = [5000,5999]                            # Range of lines that can be chosen.
 
     def newtimer(self):
@@ -221,7 +221,7 @@ class xb1():
         self.max_nxx4 = 0
         self.nxx = [722, 832, 232]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.linerange = [105,107,108,109,110,111,112,113,114]
+        self.linerange = [104,105,106,107,108,109,110,111]
 
     def newtimer(self):
         if args.v == 'light':
