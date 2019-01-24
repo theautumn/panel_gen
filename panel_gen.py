@@ -498,7 +498,6 @@ def on_DialBegin(event, **kwargs):
     # one 'w' (wait) in it to wait before dialing. If you change that, the
     # regex will break. Normally, we should always wait before dialing.
 
-    logging.info("hit dialbegin")
     output = str(event)
     DialString = re.compile('(?<=w)(\d{7})')
     DB_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
@@ -762,6 +761,7 @@ def api_stop(switch):
     # destroy all lines. 
 
     logging.info("API requested STOP on %s", switch)
+    global lines
 
     # Validate switch input.
     if switch == 'panel':
@@ -774,10 +774,8 @@ def api_stop(switch):
         return False
 
     if instance.running == True:
-        print("instance %s", instance)
-        for l in sorted(lines, reverse=True):
-            if switch == l.kind:
-                del lines[l.ident]
+        lines = [l for l in lines if l.kind != switch]           
+        
     instance.running = False
 
     try:
@@ -915,13 +913,11 @@ def delete_all_lines():
 def delete_line(ident):
     # Deletes a specific line passed in via ident.
 
+    global lines
     api_ident = int(ident)
     result = []
-    for l in lines:
-        if api_ident == l.ident:
-            logging.info("API requested delete line %s", l.ident)
-            del lines[l.ident]
-            result.append(api_ident)
+    lines = [l for l in lines if l.ident != api_ident]
+    result.append(api_ident)
     if result == []:
         return False
     else:
