@@ -507,7 +507,7 @@ def on_DialBegin(event, **kwargs):
     DB_DestChannel = DB_DestChannel.findall(output)
 
     for l in lines:
-        if DialString[0] == str(n.term) and n.ast_status == 'on_hook':
+        if DialString[0] == str(l.term) and l.ast_status == 'on_hook':
             # logging.info('DialString match %s and %s', DialString[0], str(n.term))
             l.chan = DB_DestChannel[0]
             l.ast_status = 'Dialing'
