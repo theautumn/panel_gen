@@ -64,7 +64,7 @@ class Line():
         """
         if self.switch.running == False:
             self.switch.running = True
-            self.timer -= 1
+        self.timer -= 1
         if self.timer <= 0:
             if self.status == 0:
                 if self.switch.is_dialing < self.switch.max_dialing:
@@ -163,7 +163,6 @@ class Line():
         cf = CallFile(c, con, user='asterisk')
         cf.spool()
 
-
     def hangup(self):
         # Asterisk manages the actual hangup of the call, but we need to make sure the program
         # flow is on track with whats happening out in the world. We check if a call
@@ -260,21 +259,21 @@ class panel():
 
         if __name__ == '__main__':
             if args.v == 'light':
-                traffic = int(round(random.gamma(20,8)))
+                ctimer = int(round(random.gamma(20,8)))
             elif args.v == 'heavy':
-                traffic = int(round(random.gamma(5,7)))
-            elif args.v == 'normal':
-                traffic = int(round(random.gamma(4,14)))
+                ctimer = int(round(random.gamma(5,7)))
+            else:
+                ctimer = int(round(random.gamma(4,14)))
 
         if __name__ == 'panel_gen':
             if self.api_tl == 'heavy':
-                traffic = int(round(random.gamma(5,7)))
+                ctimer = int(round(random.gamma(5,7)))
             elif self.api_tl == 'light':
-                traffic = int(round(random.gamma(20,8)))
+                ctimer = int(round(random.gamma(20,8)))
             else:
-                traffic = int(round(random.gamma(4,14)))
+                ctimer = int(round(random.gamma(4,14)))
 
-            return traffic
+        return ctimer
 
     def update(self, api):
         # Used by the API PATCH method to update switch parameters.
@@ -499,6 +498,7 @@ def on_DialBegin(event, **kwargs):
     # one 'w' (wait) in it to wait before dialing. If you change that, the
     # regex will break. Normally, we should always wait before dialing.
 
+    logging.info("hit dialbegin")
     output = str(event)
     DialString = re.compile('(?<=w)(\d{7})')
     DB_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
@@ -623,24 +623,29 @@ def make_lines(**kwargs):
     source:         the origin of the call to this function
     switch:         the switch where the lines will originate on
     orig_switch:    list of originating switches passed in from args
-    traffic_volume: light, medium, or heavy
+    traffic_load: light, medium, or heavy
     source:         whether this is called from main, or from somewhere else
     numlines:       number of lines we should create
     """
 
     source = kwargs.get('source', '')
     switch = kwargs.get('switch', '')
-    traffic_volume = kwargs.get('traffic_volume', '')
+    traffic_load = kwargs.get('traffic_load', '')
     orig_switch = kwargs.get('orig_switch','')
     source = kwargs.get('source','')
     numlines = kwargs.get('numlines', '')
 
-    global lines
+    new_lines = []
+
     if source == 'main':
-        lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
-    else:
-        lines = [Line(n, switch) for n in range(numlines)]
-    return lines
+        new_lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+    elif source == 'api':
+        new_lines = [Line(n, switch) for n in range(numlines)]
+        
+        if traffic_load != '':
+            switch.traffic_load = traffic_load
+
+    return new_lines
 
 
 # +----------------------------------------------------+
@@ -724,27 +729,30 @@ def api_start(switch, **kwargs):
     if w.is_alive == True:
 
         if switch == 'panel':
-            switch = Rainier
-        if switch == '5xb':
-            switch = Adams
-        if switch == '1xb':
-            switch = Lakeview
+            instance = Rainier
+        elif switch == '5xb':
+            instance = Adams
+        elif switch == '1xb':
+            instance = Lakeview
+        else:
+            return False
 
-        if switch.running == True:
-            logging.info("%s is running. Can't start twice.", switch)
-        elif switch.running == False:
+        if instance.running == True:
+            logging.info("%s is running. Can't start twice.", instance)
+        elif instance.running == False:
             if mode == 'demo':
-                if switch == Rainier:
-                    new_lines = make_lines(switch=switch, numlines=4)
-                elif switch == Adams:
-                    new_lines = make_lines(switch=switch, numlines=8, traffic_volume='heavy') 
+                if instance == Rainier:
+                    new_lines = make_lines(switch=instance, numlines=4, source='api')
+#                    new_lines = [Line(n, switch) for n in range(switch.max_calls)]
+                elif instance == Adams:
+                    new_lines = make_lines(switch=instance, numlines=8, traffic_load='heavy',
+                            source='api') 
             else:
-                new_lines = [Line(n, switch) for n in range(switch.max_calls)]
-        for n in new_lines:
-            lines.append(n)
-            print lines
-        switch.running = True
-        logging.info("Appending lines to %s", switch)
+                new_lines = [Line(n, switch) for n in range(instance.max_calls)]
+            for n in new_lines:
+                lines.append(n)
+            instance.running = True
+            logging.info("Appending lines to %s", switch)
 
         result = get_info()
         return result
@@ -766,10 +774,10 @@ def api_stop(switch):
         return False
 
     if instance.running == True:
-        print("instance running %s", instance)
-        for n in sorted(lines, reverse=True):
-            if switch == n.kind:
-                del lines[n.ident]
+        print("instance %s", instance)
+        for l in sorted(lines, reverse=True):
+            if switch == l.kind:
+                del lines[l.ident]
     instance.running = False
 
     try:
@@ -782,20 +790,6 @@ def api_stop(switch):
 
     result = get_info()
     return result
-
-
-def api_demo(demo): # >>>>>>>>>>>>>>>>>>>>>> Delete me #####
-    global lines
-    if demo == 'panel':
-        lines.extend([(Line(n, Rainier)) for n in range(4)])
-        print lines
-        if Rainier.running == False:
-            Rainier.running = True
-    if demo == '5xb':
-        lines = [Line(n, Adams) for n in range(9)]
-        print lines
-        Adams.traffic_load == 'heavy'
-    return "Demo Started"
 
 def api_pause():
     # Checks to see if the work thread is paused. If it's NOT paused,
@@ -1297,7 +1291,7 @@ def web_shutdown(signum, frame):
     raise WebShutdown
 
 
-if __name__ == "__mai__":
+if __name__ == "__main__":
     # Init a bunch of things if we're running as a standalone app.
 
     # Set up signal handlers so we can shutdown cleanly later.
@@ -1330,6 +1324,7 @@ if __name__ == "__mai__":
     # Here is where we actually make the lines.
 #    lines = make_lines(source='main',orig_switch=orig_switch)
     lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+
     # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
     future = client.login(username='panel_gen',secret='t431434')
