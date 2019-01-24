@@ -24,7 +24,7 @@ def start(**kwargs):
     else:
         abort(
             406,
-            "panel_gen is already running",
+            "Failed to create switch. May already be running.",
         )
 
 def stop(**kwargs):

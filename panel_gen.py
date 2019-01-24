@@ -631,7 +631,6 @@ def make_lines(**kwargs):
     switch = kwargs.get('switch', '')
     traffic_load = kwargs.get('traffic_load', '')
     orig_switch = kwargs.get('orig_switch','')
-    source = kwargs.get('source','')
     numlines = kwargs.get('numlines', '')
 
     new_lines = []
@@ -742,20 +741,25 @@ def api_start(switch, **kwargs):
             if mode == 'demo':
                 if instance == Rainier:
                     new_lines = make_lines(switch=instance, numlines=4, source='api')
-#                    new_lines = [Line(n, switch) for n in range(switch.max_calls)]
                 elif instance == Adams:
                     new_lines = make_lines(switch=instance, numlines=8, traffic_load='heavy',
                             source='api') 
-            else:
-                new_lines = [Line(n, switch) for n in range(instance.max_calls)]
-            for n in new_lines:
-                lines.append(n)
+            elif mode != 'demo':
+#                new_lines = make_lines(switch=instance, source='main')
+                new_lines = [Line(n, instance) for n in range(instance.max_calls)]
+            for l in new_lines:
+                lines.append(l)
             instance.running = True
             logging.info("Appending lines to %s", switch)
 
-        result = get_info()
-        return result
-    
+        try:
+            new_lines
+            lines_created = len(new_lines)
+            result = get_info()
+            return result
+        except NameError:
+            return False 
+
 def api_stop(switch):
     # This reads 'switch' and immediately hang up all calls, and
     # destroy all lines. 
@@ -1318,8 +1322,8 @@ if __name__ == "__main__":
     logging.info('Call volume set to %s', args.v)
 
     # Here is where we actually make the lines.
-#    lines = make_lines(source='main',orig_switch=orig_switch)
-    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+    lines = make_lines(source='main',orig_switch=orig_switch)
+#    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 
     # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
