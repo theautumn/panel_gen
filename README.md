@@ -119,6 +119,8 @@ HTTP Server
 -----------
 There is a simple, insecure HTTP server provided in http-server.py which serves up a basic web page so panel_gen can be executed via a volunteer's smartphone. This should not be available to everybody, as there are no security or sanity checks, and there's probably a thousand ways to break it. I keep it limited to a secure network so only those with the WPA key can access it. Still, it's quite cool! The actual server is [Flask](https://github.com/pallets/flask), and the CSS framework is [Skeleton](https://github.com/dhg/Skeleton).
 
+This app now provides an API via `http_server.py`! How cool is that? You can find basic documentation [here](https://github.com/theautumn/panel_gen/wiki/API), and at some point soon, I will write something more complete.
+
 Examples
 -------
 I've created a bash alias to make this easier to run, but the following examples assume you've not done that. If you'd like to create one, you can edit ~/.bashrc, and add <code>alias panel_gen='sudo -u asterisk python ~/panel_gen/panel_gen.py'</code> to the end of the file. Change the directory where panel_gen lives, as necessary.
