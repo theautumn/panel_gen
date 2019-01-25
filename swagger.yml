@@ -1,4 +1,4 @@
-# https://realpython.com/flask-connexion-rest-api/#getting-started
+#https://realpython.com/flask-connexion-rest-api/#getting-started
 swagger: "2.0"
 info:
   description: This defines the API for panel_gen
