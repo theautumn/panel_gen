@@ -133,6 +133,8 @@ paths:
       responses:
         200:
           description: Successfully placed call
+        406:
+          description: Failed to place call
 
   /switches:
     get:

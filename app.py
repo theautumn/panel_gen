@@ -53,31 +53,6 @@ def stop(**kwargs):
                 "Failed to create switch. May already be running.",
             )
 
-def web_start(**kwargs):
-    switch = kwargs.get("switch", "")
-    mode = kwargs.get("mode", "")
-    if mode == "demo":
-        result = panel_gen.api_start(switch, mode="demo")
-    elif mode != "demo":
-        result = panel_gen.api_start(switch)    
-    if result != False:
-        return 'See Other', 303, {'Location': '/'}
-    else:
-        abort(
-            406,
-            "Failed to create switch. May already be running.",
-        )
-
-def web_stop(**kwargs):
-    switch = kwargs.get("switch", "")
-    result = panel_gen.api_stop(switch)
-    if result != False:
-        return 'See Other', 303, {'Location': '/'}
-    else:
-        abort(
-            406,
-            "Failed to stop switch. Maybe already stopped.",
-        )
 def api_pause():
     result = panel_gen.api_pause()
     if result != False:
