@@ -18,6 +18,8 @@ import signal
 import connexion
 import logging
 import panel_gen
+import json
+import requests
 
 #log = logging.getLogger('werkzeug')
 #log.setLevel(logging.ERROR)
@@ -46,18 +48,22 @@ class PROCESS:
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
+    headers = {'Accept':'application/json'}
     global p, q
 
     if request.method == 'POST':
         command = request.form['command']
         if command == "Panel Start":
-            tmp = os.popen("ps -Af").read()
-            if PROCESS.PANEL not in tmp[:]:
-                print(bcolors.OKGREEN + '>>  Got a START request for PANEL' + bcolors.ENDC)
-                p = subprocess.Popen(RUN_STRING.PANEL, shell=True, preexec_fn=os.setsid)
-                return render_template('home.html')
-            else:
-                print(bcolors.HEADER + "Process already running. Cant start twice!" + bcolors.ENDC)
+            r = requests.get('http://127.0.0.1:5000/api/app/', headers=headers)
+#            r = requests.post('http://127.0.0.1:5000/api/app/start/panel?mode=demo', data = {})
+            print(r.status_code)
+#            tmp = os.popen("ps -Af").read()
+#            if PROCESS.PANEL not in tmp[:]:
+#                print(bcolors.OKGREEN + '>>  Got a START request for PANEL' + bcolors.ENDC)
+#                p = subprocess.Popen(RUN_STRING.PANEL, shell=True, preexec_fn=os.setsid)
+            return render_template('home.html')
+#            else:
+#                print(bcolors.HEADER + "Process already running. Cant start twice!" + bcolors.ENDC)
 
         elif command == "Panel Stop":
             try:

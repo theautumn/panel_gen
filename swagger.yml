@@ -70,29 +70,28 @@ paths:
         201:
           description: Successfully stopped processing calls.
 
-  /app/pause:
-    post:
-      operationId: app.api_pause
-      tags:
-        - app
-      summary: Pause execution but leave app running to unpause later.
-      description: Pause app but leave things in a resumable state.
+          #  /app/pause:
+          #    post:
+          #      operationId: app.api_pause
+          #      tags:
+          #        - app
+          #      summary: Pause execution but leave app running to unpause later.         #      description: Pause app but leave things in a resumable state.
 
-      responses:
-        201:
-          description: Successfully paused work thread
+          #      responses:
+          #        201:
+          #          description: Successfully paused work thread
 
-  /app/resume:
-    post:
-      operationId: app.api_resume
-      tags:
-        - app
-      summary: Resume from paused state. Picks up where it left off.
-      description: Resume from last state.
+#  /app/resume:
+#    post:
+#      operationId: app.api_resume
+#      tags:
+#        - app
+#      summary: Resume from paused state. Picks up where it left off.
+#      description: Resume from last state.
 
-      responses:
-        201:
-          description: Successfully resumed work thread
+#      responses:
+#        201:
+#          description: Successfully resumed work thread
 
   /call/{switch}/{destination}:
     post:

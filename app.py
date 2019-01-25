@@ -39,12 +39,25 @@ def stop(**kwargs):
         )
 
 def api_pause():
-    panel_gen.api_pause()
-    return "PAUSED"
+    result = panel_gen.api_pause()
+    if result != False:
+        return result
+    else:
+        abort(
+            406,
+            "Failed to pause app. May already be paused.",
+        )
+
 
 def api_resume():
-    panel_gen.api_resume()
-    return "RESUMED"
+    result = panel_gen.api_resume()
+    if result != False:
+        return result
+    else:
+        abort(
+            406,
+            "Failed to resume app. May already be running.",
+        )
 
 def call(**kwargs):
     switch = kwargs.get("switch", "")

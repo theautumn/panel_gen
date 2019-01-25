@@ -145,8 +145,8 @@ class Line():
                     wait = value
 
             # If the line comes from the API /call/{switch}/{line} then this line is temporary.
-            # This sets up special handling so that the status starts at "1", which will cause 
-            # hangup() to hang up the call and delete the line when the call is done. 
+            # This sets up special handling so that the status starts at "1", which will cause
+            # hangup() to hang up the call and delete the line when the call is done.
             if self.is_api == True:
                 self.status = 1
                 self.api_indicator = "***"
@@ -189,7 +189,7 @@ class Line():
             else:
                 self.timer = 15                                 # If no args.w defined, use default value.
         else:
-            self.timer = self.switch.newtimer()                 # <-- Normal call timer if args.d not specified.
+            self.timer = self.switch.newtimer()                 # Normal call timer if args.d not specified.
 
         if args.l:                                              # If user specified a line
             self.term = args.l                                  # Set term line to user specified
@@ -222,33 +222,50 @@ class Line():
 # <----- BEGIN SWITCH CLASSES ------> #
 
 class panel():
-    # This class is parameters and methods for the panel switch.
-    # It should not normally need to be edited.
+    """
+    This class is parameters and methods for the panel switch.
+    kind:           Generic name for type of switch.
+    running:        Whether or not switch is running.
+    max_dialing:    Set based on sender capacity.
+    is_dialing:     Records current number of calls in Dialing state.
+    dahdi_group:    Passed to Asterisk when call is made.
+    api_tl:         String that shows up in console interface when line
+                    is a temporary API generated call.
+    traffic_load:   Timer that we decrement once per second to control
+                    call timers.
+    max_calls:      Maximum concurrent calls the switch can handle.
+    max_nxx:        Values for trunk load. Determined by how many
+                    outgoing trunks we have provisioned on the switch.
+    nxx:            List of office codes we can dial. Corresponds directly
+					to max_nxx.
+	trunk_load:		List of max_nxx used to compute load on trunks.
+	line_range:		Range of acceptable lines to dial when calling this office.
+    """
 
     def __init__(self):
-        self.kind = "panel"                     # The kind of switch we're calling from.
-        self.running = False                    # Whether or not the switch is running.
+        self.kind = "panel"
+        self.running = False
         self.max_dialing = 6
         self.is_dialing = 0
-        self.dahdi_group = "r6"                  # Which DAHDI group to originate from.
+        self.dahdi_group = "r6"
         self.api_tl = ""
-        self.traffic_load = self.newtimer()      # Start a new timer when switch is instantiated.
+        self.traffic_load = self.newtimer()
 
-        if args.d:                               # If deterministic mode is set,
-            self.max_calls = 1                   # Set the max calls to 1, to be super basic.
+        if args.d:
+            self.max_calls = 1
         elif args.a:
-            self.max_calls = args.a              # Else, use the value given with -a
+            self.max_calls = args.a
         else:
-            self.max_calls = 3                   # Finally, if no args are given, use this default.
+            self.max_calls = 4
 
-        self.max_nxx1 = .6                       # Load for office 1 in self.trunk_load
-        self.max_nxx2 = .2                       # Load for office 2 in self.trunk_load
-        self.max_nxx3 = .2                       # Load for office 3 in self.trunk_load
-        self.max_nxx4 = 0                        # Load for office 4 in self.trunk_load
-        self.nxx = [722, 365, 232]               # Office codes that can be dialed.
+        self.max_nxx1 = .6
+        self.max_nxx2 = .2
+        self.max_nxx3 = .2
+        self.max_nxx4 = 0
+        self.nxx = [722, 365, 232]
         self.trunk_load = [self.max_nxx1,
             self.max_nxx2, self.max_nxx3]
-        self.line_range = [5000,5999]            # Range of lines that can be chosen.
+        self.line_range = [5000,5999]
 
     def __repr__(self):
         return("{}('{}')".format(self.__class__.__name__, self.running))
@@ -588,7 +605,8 @@ def make_switch(args):
         orig_switch.append(Lakeview)
 
     if __name__ == '__main__':
-        if args.o == []:                # If no args provided, just assume panel switch.
+        # If no args provided, just assume panel switch.
+        if args.o == []:
             args.o = ['panel']
 
         for o in args.o:
@@ -617,7 +635,7 @@ def make_switch(args):
     return args
 
 def make_lines(**kwargs):
-    """ 
+    """
     Takes several kwargs:
     source:         the origin of the call to this function
     switch:         the switch where the lines will originate on
@@ -639,7 +657,7 @@ def make_lines(**kwargs):
         new_lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
     elif source == 'api':
         new_lines = [Line(n, switch) for n in range(numlines)]
-        
+
         if traffic_load != '':
             switch.traffic_load = traffic_load
 
@@ -712,13 +730,13 @@ def get_info():
     return schema.dump(result)
 
 def api_start(switch, **kwargs):
-    # Should read in switch to start on, and
-    # create lines from a DB using preset defaults
-    # similar to how things work if you start via
-    # the command line.
+    """
+    Creates new lines when started from API.
+    switch: Generic switch type to create lines on.
+    mode:   'demo' or ''. Demo mode will start with preset params.
+    """
 
     global lines
-
     mode = kwargs.get('mode', '')
     logging.info("API requested START on %s", switch)
 
@@ -743,7 +761,9 @@ def api_start(switch, **kwargs):
                     new_lines = make_lines(switch=instance, numlines=4, source='api')
                 elif instance == Adams:
                     new_lines = make_lines(switch=instance, numlines=8, traffic_load='heavy',
-                            source='api') 
+                            source='api')
+                elif instance == Lakeview:
+                    new_lines = make_lines(switch=instance, numlines=2, source='api')
             elif mode != 'demo':
 #                new_lines = make_lines(switch=instance, source='main')
                 new_lines = [Line(n, instance) for n in range(instance.max_calls)]
@@ -758,11 +778,11 @@ def api_start(switch, **kwargs):
             result = get_info()
             return result
         except NameError:
-            return False 
+            return False
 
 def api_stop(switch):
     # This reads 'switch' and immediately hang up all calls, and
-    # destroy all lines. 
+    # destroy all lines.
 
     logging.info("API requested STOP on %s", switch)
     global lines
@@ -774,24 +794,30 @@ def api_stop(switch):
         instance = Adams
     elif switch == '1xb':
         instance = Lakeview
-    else: 
+    elif switch == 'all':
+        lines = []
+        Rainier.running = False
+        Adams.running = False
+        Lakeview.running = False
+    else:
         return False
-
-    if instance.running == True:
-        lines = [l for l in lines if l.kind != switch]           
-        
-    instance.running = False
-
     try:
-        # Hang up and clean up spool.
-        system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
-        system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-    except Exception as e:
-        logging.info(e)
-        return False
+        if instance.running == True:
+            lines = [l for l in lines if l.kind != switch]
+            instance.running = False
+    except NameError:
+        pass
 
-    result = get_info()
-    return result
+        try:
+            # Hang up and clean up spool.
+            system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
+            system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+        except Exception as e:
+            logging.info(e)
+            return False
+
+        result = get_info()
+        return result
 
 def api_pause():
     # Checks to see if the work thread is paused. If it's NOT paused,
@@ -802,11 +828,12 @@ def api_pause():
     if w.paused == False:
         if t.started == True:
             t.draw_paused()
-        elif t.started ==False:
             w.pause()
-            return " PAUSED: UI thread not running"
+        elif t.started == False:
+            w.pause()
+        return get_info()
     elif w.paused == True:
-        return "Already paused"
+        return False
 
 def api_resume():
     # This checks to see if we are paused. If so, then resume.
@@ -815,11 +842,12 @@ def api_resume():
     if w.paused == True:
         if t.started == True:
             t.draw_resumed()
+            w.resume()
         elif t.started == False:
             w.resume()
-            return "UI Thread not running"
+        return get_info()
     else:
-        return "Already running"
+        return False
 
 def call_now(switch, term_line):
     # This is called when a POST is sent to /api/{switch}/{line}
@@ -837,7 +865,7 @@ def call_now(switch, term_line):
         switch = Lakeview
     else:
         return False
-    
+
     on_call_time = 18
 
     # Validates line input. If sane, set up line for
@@ -849,7 +877,7 @@ def call_now(switch, term_line):
         lines[calling_line].timer = 1
         lines[calling_line].term = term_line
         lines[calling_line].call(orig_switch=switch, timer=on_call_time)
-        
+
         result = schema.dump(lines[calling_line])
         return result
     else:
@@ -888,13 +916,13 @@ def create_line(switch):
     result = []
 
     if switch == 'panel':
-        lines.append(Line(len(lines), Rainier))  
+        lines.append(Line(len(lines), Rainier))
         result.append(len(lines) - 1)
     if switch == '5xb':
-        lines.append(Line(len(lines), Adams))  
+        lines.append(Line(len(lines), Adams))
         result.append(len(lines) - 1)
     if switch == '1xb':
-        lines.append(Line(len(lines), Lakeview))  
+        lines.append(Line(len(lines), Lakeview))
         result.append(len(lines) - 1)
 
     if result == []:
@@ -934,7 +962,7 @@ def update_line(**kwargs):
 
     api_ident = kwargs.get("ident", "")
     # Pull the line ident out of the dict the API passed in.
-    for  o in enumerate(lines):
+    for i,  o in enumerate(lines):
         if o.ident == int(api_ident):
            parameters = kwargs['line']
            result = schema.load(parameters)
@@ -978,7 +1006,7 @@ def create_switch(kind):
     if '1xb' not in orig_switch:
         if kind == '1xb':
             orig_switch.append(Lakeview)
-    if orig_switch != []:    
+    if orig_switch != []:
         return orig_switch
     else:
         return False
@@ -1015,7 +1043,7 @@ def delete_switch(kind):
     # This "works" but it actually doesn't cause calls to stop on a switch.
     # orig_switch is only used with line creation at the start of execution.
     # after that, lines already have the property of their switch, so
-    # I need to find a way to actually stop calls to a switch when it 
+    # I need to find a way to actually stop calls to a switch when it
     # no longer exists.
 
     result = []
@@ -1206,7 +1234,7 @@ class ui_thread(threading.Thread):
             logging.info(e)
 
     def ui_main(self, stdscr):
-        
+
         global screen
         # Instantiate a screen, so we can play with it later.
         screen = Screen(stdscr)
@@ -1229,10 +1257,16 @@ class ui_thread(threading.Thread):
             stdscr.refresh()
 
     def draw_paused(self):
-        screen.pausescreen()
+        try:
+            screen.pausescreen()
+        except NameError:
+            pass
 
     def draw_resumed(self):
-        screen.resumescreen()
+        try:
+            screen.resumescreen()
+        except NameError:
+            pass
 
 class work_thread(threading.Thread):
     # Does all the work! Can be paused and resumed. Handles all of
@@ -1425,7 +1459,7 @@ if __name__ == "panel_gen":
         w.daemon = True
         w.start()
         t = ui_thread()
-        t.daemon = True
+#        t.daemon = True
 #        t.start()
 
         sleep(.5)
