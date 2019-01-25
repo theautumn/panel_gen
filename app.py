@@ -15,12 +15,18 @@ def read_status():
 def start(**kwargs):
     switch = kwargs.get("switch", "")
     mode = kwargs.get("mode", "")
+    source = kwargs.get("source", "")
+
     if mode == "demo":
         result = panel_gen.api_start(switch, mode="demo")
     elif mode != "demo":
         result = panel_gen.api_start(switch)    
+
     if result != False:
-        return result
+        if source == "web":
+            return 'See Other', 303, {'Location': '/'}
+        else:
+            return result 
     else:
         abort(
             406,
@@ -29,15 +35,49 @@ def start(**kwargs):
 
 def stop(**kwargs):
     switch = kwargs.get("switch", "")
+    source = kwargs.get("source", "")
+    
+    result = panel_gen.api_stop(switch)
+
+    if result != False:
+        if source == "web":
+            return 'See Other', 303, {'Location': '/'}
+        else:
+            return result 
+    else:
+        if source == "web":
+            return 'See Other', 303, {'Location': '/'}
+        else:
+            abort(
+                406,
+                "Failed to create switch. May already be running.",
+            )
+
+def web_start(**kwargs):
+    switch = kwargs.get("switch", "")
+    mode = kwargs.get("mode", "")
+    if mode == "demo":
+        result = panel_gen.api_start(switch, mode="demo")
+    elif mode != "demo":
+        result = panel_gen.api_start(switch)    
+    if result != False:
+        return 'See Other', 303, {'Location': '/'}
+    else:
+        abort(
+            406,
+            "Failed to create switch. May already be running.",
+        )
+
+def web_stop(**kwargs):
+    switch = kwargs.get("switch", "")
     result = panel_gen.api_stop(switch)
     if result != False:
-        return result
+        return 'See Other', 303, {'Location': '/'}
     else:
         abort(
             406,
             "Failed to stop switch. Maybe already stopped.",
         )
-
 def api_pause():
     result = panel_gen.api_pause()
     if result != False:

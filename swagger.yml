@@ -47,10 +47,18 @@ paths:
           in: query
           description: Allows starting demo mode
           type: string
+        - name: source
+          in: query
+          description: Changes response to 303 when running from web page.
+          type: string
 
       responses:
         201:
           description: Successfully started processing calls on switch.
+        303:
+          description: Successfully started with redirect to home page.
+        406:
+          description: Failed to start calls on switch.
 
   /app/stop/{switch}:
     post:
@@ -65,21 +73,31 @@ paths:
           description: Switch to stop. 'all' for all switches.
           type: string
           required: True
+        - name: source
+          in: query
+          description: Changes response to 303 when running from web page.
+          type: string
 
       responses:
         201:
           description: Successfully stopped processing calls.
+        303:
+          description: Successfully stopped with redirect to home page.
+        406:
+          description: Failed to stop calls on switch.
 
-          #  /app/pause:
-          #    post:
-          #      operationId: app.api_pause
-          #      tags:
-          #        - app
-          #      summary: Pause execution but leave app running to unpause later.         #      description: Pause app but leave things in a resumable state.
 
-          #      responses:
-          #        201:
-          #          description: Successfully paused work thread
+#  /app/pause:
+#    post:
+#      operationId: app.api_pause
+#      tags:
+#        - app
+#      summary: Pause execution but leave app running to unpause later.         
+#      description: Pause app but leave things in a resumable state.
+
+#      responses:
+#        201:
+#          description: Successfully paused work thread
 
 #  /app/resume:
 #    post:

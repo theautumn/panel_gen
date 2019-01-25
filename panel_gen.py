@@ -803,21 +803,23 @@ def api_stop(switch):
         return False
     try:
         if instance.running == True:
+            deadlines = [l for l in lines if l.kind == switch]
+            dahdi_chan = [i.chan for i in deadlines if i.chan != '-']
             lines = [l for l in lines if l.kind != switch]
             instance.running = False
     except NameError:
         pass
 
-        try:
-            # Hang up and clean up spool.
-            system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
-            system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-        except Exception as e:
-            logging.info(e)
-            return False
+    try:
+        # Hang up and clean up spool.
+        for i in dahdi_chan:
+            system("asterisk -rx \"channel request hangup DAHDI/{}-1\" > /dev/null 2>&1".format(i))
+    except Exception as e:
+        logging.info(e)
+        return False
 
-        result = get_info()
-        return result
+    result = get_info()
+    return result
 
 def api_pause():
     # Checks to see if the work thread is paused. If it's NOT paused,
@@ -1459,8 +1461,8 @@ if __name__ == "panel_gen":
         w.daemon = True
         w.start()
         t = ui_thread()
-#        t.daemon = True
-#        t.start()
+        t.daemon = True
+        t.start()
 
         sleep(.5)
 
