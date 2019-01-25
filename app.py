@@ -50,10 +50,10 @@ def stop(**kwargs):
         else:
             abort(
                 406,
-                "Failed to create switch. May already be running.",
+                "Failed to stop switch. Ask Sarah to fix this.",
             )
 
-def api_pause():
+def pause():
     result = panel_gen.api_pause()
     if result != False:
         return result
@@ -64,7 +64,7 @@ def api_pause():
         )
 
 
-def api_resume():
+def resume():
     result = panel_gen.api_resume()
     if result != False:
         return result

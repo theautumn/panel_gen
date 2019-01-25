@@ -62,7 +62,7 @@ def update(**kwargs):
     # otherwise, nope, that's an error
     else:
         abort(
-            404, "Line {ident} not found".format(ident=ident)
+            406, "Line {ident} not found".format(ident=ident)
             )
 
 

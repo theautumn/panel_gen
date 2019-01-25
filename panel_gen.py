@@ -682,8 +682,8 @@ class AppSchema(Schema):
     app_running = fields.Boolean()
     is_paused = fields.Boolean()
     ui_running = fields.Boolean()
-    paused = fields.Boolean()
     num_lines = fields.Integer()
+    active_switches = fields.List(fields.Str())
 
 class LineSchema(Schema):
     line = fields.Dict()
@@ -720,12 +720,16 @@ def get_info():
     # Will likely add more functionality here.
 
     schema = AppSchema()
+
+    sw_running = [s for s in orig_switch if s.running == True]
+
     result = dict([
         ('name', __name__),
         ('app_running', w.is_alive),
         ('is_paused', w.paused),
         ('ui_running', t.started),
-        ('num_lines', len(lines))
+        ('num_lines', len(lines)),
+        ('active_switches', sw_running)
         ])
     return schema.dump(result)
 
@@ -795,31 +799,32 @@ def api_stop(switch):
     elif switch == '1xb':
         instance = Lakeview
     elif switch == 'all':
-        lines = []
-        Rainier.running = False
-        Adams.running = False
-        Lakeview.running = False
+        pass
     else:
         return False
     try:
-        if instance.running == True:
-            deadlines = [l for l in lines if l.kind == switch]
-            dahdi_chan = [i.chan for i in deadlines if i.chan != '-']
-            lines = [l for l in lines if l.kind != switch]
-            instance.running = False
-    except NameError:
-        pass
+        if switch == 'all':
+            lines = []
+            for s in orig_switch:
+                s.running = False
+            
+            system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
 
-    try:
-        # Hang up and clean up spool.
-        for i in dahdi_chan:
-            system("asterisk -rx \"channel request hangup DAHDI/{}-1\" > /dev/null 2>&1".format(i))
+        else:
+            if instance.running == True:
+                deadlines = [l for l in lines if l.kind == switch]
+                dahdi_chan = [i.chan for i in deadlines if i.chan != '-']
+                lines = [l for l in lines if l.kind != switch]
+                instance.running = False
+
+                # Hang up and clean up spool.
+                for i in dahdi_chan:
+                    system("asterisk -rx \"channel request hangup DAHDI/{}-1\" > /dev/null 2>&1".format(i))
     except Exception as e:
         logging.info(e)
         return False
 
-    result = get_info()
-    return result
+    return get_info()
 
 def api_pause():
     # Checks to see if the work thread is paused. If it's NOT paused,
