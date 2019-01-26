@@ -260,11 +260,11 @@ class panel():
 
         self.max_nxx1 = .6
         self.max_nxx2 = .2
-        self.max_nxx3 = .2
-        self.max_nxx4 = 0
-        self.nxx = [722, 365, 232]
-        self.trunk_load = [self.max_nxx1,
-            self.max_nxx2, self.max_nxx3]
+        self.max_nxx3 = .1
+        self.max_nxx4 = .1
+        self.nxx = [722, 365, 232, 832]
+        self.trunk_load = [self.max_nxx1, self.max_nxx2,
+                self.max_nxx3, self.max_nxx4]
         self.line_range = [5000,5999]
 
     def __repr__(self):
@@ -297,8 +297,9 @@ class panel():
 
         for (key, value) in api["switch"].items():
             if key == 'line_range':
+                if value in range(1000, 9999):
                 # Line range must be a tuple from 1000-9999
-                self.line_range = value
+                    self.line_range = value
             if key == 'nxx':
                 # nxx must be 3 digits, matching codes we can dial
 		# number of values in nxx must also match trunk_load
@@ -355,7 +356,7 @@ class xb1():
         self.max_nxx4 = 0
         self.nxx = [722, 832, 232]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.line_range = [105,107,108,109,110,111,112,113,114]
+        self.line_range = [104,105,106,107,108,109,110,111]
 
     def __repr__(self):
         return("{}('{}')".format(self.__class__.__name__, self.running))
@@ -640,8 +641,7 @@ def make_lines(**kwargs):
     source:         the origin of the call to this function
     switch:         the switch where the lines will originate on
     orig_switch:    list of originating switches passed in from args
-    traffic_load: light, medium, or heavy
-    source:         whether this is called from main, or from somewhere else
+    traffic_load:   light, medium, or heavy
     numlines:       number of lines we should create
     """
 
