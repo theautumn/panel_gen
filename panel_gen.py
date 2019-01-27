@@ -341,6 +341,7 @@ class xb1():
         self.max_dialing = 2
         self.is_dialing = 0
         self.dahdi_group = "r11"
+        self.api_tl = ""
         self.traffic_load = self.newtimer()
 
         if args.d:
@@ -362,13 +363,23 @@ class xb1():
         return("{}('{}')".format(self.__class__.__name__, self.running))
 
     def newtimer(self):
-        if args.v == 'light':
-            t = int(round(random.gamma(20,8)))                  # Low Traffic
-        elif args.v == 'heavy':
-            t = int(round(random.gamma(5,9)))                   # Heavy Traffic
-        else:
-            t = int(round(random.gamma(5,10)))                  # Medium Traffic
-        return t
+        if __name__ == '__main__':
+            if args.v == 'light':
+                ctimer = int(round(random.gamma(20,8)))
+            elif args.v == 'heavy':
+                ctimer = int(round(random.gamma(5,7)))
+            else:
+                ctimer = int(round(random.gamma(4,14)))
+
+        if __name__ == 'panel_gen':
+            if self.api_tl == 'heavy':
+                ctimer = int(round(random.gamma(5,7)))
+            elif self.api_tl == 'light':
+                ctimer = int(round(random.gamma(20,8)))
+            else:
+                ctimer = int(round(random.gamma(4,14)))
+
+        return ctimer
 
     def update(self, api):
         # Used by the API PATCH method to update switch parameters.
@@ -418,6 +429,7 @@ class xb5():
         self.max_dialing = 7
         self.is_dialing = 0
         self.dahdi_group = "r5"
+        self.api_tl = ""
         self.traffic_load = self.newtimer()
 
         if args.d:
@@ -442,13 +454,23 @@ class xb5():
         return("{}('{}')".format(self.__class__.__name__, self.running))
 
     def newtimer(self):
-        if args.v == 'light':
-            t = int(round(random.gamma(20,8)))                  # Low Traffic
-        elif args.v == 'heavy':
-            t = int(round(random.gamma(4,5)))            # 4,6  # Heavy Traffic
-        else:
-            t = int(round(random.gamma(4,14)))                  # Medium Traffic
-        return t
+        if __name__ == '__main__':
+            if args.v == 'light':
+                ctimer = int(round(random.gamma(20,8)))
+            elif args.v == 'heavy':
+                ctimer = int(round(random.gamma(5,7)))
+            else:
+                ctimer = int(round(random.gamma(4,14)))
+
+        if __name__ == 'panel_gen':
+            if self.api_tl == 'heavy':
+                ctimer = int(round(random.gamma(5,7)))
+            elif self.api_tl == 'light':
+                ctimer = int(round(random.gamma(20,8)))
+            else:
+                ctimer = int(round(random.gamma(4,14)))
+
+        return ctimer
 
     def update(self, api):
         # Used by the API PATCH method to update switch parameters.
@@ -657,10 +679,10 @@ def make_lines(**kwargs):
         new_lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
     elif source == 'api':
         new_lines = [Line(n, switch) for n in range(numlines)]
-
+        logging.info(switch)
         if traffic_load != '':
-            switch.traffic_load = traffic_load
-
+            switch.api_tl = str(traffic_load)
+            logging.info(Adams.api_tl)
     return new_lines
 
 
@@ -766,6 +788,7 @@ def api_start(switch, **kwargs):
                 elif instance == Adams:
                     new_lines = make_lines(switch=instance, numlines=8, traffic_load='heavy',
                             source='api')
+                    Adams.api_tl = 'heavy'
                 elif instance == Lakeview:
                     new_lines = make_lines(switch=instance, numlines=2, source='api')
             elif mode != 'demo':
