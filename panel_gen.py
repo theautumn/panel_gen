@@ -231,8 +231,6 @@ class panel():
     dahdi_group:    Passed to Asterisk when call is made.
     api_tl:         String that shows up in console interface when line
                     is a temporary API generated call.
-    traffic_load:   Timer that we decrement once per second to control
-                    call timers.
     max_calls:      Maximum concurrent calls the switch can handle.
     max_nxx:        Values for trunk load. Determined by how many
                     outgoing trunks we have provisioned on the switch.
@@ -249,7 +247,6 @@ class panel():
         self.is_dialing = 0
         self.dahdi_group = "r6"
         self.api_tl = ""
-        self.traffic_load = self.newtimer()
 
         if args.d:
             self.max_calls = 1
@@ -273,7 +270,7 @@ class panel():
     def newtimer(self):
         # First checks to see if args.v is specified.
         # If we're running as module, ignore args, and use API value.
-
+        
         if __name__ == '__main__':
             if args.v == 'light':
                 ctimer = int(round(random.gamma(20,8)))
@@ -342,7 +339,6 @@ class xb1():
         self.is_dialing = 0
         self.dahdi_group = "r11"
         self.api_tl = ""
-        self.traffic_load = self.newtimer()
 
         if args.d:
             self.max_calls = 1
@@ -413,8 +409,6 @@ class xb1():
 		# Must be a group that we have hooked in to panel_gen
                 self.dahdi_group = value
             if key == 'trunk_load':
-		# Total of all values must add up to 1
-		# Number of values must equal number of NXXs
                 self.trunk_load = value
             if key == 'traffic_load':
                 self.api_tl = value
@@ -430,7 +424,6 @@ class xb5():
         self.is_dialing = 0
         self.dahdi_group = "r5"
         self.api_tl = ""
-        self.traffic_load = self.newtimer()
 
         if args.d:
             self.max_calls = 1
@@ -464,7 +457,7 @@ class xb5():
 
         if __name__ == 'panel_gen':
             if self.api_tl == 'heavy':
-                ctimer = int(round(random.gamma(5,7)))
+                ctimer = int(round(random.gamma(4,5)))
             elif self.api_tl == 'light':
                 ctimer = int(round(random.gamma(20,8)))
             else:
@@ -729,7 +722,7 @@ class SwitchSchema(Schema):
     trunk_load = fields.List(fields.Str())
     line_range = fields.List(fields.Str())
     running = fields.Boolean()
-    traffic_load = fields.Str()
+    ctimer = fields.Str()
     api_tl = fields.Str()
 
 class CallSchema(Schema):
