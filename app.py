@@ -19,14 +19,15 @@ def start(**kwargs):
 
     if mode == "demo":
         result = panel_gen.api_start(switch, mode="demo")
-    elif mode != "demo":
-        result = panel_gen.api_start(switch)    
 
-    if result != False:
         if source == "web":
             return 'See Other', 303, {'Location': '/'}
         else:
             return result 
+    
+    elif mode != "demo":
+        result = panel_gen.api_start(switch)    
+
     else:
         abort(
             406,

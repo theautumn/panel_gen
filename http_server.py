@@ -37,6 +37,10 @@ class bcolors:
 def home():
     return render_template('home.html')
 
+@app.route('/dark', methods=['GET'])
+def dark():
+    return render_template('dark.html')
+
 @app.route('/5xb', methods=['GET'])
 def xb5home():
     return render_template('5xb.html')
