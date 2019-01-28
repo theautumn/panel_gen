@@ -181,7 +181,11 @@ class Line():
         # Delete the line if we are just doing a one-shot call from the API.
         if self.is_api == True:
             logging.info("Deleted API one-shot line.")
+            currentlines = [l for l in lines if l.switch == self.switch]
+
             del lines[self.ident]
+            if len(currentlines) <= 1:
+                self.switch.running = False
 
         if args.d:                                              # Are we in deterministic mode?
             if args.w:                                          # args.w is wait time between calls
@@ -695,10 +699,11 @@ def make_lines(**kwargs):
 class AppSchema(Schema):
     name = fields.Str()
     app_running = fields.Boolean()
-    is_paused = fields.Boolean()
+    panel_running = fields.Boolean()
+    xb5_running = fields.Boolean()
     ui_running = fields.Boolean()
+    is_paused = fields.Boolean()
     num_lines = fields.Integer()
-    active_switches = fields.List(fields.Str())
 
 class LineSchema(Schema):
     line = fields.Dict()
@@ -736,15 +741,14 @@ def get_info():
 
     schema = AppSchema()
 
-    sw_running = [s for s in orig_switch if s.running == True]
-
     result = dict([
         ('name', __name__),
         ('app_running', w.is_alive),
         ('is_paused', w.paused),
         ('ui_running', t.started),
         ('num_lines', len(lines)),
-        ('active_switches', sw_running)
+        ('panel_running', Rainier.running),
+        ('xb5_running', Adams.running),
         ])
     return schema.dump(result)
 

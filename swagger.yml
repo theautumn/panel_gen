@@ -36,8 +36,10 @@ paths:
                   type: boolean
                 num_lines:
                   type: string
-                active_switches:
-                  type: array
+                panel_running:
+                  type: boolean
+                xb5_running:
+                  type: boolean
 
   /app/start/{switch}:
     post:
