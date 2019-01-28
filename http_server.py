@@ -16,8 +16,8 @@ import connexion
 import logging
 import panel_gen
 
-#log = logging.getLogger('werkzeug')
-#log.setLevel(logging.ERROR)
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 #app = Flask(__name__)
 app = connexion.App(__name__, specification_dir='./')
@@ -38,7 +38,7 @@ def home():
     return render_template('home.html')
 
 @app.route('/dark', methods=['GET'])
-def dark():
+def darkt():
     return render_template('dark.html')
 
 @app.route('/5xb', methods=['GET'])

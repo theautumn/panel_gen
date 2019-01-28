@@ -22,6 +22,8 @@ def start(**kwargs):
 
         if source == "web":
             return 'See Other', 303, {'Location': '/'}
+        elif source == "dark":
+            return 'See Other', 303, {'Location': '/dark'}
         else:
             return result 
     
@@ -43,6 +45,8 @@ def stop(**kwargs):
     if result != False:
         if source == "web":
             return 'See Other', 303, {'Location': '/'}
+        elif source == "dark":
+            return 'See Other', 303, {'Location': '/dark'}
         else:
             return result 
     else:
