@@ -443,7 +443,7 @@ class xb5():
         self.nxx = [722, 832, 232, 275]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
         self.line_range = [1330,1009,1904,1435,9072,9073,1274,1485,1020,5678,5852,
-                        1003,6766,6564,1076,1026,5018,1137,9138,1165,1309,1440,9485,
+                        1003,6766,6564,1076,5018,1137,9138,1165,1309,1440,9485,
                         9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,4057,1055,
                         1035,1126,9267,1381,1470,9512,1663,9743,1841,1921]
 
@@ -827,6 +827,7 @@ def api_stop(switch):
             lines = []
             for s in orig_switch:
                 s.running = False
+                s.is_dialing = 0
             
             system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
 
@@ -836,6 +837,7 @@ def api_stop(switch):
                 dahdi_chan = [i.chan for i in deadlines if i.chan != '-']
                 lines = [l for l in lines if l.kind != switch]
                 instance.running = False
+                instance.is_dialing = 0
 
                 # Hang up and clean up spool.
                 for i in dahdi_chan:
