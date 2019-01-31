@@ -421,33 +421,6 @@ paths:
             description: Switch that the line will originate from
             type: string
             required: True
-#            schema:
-#              type: object
-#              properties:
-#                ident: 
-#                  type: string
-#                  description: Number of this line in list.
-#                switch:
-#                  type: string
-#                  description: Switch this line will call from
-#                timer:
-#                  type: integer
-#                  description: Number of seconds remaining until next action
-#                hook_state:
-#                  type: integer
-#                  description: 0 = On hook / 1 = Off hook
-#                ast_status:
-#                  type: string
-#                  description: Status of the line in Asterisk
-#                is_dialing:
-#                  type: boolean
-#                  description: Whether or not the line is currently holding a sender
-#                dahdi_chan:
-#                  type: integer
-#                  description: DAHDI channel the line belongs to
-#                called_no:
-#                  type: string
-#                  description: Number the line will call
         responses:
           201:
             description: Successfully created line
