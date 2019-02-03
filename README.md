@@ -117,7 +117,9 @@ Be aware that when paused, the program's timers stop, but Asterisk's timers keep
 
 HTTP Server
 -----------
-There is a simple, insecure HTTP server provided in http-server.py which serves up a basic web page so panel_gen can be executed via a volunteer's smartphone. This should not be available to everybody, as there are no security or sanity checks, and there's probably a thousand ways to break it. I keep it limited to a secure network so only those with the WPA key can access it. Still, it's quite cool! The actual server is [Flask](https://github.com/pallets/flask), and the CSS framework is [Skeleton](https://github.com/dhg/Skeleton).
+There is a simple, insecure HTTP server provided in http-server.py which serves up a basic web page so panel_gen can be executed via a volunteer's smartphone. This should not be available to everybody, as there are no security or sanity checks, and there's probably a thousand ways to break it. I keep it limited to a secure network so only those with the WPA key can access it. The actual server is [Flask](https://github.com/pallets/flask), and the CSS framework is [Skeleton](https://github.com/dhg/Skeleton).
+
+This app now provides an API via `http_server.py`! How cool is that? You can find basic documentation [here](https://github.com/theautumn/panel_gen/wiki/API), and at some point soon, I will write something more complete. Use at your own risk :)
 
 Examples
 -------

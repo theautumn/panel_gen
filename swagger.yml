@@ -1,0 +1,426 @@
+#https://realpython.com/flask-connexion-rest-api/#getting-started
+swagger: "2.0"
+info:
+  description: This defines the API for panel_gen
+  version: "1.0.0"
+  title: panel_gen traffic generator
+consumes:
+  - application/json
+produces:
+  - application/json
+
+basePath: /api
+
+paths:
+  /app:
+    get:
+      operationId: app.read_status
+      tags:
+        - app
+      summary: Get general app status information
+      description: Gets high-level app status
+      responses:
+        200:
+          description: Successful app read operation
+          schema:
+            type: array
+            items:
+              properties:
+                name:
+                  type: string
+                app_running:
+                  type: boolean
+                is_paused:
+                  type: boolean
+                ui_running:
+                  type: boolean
+                num_lines:
+                  type: string
+                panel_running:
+                  type: boolean
+                xb5_running:
+                  type: boolean
+
+  /app/start/{switch}:
+    post:
+      operationId: app.start
+      tags:
+        - app
+      summary: Start calls on a switch.
+      description: Starts calls on a particular switch.
+      parameters:
+        - name: switch
+          in: path
+          description: Switch to originate call from.
+          type: string
+          required: True
+        - name: mode
+          in: query
+          description: Allows starting demo mode, which sets special parameters.
+          type: string
+        - name: source
+          in: query
+          description: Changes response to 303 when running from web page.
+          type: string
+
+      responses:
+        201:
+          description: Successfully started processing calls on switch.
+        303:
+          description: Successfully started with redirect to home page.
+        406:
+          description: Failed to start calls on switch.
+
+  /app/stop/{switch}:
+    post:
+      operationId: app.stop
+      tags:
+        - app
+      summary: Stop calls on a switch..
+      description: Stop all actions and release lines. Use /stop/all to stop everything.
+      parameters:
+        - name: switch
+          in: path
+          description: Switch to stop. 'all' for all switches.
+          type: string
+          required: True
+        - name: source
+          in: query
+          description: Changes response to 303 when running from web page.
+          type: string
+
+      responses:
+        201:
+          description: Successfully stopped processing calls.
+        303:
+          description: Successfully stopped with redirect to home page.
+        406:
+          description: Failed to stop calls on switch.
+
+
+#  /app/pause:
+#    post:
+#      operationId: app.pause
+#      tags:
+#        - app
+#      summary: Pause execution but leave app running to unpause later.         
+#      description: Pause app but leave things in a resumable state.
+
+#      responses:
+#        201:
+#          description: Successfully paused work thread
+
+#  /app/resume:
+#    post:
+#      operationId: app.resume
+#      tags:
+#        - app
+#      summary: Resume from paused state. Picks up where it left off.
+#      description: Resume from last state.
+
+#      responses:
+#        201:
+#          description: Successfully resumed work thread
+
+  /call/{switch}/{destination}:
+    post:
+      operationId: app.call
+      tags:
+        - app
+      summary: Place a call now.
+      description: Place a call immediately.
+      parameters:
+        - name: switch
+          in: path
+          description: Switch to originate call from
+          type: string
+          required: True
+        - name: destination
+          in: path
+          description: Destination line to call
+          type: string
+          required: True
+
+      responses:
+        200:
+          description: Successfully placed call
+        406:
+          description: Failed to place call. Ask Sarah.
+
+  /switches:
+    get:
+      operationId: switches.read_all
+      tags:
+        - switches
+      summary: Read all switch objects
+      description: Read current status of all switches
+      responses:
+        200:
+          description: Successful read switch operation
+        404:
+          description: Switches not found.
+          schema:
+            type: array
+            items:
+              properties:
+                kind:
+                  type: string
+                running:
+                  type: boolean
+                max_calls:
+                  type: integer
+                max_dialing:
+                  type: integer
+                is_dialing:
+                  type: integer 
+                dahdi_group:
+                  type: string
+                nxx:
+                  type: array
+                line_range:
+                  type: array
+                trunk_load:
+                  type: array
+
+  /switches/{kind}:
+    get:
+      operationId: switches.read_one
+      tags:
+      - switches
+      summary: Read one switch from the switches list
+      description: Read current status of a particular switch
+      parameters:
+      - name: kind
+        in: path
+        description: Kind of switch to get from the list
+        type: string
+        required: True
+      responses:
+        200:
+          description: Successfully read switch from switches list operation
+          schema:
+            properties:
+              kind:
+                type: string
+              running:
+                type: boolean
+              max_calls:
+                type: integer
+              max_dialing:
+                type: integer
+              is_dialing:
+                type: integer
+              dahdi_group:
+                type: string
+              nxx:
+                type: array
+              line_range:
+                type: array
+              trunk_load:
+                type: array
+              traffic_load:
+                type: string
+        404:
+          description: Switch of type not found.
+
+    post:
+        operationId: switches.create
+        tags:
+          - switches
+        summary: Create a new instance of a switch
+        description: Instantiate a switch object
+        parameters:
+          - name: kind
+            in: path
+            description: Virtual switch to create
+            type: string
+            required: True
+        responses:
+          201:
+            description: Successfully created switch.
+          406:
+            description: Switch was not created.
+
+    patch:
+      operationId: switches.update
+      tags:
+        - switches
+      summary: Update a switch in the switches list
+      description: Update an already existing switch in the switches list
+      parameters:
+        - name: kind
+          in: path
+          description: Kind of switch to update in the list
+          type: string
+          required: True
+        - name: switch
+          in: body
+          schema:
+            type: object
+            properties:
+              running:
+                type: boolean
+              max_calls:
+                type: integer
+              max_dialing:
+                type: integer
+              dahdi_group:
+                type: string
+              nxx:
+                type: array
+              line_range:
+                type: array
+              trunk_load:
+                type: array
+              traffic_load:
+                type: string
+      responses:
+        200:
+          description: Successfully updated switch in switches list
+        406:
+          description: Sarah broke something. Oh no.
+
+  /lines:
+    get:
+      operationId: lines.read_all
+      tags:
+        - lines
+      summary: Represents line objects
+      description: Read all lines
+      responses:
+        200:
+          description: Successful read line operation
+          schema:
+            type: array
+            items:
+              properties:
+                ident:
+                  type: string
+                switch:
+                  type: string
+                timer:
+                  type: integer
+                hook_state:
+                  type: integer
+                ast_status:
+                  type: string
+                dahdi_chan:
+                  type: string
+                called_no:
+                  type: string
+
+    delete:
+      operationId: lines.delete_all
+      tags:
+        - lines
+      summary: Represents line objects
+      description: Deletes all lines
+      responses:
+        204:
+          description: Successful delete line operation
+
+  /lines/{ident}:
+    get:
+      operationId: lines.read_one
+      tags:
+      - lines
+      summary: Read one line from the lines list
+      description: Read one line from the lines list
+      parameters:
+      - name: ident
+        in: path
+        description: Key of line to get from the list
+        type: string
+        required: True
+      responses:
+        200:
+          description: Successfully read line from lines list operation
+          schema:
+            properties:
+              ident:
+                type: string
+              switch:
+                type: string
+              timer:
+                type: integer
+              hook_state:
+                type: integer
+              ast_status:
+                type: string
+              is_dialing:
+                type: boolean
+              dahdi_chan:
+                type: string
+              called_no:
+                type: string
+        404:        
+          description: Line does not exist.
+
+    patch:
+      operationId: lines.update
+      tags:
+        - lines
+      summary: Update a line in the lines list
+      description: Update an already existing line in the lines list
+      parameters:
+        - name: ident
+          in: path
+          description: Identity of line to update in the list. Normally an integer, starting at 0
+          type: string
+          required: True
+        - name: line
+          in: body
+          schema:
+            type: object
+            properties:
+              switch:
+                type: string
+              timer:
+                type: integer
+              hook_state:
+                type: integer
+              ast_status:
+                type: string
+              is_dialing:
+                type: boolean
+              dahdi_chan:
+                type: string
+              called_no:
+                type: string
+      responses:
+        200:
+          description: Successfully updated line
+        406:
+          description: Line could not be updated
+
+    delete:
+      operationId: lines.delete
+      tags:
+        - lines
+      summary: Delete a line from the lines list
+      description: Delete a line
+      parameters:
+        - name: ident
+          in: path
+          type: string
+          required: True
+      responses:
+        204:
+          description: Successfully deleted a line
+
+  /lines/{switch}:
+    post:
+        operationId: lines.create
+        tags:
+          - lines
+        summary: Create a new line
+        description: Instantiate a line object belonging to a particular switch.
+        parameters:
+          - name: switch
+            in: path
+            description: Switch that the line will originate from
+            type: string
+            required: True
+        responses:
+          201:
+            description: Successfully created line

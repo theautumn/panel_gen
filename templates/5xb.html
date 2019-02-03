@@ -3,9 +3,12 @@
 {% block header %}No. 5 Crossbar{% endblock %}
 
 {% block content %}
-    	<form method="post" action="/5xb">
-	<input class="button-primary" type="submit", name="command", value="start">
+    <form method="post" action="/api/app/start/5xb?mode=demo&source=web">
+    <input class="button-primary" type="submit", name="command", value="start">
+    </form>
+    <form method="post" action="/api/app/stop/5xb?source=web">
 	<input class="button" type="submit", name="command", value="stop">
+    </form>
 	<div>
 		<h5> {{ status }} </h5>
 {% endblock %}

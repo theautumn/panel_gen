@@ -125,8 +125,9 @@ body {
   line-height: 1.6;
   font-weight: 400;
   font-family: "Raleway", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  color: #222; }
-
+  color: #f5f2f2;
+  background-color: #303030 }
+  
 
 /* Typography
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
@@ -182,7 +183,7 @@ input[type="button"] {
   text-transform: uppercase;
   text-decoration: none;
   white-space: nowrap;
-  background-color: transparent;
+  background-color: #fffffff7;
   border-radius: 10px;
   border: 1px solid #bbb;
   cursor: pointer;
@@ -222,7 +223,7 @@ input[type="button"].button-primary:focus {
   background-color: #1EAEDB;
   border-color: #1EAEDB; }
 .button.button-red,
-button.button-green,
+button.button-red,
 input[type="submit"].button-red,
 input[type="reset"].button-red,
 input[type="button"].button-red {
@@ -230,6 +231,22 @@ input[type="button"].button-red {
   background-color: #e84545;
   border-color: #33C3F0; }
 
+.button.button-orange,
+button.button-orange,
+input[type="submit"].button-orange,
+input[type="reset"].button-orange,
+input[type="button"].button-orange {
+  color: #FFF;
+  background-color:#ff7800 ;
+  border-color: #33C3F0; }
+.button.button-egshell,
+button.button-eggshell,
+input[type="submit"].button-eggshell,
+input[type="reset"].button-eggshell,
+input[type="button"].button-eggshell {
+  color: #222;
+  background-color: #f7f4e9;
+  border-color: #33C3F0; }
 /* Forms
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
 input[type="email"],
@@ -361,8 +378,8 @@ p,
 ul,
 ol,
 form {
-  margin-bottom: 2.5rem; }
-
+  margin-bottom: 2.5rem;
+  display: inline; }
 
 /* Utilities
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
