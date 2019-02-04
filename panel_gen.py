@@ -43,6 +43,7 @@ class Line():
                         interface.
     self.api_indicator: See above. Is set to "***" if a line is a temp API line.
     """
+
     def __init__(self, ident, switch):
         self.switch = switch
         self.kind = switch.kind
@@ -64,18 +65,17 @@ class Line():
         return '<Line(name={self.ident!r})>'.format(self=self)
 
     def set_timer(self):
-        # Creates a new timer from whichever switch the line belongs to.
+        """ Returns a new timer from whichever switch the line belongs to."""
         self.timer = switch.newtimer
         return self.timer
 
     def tick(self):
         """
-        Decrement timers by 1 every second until it reaches 0
-        At 0, we're going to check a few things. First, status. If line is on hook "0",
-        and if we haven't maxed out the senders, then call and set the status of the line to "1".
-        If we have more dialing than we have sender capacity, then we reset the timer to
-        a "reasonable number of seconds" and try again.
-        If self.status is "1", we simply call hangup(), which takes care of the cleanup.
+        Decrement line timer by 1 every second until it reaches 0.
+        Manages the self.status state machine by placing calls or hanging up,
+        depending on line.status.
+
+        Returns the new value of self.timer
         """
         if self.switch.running == False:
             self.switch.running = True
@@ -94,9 +94,12 @@ class Line():
         return self.timer
 
     def pick_called_line(self, term_choices):
-        # If a terminating office wasn't given at runtime, then just default to a random choice
-        # as defined by the class of the switch we're calling from. Else, pick a random from the
-        # args that the user gave with the -t switch.
+        """
+        Returns a string containing a 7-digit number to call.
+        
+        term_choices:       List of office codes we can dial
+			    set as a global in __main__
+	"""
 
         if term_choices == []:
             term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)
@@ -120,14 +123,13 @@ class Line():
             assert False
 
 
-        term = int(str(term_office) + str(term_station))        # And put it together.
+        term = int(str(term_office) + str(term_station))
         #logging.info('Terminating line selected: %s', term)
         return term
 
     def call(self, **kwargs):
         """
-	Checks if we're in deterministic mode and sets duration
-	accordingly. Also checks for wait time in -d mode.
+	Places a call. Returns nothing.
 
         Dialing takes ~10 to 12 seconds. We're going to set a timer
         for call duration here, and then a few lines down,
@@ -216,7 +218,7 @@ class Line():
             self.term = self.pick_called_line(term_choices)     # Pick a new terminating line.
 
     def update(self, api):
-        # Used by the API PATCH method to update line parameters.
+        """ Used by the API PATCH method to update line parameters."""
 
         for (key, value) in api.items():
             if key == 'switch':
@@ -232,7 +234,7 @@ class Line():
                 self.timer = value
             if key == 'dahdi_chan':
                 # Change which channel a line belongs to. Also might break everything.
-                self.dahdi_chan = value
+                self.chan = value
             if key == 'called_no':
                 self.term = value
 
@@ -243,13 +245,15 @@ class Line():
 class panel():
     """
     This class is parameters and methods for the panel switch.
+
     kind:           Generic name for type of switch.
     running:        Whether or not switch is running.
     max_dialing:    Set based on sender capacity.
     is_dialing:     Records current number of calls in Dialing state.
     dahdi_group:    Passed to Asterisk when call is made.
-    api_tl:         String that shows up in console interface when line
-                    is a temporary API generated call.
+    api_volume:     String that contains "light", "heavy", or "".
+		    Sets the random.gamma distribution for generating
+		    new call timers. 
     max_calls:      Maximum concurrent calls the switch can handle.
     max_nxx:        Values for trunk load. Determined by how many
                     outgoing trunks we have provisioned on the switch.
@@ -265,7 +269,7 @@ class panel():
         self.max_dialing = 6
         self.is_dialing = 0
         self.dahdi_group = "r6"
-        self.api_tl = ""
+        self.api_volume = ""
 
         if args.d:
             self.max_calls = 1
@@ -284,68 +288,74 @@ class panel():
         self.line_range = [5000,5999]
 
     def __repr__(self):
-        return("{}('{}')".format(self.__class__.__name__, self.running))
+        return("{}".format(self.__class__.__name__))
 
     def newtimer(self):
-        # First checks to see if args.v is specified.
-        # If we're running as module, ignore args, and use API value.
+	""" Returns timer back to Line() object """
         
         if __name__ == '__main__':
             if args.v == 'light':
-                ctimer = int(round(random.gamma(20,8)))
+                timer = int(round(random.gamma(20,8)))
             elif args.v == 'heavy':
-                ctimer = int(round(random.gamma(5,7)))
+                timer = int(round(random.gamma(5,7)))
             else:
-                ctimer = int(round(random.gamma(4,14)))
+                timer = int(round(random.gamma(4,14)))
 
         if __name__ == 'panel_gen':
-            if self.api_tl == 'heavy':
-                ctimer = int(round(random.gamma(5,7)))
-            elif self.api_tl == 'light':
-                ctimer = int(round(random.gamma(20,8)))
+            if self.api_volume == 'light':
+                timer = int(round(random.gamma(20,8)))
+            elif self.api_volume == 'heavy':
+                timer = int(round(random.gamma(5,7)))
             else:
-                ctimer = int(round(random.gamma(4,14)))
+                timer = int(round(random.gamma(4,14)))
 
-        return ctimer
+        return timer
 
     def update(self, api):
-        # Used by the API PATCH method to update switch parameters.
+        """ Used by the API PATCH method to update switch parameters."""
 
-        for (key, value) in api["switch"].items():
-            if key == 'line_range':
-                if value in range(1000, 9999):
-                # Line range must be a tuple from 1000-9999
-                    self.line_range = value
-            if key == 'nxx':
-                # nxx must be 3 digits, matching codes we can dial
-		# number of values in nxx must also match trunk_load
-                for i in value:
-                    self.nxx = value
-            if key == 'running':
-		# Can be used to start and stop a particular switch.
-		# This feature is not yet implemented fully.
-                self.running = value
-            if key == 'max_dialing':
-		# Must be <= 10
-                if value >=10:
-                    return "Fail: bad_max"
-                else:
-                    self.max_dialing = value
-            if key == 'max_calls':
-		# Must be <= 10
-                if value >= 10:
-                    return "Fail: must be less than 10 max dialing"
-                else:
-                    self.max_calls = value
-            if key == 'dahdi_group':
-		# Must be a group that we have hooked in to panel_gen
-                self.dahdi_group = value
-            if key == 'trunk_load':
-		# Total of all values must add up to 1
-		# Number of values must equal number of NXXs
-                self.trunk_load = value
-            if key == 'traffic_load':
-                self.api_tl = value
+        try:
+	    for (key, value) in api["switch"].items():
+		if key == 'line_range':
+		    if value in range(1000, 9999):
+		    # Line range must be a tuple from 1000-9999
+			self.line_range = value
+		if key == 'nxx':
+		    # nxx must be 3 digits, matching codes we can dial
+		    # number of values in nxx must also match trunk_load
+		    for i in value:
+			self.nxx = value
+		if key == 'running':
+		    # Can be used to start and stop a particular switch.
+		    # This feature is not yet implemented fully.
+		    self.running = value
+		if key == 'max_dialing':
+		    # Must be <= 10
+		    if value >=10:
+			return "Fail: bad_max"
+		    else:
+			self.max_dialing = value
+		if key == 'max_calls':
+		    # Must be <= 10
+		    if value >= 10:
+			return "Fail: must be less than 10 max dialing"
+		    else:
+			self.max_calls = value
+		if key == 'dahdi_group':
+		    # Must be a group that we have hooked in to panel_gen
+		    self.dahdi_group = value
+		if key == 'trunk_load':
+		    # Total of all values must add up to 1
+		    # Number of values must equal number of NXXs
+		    self.trunk_load = value
+		if key == 'traffic_load':
+		    self.api_volume = value
+
+	except Exception as e:
+		logging.info(e)
+		return False
+
+	return True
 
 class xb1():
     # This class is for the No. 1 Crossbar.
@@ -357,7 +367,7 @@ class xb1():
         self.max_dialing = 2
         self.is_dialing = 0
         self.dahdi_group = "r11"
-        self.api_tl = ""
+        self.api_volume = ""
 
         if args.d:
             self.max_calls = 1
@@ -380,57 +390,67 @@ class xb1():
     def newtimer(self):
         if __name__ == '__main__':
             if args.v == 'light':
-                ctimer = int(round(random.gamma(20,8)))
+                timer = int(round(random.gamma(20,8)))
             elif args.v == 'heavy':
-                ctimer = int(round(random.gamma(5,7)))
+                timer = int(round(random.gamma(5,7)))
             else:
-                ctimer = int(round(random.gamma(4,14)))
+                timer = int(round(random.gamma(4,14)))
 
         if __name__ == 'panel_gen':
-            if self.api_tl == 'heavy':
-                ctimer = int(round(random.gamma(5,7)))
-            elif self.api_tl == 'light':
-                ctimer = int(round(random.gamma(20,8)))
+            if self.api_volume == 'heavy':
+                timer = int(round(random.gamma(5,7)))
+            elif self.api_volume == 'light':
+                timer = int(round(random.gamma(20,8)))
             else:
-                ctimer = int(round(random.gamma(4,14)))
+                timer = int(round(random.gamma(4,14)))
 
-        return ctimer
+        return timer
 
     def update(self, api):
         # Used by the API PATCH method to update switch parameters.
 
-        for (key, value) in api["switch"].items():
-            if key == 'line_range':
-                # Line range must be a tuple from 1000-9999
-                self.line_range = value
-            if key == 'nxx':
-                # nxx must be 3 digits, matching codes we can dial
-		# number of values in nxx must also match trunk_load
-                for i in value:
-                    self.nxx = value
-            if key == 'running':
-		# Can be used to start and stop a particular switch.
-		# This feature is not yet implemented fully.
-                self.running = value
-            if key == 'max_dialing':
-		# Must be <= 10
-                if value >=10:
-                    return "Fail: bad_max"
-                else:
-                    self.max_dialing = value
-            if key == 'max_calls':
-		# Must be <= 10
-                if value >= 10:
-                    return "Fail: must be less than 10 max dialing"
-                else:
-                    self.max_calls = value
-            if key == 'dahdi_group':
-		# Must be a group that we have hooked in to panel_gen
-                self.dahdi_group = value
-            if key == 'trunk_load':
-                self.trunk_load = value
-            if key == 'traffic_load':
-                self.api_tl = value
+        try:
+	    for (key, value) in api["switch"].items():
+		if key == 'line_range':
+		    if value in range(1000, 9999):
+		    # Line range must be a tuple from 1000-9999
+			self.line_range = value
+		if key == 'nxx':
+		    # nxx must be 3 digits, matching codes we can dial
+		    # number of values in nxx must also match trunk_load
+		    for i in value:
+			self.nxx = value
+		if key == 'running':
+		    # Can be used to start and stop a particular switch.
+		    # This feature is not yet implemented fully.
+		    self.running = value
+		if key == 'max_dialing':
+		    # Must be <= 10
+		    if value >=10:
+			return "Fail: bad_max"
+		    else:
+			self.max_dialing = value
+		if key == 'max_calls':
+		    # Must be <= 10
+		    if value >= 10:
+			return "Fail: must be less than 10 max dialing"
+		    else:
+			self.max_calls = value
+		if key == 'dahdi_group':
+		    # Must be a group that we have hooked in to panel_gen
+		    self.dahdi_group = value
+		if key == 'trunk_load':
+		    # Total of all values must add up to 1
+		    # Number of values must equal number of NXXs
+		    self.trunk_load = value
+		if key == 'traffic_load':
+		    self.api_volume = value
+
+	except Exception as e:
+		logging.info(e)
+		return False
+
+	return True
 
 class xb5():
     # This class is for the No. 5 Crossbar.
@@ -442,7 +462,7 @@ class xb5():
         self.max_dialing = 7
         self.is_dialing = 0
         self.dahdi_group = "r5"
-        self.api_tl = ""
+        self.api_volume = ""
 
         if args.d:
             self.max_calls = 1
@@ -468,59 +488,67 @@ class xb5():
     def newtimer(self):
         if __name__ == '__main__':
             if args.v == 'light':
-                ctimer = int(round(random.gamma(20,8)))
+                timer = int(round(random.gamma(20,8)))
             elif args.v == 'heavy':
-                ctimer = int(round(random.gamma(5,7)))
+                timer = int(round(random.gamma(5,7)))
             else:
-                ctimer = int(round(random.gamma(4,14)))
+                timer = int(round(random.gamma(4,14)))
 
         if __name__ == 'panel_gen':
-            if self.api_tl == 'heavy':
-                ctimer = int(round(random.gamma(4,5)))
-            elif self.api_tl == 'light':
-                ctimer = int(round(random.gamma(20,8)))
+            if self.api_volume == 'heavy':
+                timer = int(round(random.gamma(4,5)))
+            elif self.api_volume == 'light':
+                timer = int(round(random.gamma(20,8)))
             else:
-                ctimer = int(round(random.gamma(4,14)))
+                timer = int(round(random.gamma(4,14)))
 
-        return ctimer
+        return timer
 
     def update(self, api):
         # Used by the API PATCH method to update switch parameters.
 
-        for (key, value) in api["switch"].items():
-            if key == 'line_range':
-                # Line range must be a tuple from 1000-9999
-                self.line_range = value
-            if key == 'nxx':
-                # nxx must be 3 digits, matching codes we can dial
-		# number of values in nxx must also match trunk_load
-                for i in value:
-                    self.nxx = value
-            if key == 'running':
-		# Can be used to start and stop a particular switch.
-		# This feature is not yet implemented fully.
-                self.running = value
-            if key == 'max_dialing':
-		# Must be <= 10
-                if value >=10:
-                    return "Fail: bad_max"
-                else:
-                    self.max_dialing = value
-            if key == 'max_calls':
-		# Must be <= 10
-                if value >= 10:
-                    return "Fail: must be less than 10 max dialing"
-                else:
-                    self.max_calls = value
-            if key == 'dahdi_group':
-		# Must be a group that we have hooked in to panel_gen
-                self.dahdi_group = value
-            if key == 'trunk_load':
-		# Total of all values must add up to 1
-		# Number of values must equal number of NXXs
-                self.trunk_load = value
-            if key == 'traffic_load':
-                self.api_tl = value
+        try:
+	    for (key, value) in api["switch"].items():
+		if key == 'line_range':
+		    if value in range(1000, 9999):
+		    # Line range must be a tuple from 1000-9999
+			self.line_range = value
+		if key == 'nxx':
+		    # nxx must be 3 digits, matching codes we can dial
+		    # number of values in nxx must also match trunk_load
+		    for i in value:
+			self.nxx = value
+		if key == 'running':
+		    # Can be used to start and stop a particular switch.
+		    # This feature is not yet implemented fully.
+		    self.running = value
+		if key == 'max_dialing':
+		    # Must be <= 10
+		    if value >=10:
+			return "Fail: bad_max"
+		    else:
+			self.max_dialing = value
+		if key == 'max_calls':
+		    # Must be <= 10
+		    if value >= 10:
+			return "Fail: must be less than 10 max dialing"
+		    else:
+			self.max_calls = value
+		if key == 'dahdi_group':
+		    # Must be a group that we have hooked in to panel_gen
+		    self.dahdi_group = value
+		if key == 'trunk_load':
+		    # Total of all values must add up to 1
+		    # Number of values must equal number of NXXs
+		    self.trunk_load = value
+		if key == 'traffic_load':
+		    self.api_volume = value
+
+	except Exception as e:
+		logging.info(e)
+		return False
+
+	return True
 
 class step():
     # This class is for the SxS office. It's very minimal, as we are not currently
@@ -638,9 +666,6 @@ def make_switch(args):
         orig_switch.append(Lakeview)
 
     if __name__ == '__main__':
-        # If no args provided, just assume panel switch.
-        if args.o == []:
-            args.o = ['panel']
 
         for o in args.o:
             if o == 'panel' or o == '722':
@@ -651,6 +676,9 @@ def make_switch(args):
                 orig_switch.append(Lakeview)
             elif o == 'all':
                 orig_switch.extend((Lakeview, Adams, Rainier))
+        
+        if args.o == []:
+            orig_switch.append(Rainier)
 
     global term_choices
     term_choices = []
@@ -691,8 +719,8 @@ def make_lines(**kwargs):
         new_lines = [Line(n, switch) for n in range(numlines)]
         logging.info(switch)
         if traffic_load != '':
-            switch.api_tl = str(traffic_load)
-            logging.info(Adams.api_tl)
+            switch.api_volume = str(traffic_load)
+            logging.info(Adams.api_volume)
     return new_lines
 
 
@@ -725,8 +753,8 @@ class LineSchema(Schema):
     timer = fields.Integer()
     is_dialing = fields.Boolean()
     ast_status = fields.Str()
-    chan = fields.Str()
-    term = fields.Str()
+    dahdi_chan = fields.Str()
+    called_no = fields.Str()
     hook_state = fields.Integer()
 
 class SwitchSchema(Schema):
@@ -740,8 +768,8 @@ class SwitchSchema(Schema):
     trunk_load = fields.List(fields.Str())
     line_range = fields.List(fields.Str())
     running = fields.Boolean()
-    ctimer = fields.Str()
-    api_tl = fields.Str()
+    timer = fields.Str()
+    api_volume = fields.Str()
 
 
 def get_info():
@@ -790,7 +818,7 @@ def api_start(switch, **kwargs):
                 elif instance == Adams:
                     new_lines = make_lines(switch=instance, numlines=8, traffic_load='heavy',
                             source='api')
-                    Adams.api_tl = 'heavy'
+                    Adams.api_volume = 'heavy'
                 elif instance == Lakeview:
                     new_lines = make_lines(switch=instance, numlines=2, source='api')
             elif mode != 'demo':
@@ -1378,7 +1406,7 @@ if __name__ == "__main__":
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
             filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
 
-    logging.info('Originating calls on %s', args.o)
+    logging.info('Originating calls on %s', orig_switch)
     if args.t != []:
         logging.info('Terminating calls on %s', term_choices)
     if args.d == True:
