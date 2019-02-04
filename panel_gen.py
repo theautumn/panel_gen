@@ -26,30 +26,45 @@ from pycall import CallFile, Call, Application, Context
 from asterisk.ami import AMIClient, EventListener
 
 class Line():
-# Main class for calling lines. Contains all the essential vitamins and minerals.
-# It's an important part of a balanced breakfast.
+    """
+    This class defines Line objects. 
 
+    self.switch:        Set to an instantiated switch object. Usually Rainier,
+                        Adams, or Lakeview
+    self.kind:          Type of switch for above objects. "panel, 1xb, 5xb"
+    self.status:        0 = OnHook, 1 = OffHook
+    self.term:          String containing the 7-digit terminating line.
+    self.timer:         Starts with a standard random.gamma, then gets set
+                        subsequently by the call volume attribute of the switch.
+    self.ident:         Integer starting with 0 that identifies the line.
+    self.chan:          DAHDI channel. We get this from asterisk.ami once the call
+                        is in progress. See on_DialBegin()
+    self.is_api:        Used to identify an API one-shot line in the console
+                        interface.
+    self.api_indicator: See above. Is set to "***" if a line is a temp API line.
+    """
     def __init__(self, ident, switch):
         self.switch = switch
         self.kind = switch.kind
-        self.status = 0                                             # Set status to on-hook.
+        self.status = 0
 
-	if args.l:                                                  # If user specified a line
-            self.term = args.l                                      # Set term line to user specified
-        else:                                                       # Else,
-            self.term = self.pick_called_line(term_choices)         # Generate a term line randomly.
+	if args.l:
+            self.term = args.l
+        else:
+            self.term = self.pick_called_line(term_choices)
 
-        self.timer = int(random.gamma(3,4))                         # Set a start timer because i said so.
-        self.ident = ident                                          # Set an integer for identity.
-        self.chan = '-'                                             # Set DAHDI channel to 0 to start
+        self.timer = int(random.gamma(3,4))
+        self.ident = ident
+        self.chan = '-'
         self.ast_status = 'on_hook'
-        self.is_api = False                                         # Used for temporary lines from API
-        self.api_indicator = ""                                     # For drawing the table in the UI
+        self.is_api = False
+        self.api_indicator = ""
 
     def __repr__(self):
         return '<Line(name={self.ident!r})>'.format(self=self)
 
     def set_timer(self):
+        # Creates a new timer from whichever switch the line belongs to.
         self.timer = switch.newtimer
         return self.timer
 
@@ -239,9 +254,9 @@ class panel():
     max_nxx:        Values for trunk load. Determined by how many
                     outgoing trunks we have provisioned on the switch.
     nxx:            List of office codes we can dial. Corresponds directly
-					to max_nxx.
-	trunk_load:		List of max_nxx used to compute load on trunks.
-	line_range:		Range of acceptable lines to dial when calling this office.
+		    to max_nxx.
+    trunk_load:	    List of max_nxx used to compute load on trunks.
+    line_range:	    Range of acceptable lines to dial when calling this office.
     """
 
     def __init__(self):
@@ -357,7 +372,7 @@ class xb1():
         self.max_nxx4 = 0
         self.nxx = [722, 832, 232]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.line_range = [104,105,106,107,108,109,110,111]
+        self.line_range = [105,107,108,109,110,111]
 
     def __repr__(self):
         return("{}('{}')".format(self.__class__.__name__, self.running))
@@ -442,10 +457,10 @@ class xb5():
         self.max_nxx4 = .1
         self.nxx = [722, 832, 232, 275]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
-        self.line_range = [1330,1009,1904,1435,9072,9073,1274,1485,1020,5678,5852,
-                        1003,6766,6564,1076,5018,1137,9138,1165,1309,1440,9485,
-                        9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,4057,1055,
-                        1035,1126,9267,1381,1470,9512,1663,9743,1841,1921]
+        self.line_range = [1330,1435,9072,9073,1274,1485,1020,5852,
+                        1003,6766,6564,1076,5018,1137,9138,1165,1309,9485,
+                        9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,
+                        4057,1055,1035,9267,1381,1470,9512,1663,9743,1841,1921]
 
     def __repr__(self):
         return("{}('{}')".format(self.__class__.__name__, self.running))
@@ -596,8 +611,6 @@ def parse_args():
             help='Use with -d option to specify call duration.')
     parser.add_argument('-log', metavar='loglevel', type=str, default='INFO',
             help='Set log level to WARNING, INFO, DEBUG.')
-    parser.add_argument('--http', action='store_true',
-            help='Run in headless HTTP server mode for remote control.')
 
     global args
     args = parser.parse_args()
@@ -730,15 +743,9 @@ class SwitchSchema(Schema):
     ctimer = fields.Str()
     api_tl = fields.Str()
 
-class CallSchema(Schema):
-    orig_switch = fields.Str()
-    called_no = fields.Str()
-    timer = fields.Integer()
 
 def get_info():
-    # API can get general info about running state.
-    # Will likely add more functionality here.
-
+    # API call to get general info about running state.
     schema = AppSchema()
 
     result = dict([
@@ -763,8 +770,6 @@ def api_start(switch, **kwargs):
     mode = kwargs.get('mode', '')
     logging.info("API requested START on %s", switch)
 
-#    if w.is_alive != True:
-#        w.start()
     if w.is_alive == True:
 
         if switch == 'panel':
@@ -1065,7 +1070,6 @@ def update_switch(**kwargs):
     result = schema.load(parameters)
     outcome = switch.update(result)
 
-    # >>> !! Should return the switch, or a specific error that the user can act upon.
     return schema.dump(switch)
 
 def delete_switch(kind):
@@ -1215,11 +1219,10 @@ class Screen():
         tablefmt="pipe", stralign = "right" ))
 
         # Print asterisk channels below the table so we can see what its actually doing.
-        if not args.http == True:
-            if y > 35:
-                ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-                stdscr.addstr(20,5,"============ Asterisk output ===========")
-                stdscr.addstr(22,0,ast_out)
+        if y > 35:
+            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
+            stdscr.addstr(20,5,"============ Asterisk output ===========")
+            stdscr.addstr(22,0,ast_out)
 
         # Print the contents of /var/log/panel_gen/calls.log
         if y > 45:
@@ -1246,9 +1249,7 @@ class Screen():
 class ui_thread(threading.Thread):
     # The UI thread! Besides handling pause and resume, this also
     # sets up a screen, and calls various things in Screen() to
-    # help with drawing. Note: This thread does not start if
-    # panel_gen is run with the --http option. No UI necessary
-    # in headless mode.
+    # help with drawing.
 
     def __init__(self):
 
@@ -1395,10 +1396,9 @@ if __name__ == "__main__":
         raise Exception(str(future.response))
 
     try:
-        if not args.http:
-            t = ui_thread()
-            t.daemon = True
-            t.start()
+        t = ui_thread()
+        t.daemon = True
+        t.start()
         w = work_thread()
         w.daemon = True
         w.start()
@@ -1479,7 +1479,6 @@ if __name__ == "panel_gen":
             filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
 
     lines = []
-#    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 #    lines = make_lines(source='main',orig_switch=orig_switch)
     logging.info('Starting panel_gen as thread from http_server')
 
