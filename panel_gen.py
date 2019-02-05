@@ -723,6 +723,19 @@ def make_lines(**kwargs):
             logging.info(Adams.api_volume)
     return new_lines
 
+def start_ui():
+    """
+    This starts the panel_gen UI. Only useful when run as module.
+
+    :return:    Nothing
+    :args:      Nothing
+    """
+    try:
+        t = ui_thread()
+        t.daemon = True
+        t.start()
+    except Exception as e:
+        print e
 
 # +----------------------------------------------------+
 # |                                                    |
@@ -1514,9 +1527,6 @@ if __name__ == "panel_gen":
         w = work_thread()
         w.daemon = True
         w.start()
-        t = ui_thread()
-        t.daemon = True
-        t.start()
 
         sleep(.5)
 

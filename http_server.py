@@ -23,6 +23,11 @@ log.setLevel(logging.ERROR)
 app = connexion.App(__name__, specification_dir='./')
 app.add_api('swagger.yml')
 
+# This starts the UI. Normally, when we import as
+# a module, we don't want to start the UI and take
+# over the user's screen unless specificall asked.
+panel_gen.start_ui()
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'

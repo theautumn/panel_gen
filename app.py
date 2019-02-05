@@ -3,16 +3,34 @@ import panel_gen
 
 # Handler for /app GET
 def read_status():
-   result = panel_gen.get_info() 
-   if result != False:
+    """
+    GET /app/
+    Success:    Returns 200 OK + app status messages
+    Failure:    Returns 406 Failed to get info
+    """
+    result = panel_gen.get_info() 
+    if result != False:
        return result
-   else:
+    else:
        abort(
             406,
             "Failed to get info",
         )
 
 def start(**kwargs):
+    """
+    POST /app/start/{switch}
+    Success:    Returns 200 OK + Starts calls on {switch}.
+                Also returns JSON formatted switch status message.
+    Failure:    Returns 406
+    If launched from web browser at http://0.0.0.0:5000, returns 303
+    redirect back to same page with no status message.
+
+    **kwargs allow the POST to be parsed for specifics
+    switch:     In URI path, Can be "1xb", "5xb", "panel"
+    mode:       In URI query string. Can be "demo", empty.
+    source:     In URI query string. "main" or "dark"
+    """
     switch = kwargs.get("switch", "")
     mode = kwargs.get("mode", "")
     source = kwargs.get("source", "")
@@ -37,6 +55,17 @@ def start(**kwargs):
         )
 
 def stop(**kwargs):
+    """
+    POST /app/stop/{switch}
+    Success:    Returns 200 OK + Stops calls on {switch}.
+    Failure:    Returns 406
+    If launched from web browser at http://0.0.0.0:5000, returns 303
+    redirect back to same page with no status message.
+
+    **kwargs allow the POST to be parsed for specifics
+    switch:     In URI path. Can be "1xb", "5xb", "panel"
+    source:     In URI query string. Can be "demo", empty.
+    """
     switch = kwargs.get("switch", "")
     source = kwargs.get("source", "")
     
@@ -59,6 +88,7 @@ def stop(**kwargs):
             )
 
 def pause():
+    """ Not currently used. """
     result = panel_gen.api_pause()
     if result != False:
         return result
@@ -70,6 +100,7 @@ def pause():
 
 
 def resume():
+    """ Not currently used. """
     result = panel_gen.api_resume()
     if result != False:
         return result
@@ -80,6 +111,18 @@ def resume():
         )
 
 def call(**kwargs):
+    """
+    POST /app/call/{switch}
+    Places a single call on {switch} that lasts for 18 seconds,
+    then hangs up and deletes the line from the switch.
+    Success:    Returns 200 OK + JSON parseable switch status.
+    Failure:    Returns 406 + Unhelpful error message.
+
+    **kwargs allow the POST to be parsed for specifics
+    switch:         In URI path. Can be "1xb", "5xb", "panel".
+    destination:    In URI path. Called line.
+
+    """
     switch = kwargs.get("switch", "")
     destination = kwargs.get("destination", "")
     result = panel_gen.call_now(switch, destination)

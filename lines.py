@@ -17,7 +17,7 @@ def read_one(ident):
     This function responds to a request for /api/line/{key}
     with one matching line from linees
     :param key:   key of line to find
-    :return:        line matching key
+    :return:        line matching ident
     """
     line = panel_gen.get_line(ident)
     if line != False:
