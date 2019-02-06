@@ -717,10 +717,8 @@ def make_lines(**kwargs):
         new_lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
     elif source == 'api':
         new_lines = [Line(n, switch) for n in range(numlines)]
-        logging.info(switch)
         if traffic_load != '':
             switch.api_volume = str(traffic_load)
-            logging.info(Adams.api_volume)
     return new_lines
 
 def start_ui():
@@ -730,6 +728,8 @@ def start_ui():
     :return:    Nothing
     :args:      Nothing
     """
+    global t
+
     try:
         t = ui_thread()
         t.daemon = True
@@ -800,7 +800,7 @@ def get_info():
         ])
     return schema.dump(result)
 
-def api_start(switch, **kwargs):
+def api_start(**kwargs):
     """
     Creates new lines when started from API.
     switch: Generic switch type to create lines on.
@@ -809,7 +809,15 @@ def api_start(switch, **kwargs):
 
     global lines
     mode = kwargs.get('mode', '')
-    logging.info("API requested START on %s", switch)
+    source = kwargs.get('source', '')
+    switch = kwargs.get('switch', '')
+
+    if source == 'web':
+        logging.info("App requested START on %s", switch)
+    elif source == 'key':
+        logging.info('Key operated: START on %s', switch)
+    else:
+        logging.info('I dont know why, but we are starting on %s', switch)
 
     if w.is_alive == True:
 
@@ -850,11 +858,20 @@ def api_start(switch, **kwargs):
         except NameError:
             return False
 
-def api_stop(switch):
+def api_stop(**kwargs):
     # This reads 'switch' and immediately hang up all calls, and
     # destroy all lines.
 
-    logging.info("API requested STOP on %s", switch)
+    switch = kwargs.get('switch', '')
+    source = kwargs.get('source', '')
+
+    if source == 'web':
+        logging.info("App requested STOP on %s", switch)
+    elif source == 'key':
+        logging.info('Key operated: STOP on %s', switch)
+    else:
+        logging.info('Stopping, but not sure why!')
+
     global lines
 
     # Validate switch input.

@@ -29,14 +29,14 @@ def start(**kwargs):
     **kwargs allow the POST to be parsed for specifics
     switch:     In URI path, Can be "1xb", "5xb", "panel"
     mode:       In URI query string. Can be "demo", empty.
-    source:     In URI query string. "main" or "dark"
+    source:     In URI query string. "web", "dark", "key"
     """
     switch = kwargs.get("switch", "")
     mode = kwargs.get("mode", "")
     source = kwargs.get("source", "")
 
-    if mode == "demo":
-        result = panel_gen.api_start(switch, mode="demo")
+    try:
+        result = panel_gen.api_start(**kwargs)
 
         if source == "web":
             return 'See Other', 303, {'Location': '/'}
@@ -44,11 +44,8 @@ def start(**kwargs):
             return 'See Other', 303, {'Location': '/dark'}
         else:
             return result 
-    
-    elif mode != "demo":
-        result = panel_gen.api_start(switch)    
 
-    else:
+    except Exception as e:
         abort(
             406,
             "Failed to create switch. May already be running.",
@@ -64,12 +61,11 @@ def stop(**kwargs):
 
     **kwargs allow the POST to be parsed for specifics
     switch:     In URI path. Can be "1xb", "5xb", "panel"
-    source:     In URI query string. Can be "demo", empty.
+    source:     In URI query string. Can be "web", "key".
     """
-    switch = kwargs.get("switch", "")
     source = kwargs.get("source", "")
     
-    result = panel_gen.api_stop(switch)
+    result = panel_gen.api_stop(**kwargs)
 
     if result != False:
         if source == "web":
