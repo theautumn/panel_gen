@@ -119,9 +119,7 @@ def call(**kwargs):
     destination:    In URI path. Called line.
 
     """
-    switch = kwargs.get("switch", "")
-    destination = kwargs.get("destination", "")
-    result = panel_gen.call_now(switch, destination)
+    result = panel_gen.call_now(**kwargs)
     if result != False:
         return result
     else:

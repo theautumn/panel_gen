@@ -19,7 +19,6 @@ import panel_gen
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-#app = Flask(__name__)
 app = connexion.App(__name__, specification_dir='./')
 app.add_api('swagger.yml')
 
@@ -55,4 +54,7 @@ def panelhome():
     return render_template('panel.html')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    try:
+        app.run(host='0.0.0.0')
+    finally:
+        panel_gen.module_shutdown()

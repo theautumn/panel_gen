@@ -27,7 +27,7 @@ from asterisk.ami import AMIClient, EventListener
 
 class Line():
     """
-    This class defines Line objects. 
+    This class defines Line objects.
 
     self.switch:        Set to an instantiated switch object. Usually Rainier,
                         Adams, or Lakeview
@@ -87,7 +87,7 @@ class Line():
                     self.status = 1
                 else:
                     self.timer = int(round(random.gamma(5,5)))
-                    logging.info("Exceeded sender limit: %s with %s calls dialing. Delaying call.",
+                    logging.warning("Exceeded sender limit: %s with %s calls dialing. Delaying call.",
                         self.switch.max_dialing, self.switch.is_dialing)
             elif self.status == 1:
                 self.hangup()
@@ -96,7 +96,7 @@ class Line():
     def pick_called_line(self, term_choices):
         """
         Returns a string containing a 7-digit number to call.
-        
+
         term_choices:       List of office codes we can dial
 			    set as a global in __main__
 	"""
@@ -188,9 +188,9 @@ class Line():
         # set the next called line.
 
         if self.ast_status == 'Dialing':
-            logging.info('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
+            logging.warning('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
-        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
+        logging.debug('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0                                         # Set the status of this call to 0.
         self.chan = '-'
         self.ast_status = 'on_hook'
@@ -253,7 +253,7 @@ class panel():
     dahdi_group:    Passed to Asterisk when call is made.
     api_volume:     String that contains "light", "heavy", or "".
 		    Sets the random.gamma distribution for generating
-		    new call timers. 
+		    new call timers.
     max_calls:      Maximum concurrent calls the switch can handle.
     max_nxx:        Values for trunk load. Determined by how many
                     outgoing trunks we have provisioned on the switch.
@@ -292,7 +292,7 @@ class panel():
 
     def newtimer(self):
 	""" Returns timer back to Line() object """
-        
+
         if __name__ == '__main__':
             if args.v == 'light':
                 timer = int(round(random.gamma(20,8)))
@@ -352,7 +352,7 @@ class panel():
 		    self.api_volume = value
 
 	except Exception as e:
-		logging.info(e)
+		logging.error(e)
 		return False
 
 	return True
@@ -447,7 +447,7 @@ class xb1():
 		    self.api_volume = value
 
 	except Exception as e:
-		logging.info(e)
+		logging.error(e)
 		return False
 
 	return True
@@ -545,7 +545,7 @@ class xb5():
 		    self.api_volume = value
 
 	except Exception as e:
-		logging.info(e)
+		logging.error(e)
 		return False
 
 	return True
@@ -591,7 +591,7 @@ def on_DialBegin(event, **kwargs):
             l.chan = DB_DestChannel[0]
             l.ast_status = 'Dialing'
             l.switch.is_dialing += 1
-            logging.info('Calling %s on DAHDI/%s from %s', l.term, l.chan, l.switch.kind)
+            logging.debug('Calling %s on DAHDI/%s from %s', l.term, l.chan, l.switch.kind)
 
 def on_DialEnd(event, **kwargs):
     # Same thing as above, except catches DialEnd and sets the state of the call
@@ -676,7 +676,7 @@ def make_switch(args):
                 orig_switch.append(Lakeview)
             elif o == 'all':
                 orig_switch.extend((Lakeview, Adams, Rainier))
-        
+
         if args.o == []:
             orig_switch.append(Rainier)
 
@@ -831,7 +831,7 @@ def api_start(**kwargs):
             return False
 
         if instance.running == True:
-            logging.info("%s is running. Can't start twice.", instance)
+            logging.warning("%s is running. Can't start twice.", instance)
         elif instance.running == False:
             if mode == 'demo':
                 if instance == Rainier:
@@ -848,7 +848,7 @@ def api_start(**kwargs):
             for l in new_lines:
                 lines.append(l)
             instance.running = True
-            logging.info("Appending lines to %s", switch)
+            logging.info("Appending %s lines to %s", len(new_lines), switch)
 
         try:
             new_lines
@@ -891,7 +891,7 @@ def api_stop(**kwargs):
             for s in orig_switch:
                 s.running = False
                 s.is_dialing = 0
-            
+
             system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
 
         else:
@@ -941,12 +941,17 @@ def api_resume():
     else:
         return False
 
-def call_now(switch, term_line):
+def call_now(**kwargs):
     # This is called when a POST is sent to /api/{switch}/{line}
     # and immediately places a call from SWITCH to LINE. The line
     # is deleted when the call is done.
 
     schema = LineSchema()
+
+    switch = kwargs.get('switch','')
+    term_line = kwargs.get('destination','')
+
+    logging.info('API requested one-shot call on %s', switch)
 
     # Validates switch input.
     if switch == 'panel':
@@ -1200,7 +1205,7 @@ class Screen():
         # d: delete the 0th line.
         if key == ord('d'):
             if len(lines) <=1:
-                logging.info("Tried to delete last remaining line. No.")
+                logging.warning("Tried to delete last remaining line. No.")
             elif len(lines) > 1:
                 del lines[0]
 
@@ -1319,7 +1324,7 @@ class ui_thread(threading.Thread):
         try:
             curses.wrapper(self.ui_main)
         except Exception as e:
-            logging.info(e)
+            logging.error(e)
 
     def ui_main(self, stdscr):
 
@@ -1412,6 +1417,25 @@ def app_shutdown(signum, frame):
 def web_shutdown(signum, frame):
     raise WebShutdown
 
+def module_shutdown():
+    t.shutdown_flag.set()
+    t.join()
+    w.shutdown_flag.set()
+    w.join()
+
+    logging.info("Exited due to web interface shutdown")
+
+    # Hang up and clean up spool.
+    system("asterisk -rx \"channel request hangup all\"")
+    system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+
+    # Clean exit for logging
+    logging.shutdown()
+
+    # Log out of AMI
+    client.logoff()
+
+    print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
 
 if __name__ == "__main__":
     # Init a bunch of things if we're running as a standalone app.
@@ -1430,11 +1454,11 @@ if __name__ == "__main__":
     try:
         with open('/var/log/panel_gen/calls.log', 'a') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+            filename='/var/log/panel_gen/calls.log',level=logging.DEBUG, datefmt='%m/%d/%Y %I:%M:%S %p')
     except IOError:
         with open('/var/log/panel_gen/calls.log', 'w') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+            filename='/var/log/panel_gen/calls.log',level=logging.DEBUG, datefmt='%m/%d/%Y %I:%M:%S %p')
 
     logging.info('Originating calls on %s', orig_switch)
     if args.t != []:
@@ -1478,6 +1502,9 @@ if __name__ == "__main__":
         system("asterisk -rx \"channel request hangup all\"")
         system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
 
+        # Clean exit from logging.
+        logging.shutdown()
+
         # Log out of AMI
         client.logoff()
 
@@ -1498,6 +1525,9 @@ if __name__ == "__main__":
         system("asterisk -rx \"channel request hangup all\"")
         system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
 
+        # Clean exit for logging
+        logging.shutdown()
+
         # Log out of AMI
         client.logoff()
 
@@ -1512,8 +1542,8 @@ if __name__ == "__main__":
         w.join()
 
         print("\nOS error {0}".format(e))
-        logging.info('**** OS Error ****')
-        logging.info('{0}'.format(e))
+        logging.error('**** OS Error ****')
+        logging.error('{0}'.format(e))
 
 if __name__ == "panel_gen":
     # The below gets run if this code is imported as a module.
@@ -1560,6 +1590,9 @@ if __name__ == "panel_gen":
         # Hang up and clean up spool.
         system("asterisk -rx \"channel request hangup all\"")
         system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+
+        # Clean exit for logging
+        logging.shutdown()
 
         # Log out of AMI
         client.logoff()
