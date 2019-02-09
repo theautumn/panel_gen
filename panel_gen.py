@@ -645,7 +645,7 @@ def parse_args():
     make_switch(args)
 
 def make_switch(args):
-    # Instantiate some switches. This is so we can ask to get their parameters later.
+    """ Instantiate some switches. This is so we can ask to get their parameters later."""
 
     global Rainier
     global Adams
@@ -724,6 +724,7 @@ def make_lines(**kwargs):
 def start_ui():
     """
     This starts the panel_gen UI. Only useful when run as module.
+    When run as __main__, the UI is started for you.
 
     :return:    Nothing
     :args:      Nothing
@@ -804,7 +805,10 @@ def api_start(**kwargs):
     """
     Creates new lines when started from API.
     switch: Generic switch type to create lines on.
-    mode:   'demo' or ''. Demo mode will start with preset params.
+    
+    mode:       'demo' or ''. Demo mode will start with preset params.
+    source:     Used to log where the start request came from.
+    switch:     Specifies which switch to start calls on.
     """
 
     global lines
@@ -859,8 +863,12 @@ def api_start(**kwargs):
             return False
 
 def api_stop(**kwargs):
-    # This reads 'switch' and immediately hang up all calls, and
-    # destroy all lines.
+    """
+    Immediately hang up all calls, and destroy all lines.
+    
+    switch:     Which switch to hangup and stop.
+    source:     Where the request came from. Used for logging.
+    """
 
     switch = kwargs.get('switch', '')
     source = kwargs.get('source', '')
@@ -912,10 +920,7 @@ def api_stop(**kwargs):
     return get_info()
 
 def api_pause():
-    # Checks to see if the work thread is paused. If it's NOT paused,
-    # we will pause it. If the UI thread is running, we draw a paused
-    # notification on screen. This particular part is somewhat broken.
-    # I think I need to make the return more sensible as well.
+    # Not used at the moment. Broken.
 
     if w.paused == False:
         if t.started == True:
@@ -928,8 +933,7 @@ def api_pause():
         return False
 
 def api_resume():
-    # This checks to see if we are paused. If so, then resume.
-    # Should probably return something more sensible.
+    # Not used at the moment. Broken.
 
     if w.paused == True:
         if t.started == True:
@@ -942,9 +946,13 @@ def api_resume():
         return False
 
 def call_now(**kwargs):
-    # This is called when a POST is sent to /api/{switch}/{line}
-    # and immediately places a call from SWITCH to LINE. The line
-    # is deleted when the call is done.
+    """
+    Immediately places a call from switch to destination. The line is
+    deleted when the call timer expires.
+    
+    switch:     Switch to originate call on.
+    term_line:  Destination number to call.
+    """
 
     schema = LineSchema()
 
@@ -963,6 +971,7 @@ def call_now(**kwargs):
     else:
         return False
 
+    # The call timer. Can be changed, if needed.
     on_call_time = 18
 
     # Validates line input. If sane, set up line for
@@ -981,7 +990,7 @@ def call_now(**kwargs):
         return False
 
 def get_all_lines():
-    # From API. Returns all active lines.
+    """ Returns formatted list of all lines """
 
     schema = LineSchema()
     result = [schema.dump(l) for l in lines]
@@ -1006,8 +1015,6 @@ def create_line(switch):
     # Creates a new line using default parameters.
     # lines.append uses the current number of lines in list
     # to create the ident value for the new line.
-
-    # Should eventually accept optional parameters.
 
     schema = LineSchema()
     result = []
@@ -1067,8 +1074,7 @@ def update_line(**kwargs):
            return schema.dump(o)
 
 def get_all_switches():
-    # Return all switches that exist in orig_switch. Sort of
-    # broken because I don't use orig_switch properly.
+    """ Returns formatted list of all switches"""
 
     schema = SwitchSchema()
     result = [schema.dump(n) for n in orig_switch]
@@ -1408,14 +1414,8 @@ class work_thread(threading.Thread):
 class ServiceExit(Exception):
     pass
 
-class WebShutdown(Exception):
-    pass
-
 def app_shutdown(signum, frame):
     raise ServiceExit
-
-def web_shutdown(signum, frame):
-    raise WebShutdown
 
 def module_shutdown():
     t.shutdown_flag.set()
@@ -1443,7 +1443,6 @@ if __name__ == "__main__":
     # Set up signal handlers so we can shutdown cleanly later.
     signal.signal(signal.SIGTERM, app_shutdown)
     signal.signal(signal.SIGINT, app_shutdown)
-    signal.signal(signal.SIGALRM, web_shutdown)
 
     paused = None
 
@@ -1469,7 +1468,6 @@ if __name__ == "__main__":
 
     # Here is where we actually make the lines.
     lines = make_lines(source='main',orig_switch=orig_switch)
-#    lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
 
     # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
@@ -1511,28 +1509,6 @@ if __name__ == "__main__":
         print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
         print("Thank you for playing Wing Commander!\n\n")
 
-    except WebShutdown:
-        # Exception handler for http-server shutdown. The http-server
-        # passes SIGALRM, which calls web_shutdown and eventually
-        # leads us here.
-
-        w.shutdown_flag.set()
-        w.join()
-
-        logging.info("Exited due to web interface shutdown")
-
-        # Hang up and clean up spool.
-        system("asterisk -rx \"channel request hangup all\"")
-        system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-
-        # Clean exit for logging
-        logging.shutdown()
-
-        # Log out of AMI
-        client.logoff()
-
-        print("panel_gen web shutdown complete.\n")
-
     except Exception as e:
         # Exception for any other errors that I'm not explicitly handling.
 
@@ -1567,7 +1543,6 @@ if __name__ == "panel_gen":
             filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
 
     lines = []
-#    lines = make_lines(source='main',orig_switch=orig_switch)
     logging.info('Starting panel_gen as thread from http_server')
 
     try:
