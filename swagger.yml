@@ -424,3 +424,17 @@ paths:
         responses:
           201:
             description: Successfully created line
+  /museum:
+    get:
+      operationId: museum.read_status
+      tags:
+        - museum
+      summary: Gets battery status
+      description: Do we have -48V
+      responses:
+        200:
+          description: Successful status read operation
+          schema:
+            properties:
+              status:
+                type: boolean

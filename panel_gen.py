@@ -787,14 +787,22 @@ class SwitchSchema(Schema):
 
 
 def get_info():
-    # API call to get general info about running state.
+    """ Returns info about app state. """
     schema = AppSchema()
+
+    ui_running = False
+
+    try:
+        if t.started == True:
+           ui_running = True
+    except Exception as e:
+        pass
 
     result = dict([
         ('name', __name__),
         ('app_running', w.is_alive),
         ('is_paused', w.paused),
-        ('ui_running', t.started),
+        ('ui_running', ui_running),
         ('num_lines', len(lines)),
         ('panel_running', Rainier.running),
         ('xb5_running', Adams.running),
@@ -923,24 +931,16 @@ def api_pause():
     # Not used at the moment. Broken.
 
     if w.paused == False:
-        if t.started == True:
-            t.draw_paused()
-            w.pause()
-        elif t.started == False:
-            w.pause()
+        w.pause()
         return get_info()
-    elif w.paused == True:
+    else:
         return False
 
 def api_resume():
     # Not used at the moment. Broken.
 
     if w.paused == True:
-        if t.started == True:
-            t.draw_resumed()
-            w.resume()
-        elif t.started == False:
-            w.resume()
+        w.resume()
         return get_info()
     else:
         return False
@@ -1418,8 +1418,11 @@ def app_shutdown(signum, frame):
     raise ServiceExit
 
 def module_shutdown():
-    t.shutdown_flag.set()
-    t.join()
+    try:
+        t.shutdown_flag.set()
+        t.join()
+    except Exception:
+        pass
     w.shutdown_flag.set()
     w.join()
 
