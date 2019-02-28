@@ -594,9 +594,11 @@ def on_DialBegin(event, **kwargs):
             logging.debug('Calling %s on DAHDI/%s from %s', l.term, l.chan, l.switch.kind)
 
 def on_DialEnd(event, **kwargs):
-    # Same thing as above, except catches DialEnd and sets the state of the call
-    # to "Ringing", and decrements the is_dialing counter.
+    """
+    Callback function for DialEnd AMI events. Sets state to "Ringing".
+    Decrements the "is_dialing" counter.
 
+    """
     output = str(event)
     DE_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
     DE_DestChannel = DE_DestChannel.findall(output)

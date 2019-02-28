@@ -2,7 +2,7 @@ from flask import abort
 import os
 import subprocess
 
-ENDPOINT='192.168.0.33'
+ENDPOINT='192.168.0.68'
 FNULL= open(os.devnull,'w')
 
 def read_status():
@@ -18,7 +18,7 @@ def read_status():
     elif ping != 0:
         status = False
     else:
-       abort(406, "Failed to get info", )
+       abort(406, "Failed to return ping result", )
     
     result = {"status" : status }
 
