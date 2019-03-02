@@ -2,7 +2,7 @@ from flask import abort
 import os
 import subprocess
 
-ENDPOINT='192.168.0.68'
+ENDPOINT='192.168.0.220'
 FNULL= open(os.devnull,'w')
 
 def read_status():

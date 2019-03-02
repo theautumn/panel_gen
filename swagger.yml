@@ -1,9 +1,10 @@
 #https://realpython.com/flask-connexion-rest-api/#getting-started
 swagger: "2.0"
 info:
-  description: This defines the API for panel_gen
-  version: "1.0.0"
-  title: panel_gen traffic generator
+  description: API for panel_gen, a telephone traffic 
+                generator for Connections Museum, Seattle.
+  version: "1.1.0"
+  title: panel_gen
 consumes:
   - application/json
 produces:
@@ -18,7 +19,7 @@ paths:
       tags:
         - app
       summary: Get general app status information
-      description: Gets high-level app status
+      description: Gets status of panel_gen and switches
       responses:
         200:
           description: Successful app read operation
@@ -47,7 +48,7 @@ paths:
       tags:
         - app
       summary: Start calls on a switch.
-      description: Starts calls on a particular switch.
+      description: Switch is required. Mode and source are not.
       parameters:
         - name: switch
           in: path
@@ -128,7 +129,7 @@ paths:
       tags:
         - app
       summary: Place a call now.
-      description: Place a call immediately.
+      description: Place a call immediately. Line will disappear after 18 seconds.
       parameters:
         - name: switch
           in: path
@@ -430,7 +431,7 @@ paths:
       tags:
         - museum
       summary: Gets battery status
-      description: Do we have -48V
+      description: True when -48V battery is on, False when battery is off. 
       responses:
         200:
           description: Successful status read operation

@@ -23,7 +23,7 @@ from tabulate import tabulate
 from numpy import random
 from pathlib import Path
 from pycall import CallFile, Call, Application, Context
-from asterisk.ami import AMIClient, EventListener
+from asterisk.ami import AMIClient, EventListener, SimpleAction
 
 class Line():
     """
@@ -169,7 +169,7 @@ class Line():
                 self.api_indicator = "***"
 
             # Set the vars to actually pass to call file
-            vars = {'waittime': wait}
+            vars = {'waittime': wait+5}
 
         # Make the .call file amd throw it into the asterisk spool.
         # Pass control of the call to the sarah_callsim context in
@@ -181,17 +181,23 @@ class Line():
         cf.spool()
 
     def hangup(self):
-        # Asterisk manages the actual hangup of the call, but we need to make sure the program
-        # flow is on track with whats happening out in the world. We check if a call
-        # is being dialed when hangup() is called. If so, we need to decrement the dialing counter.
-        # Then, set status, chan, and ast_status back to normal values, set a new timer, and
-        # set the next called line.
+        """
+	Check if a call is being dialed during hangup. 
+	If so, we need to decrement the dialing counter.
+        Then, send an AMI hangup request to Asterisk,
+	set status, chan, and ast_status back to normal values, 
+	set a new timer, and set the next called line.
+	"""
 
         if self.ast_status == 'Dialing':
             logging.warning('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
+
+	action = SimpleAction('Hangup',Channel='DAHDI/{}-1'.format(self.chan),)
+	client.send_action(action) 
+
         logging.debug('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
-        self.status = 0                                         # Set the status of this call to 0.
+        self.status = 0
         self.chan = '-'
         self.ast_status = 'on_hook'
 
@@ -569,14 +575,11 @@ class step():
 # +-----------------------------------------------+
 
 def on_DialBegin(event, **kwargs):
-    # This parses DialBegin notifications from the AMI.
-    # It uses regex to extract the DialString and DestChannel, then associates the
-    # dialed number with its DAHDI channel. This is then displayed for the user.
-    # Also increments the is_dialing counter.
-
-    # The regex match for DialString relies on the dialplan having at least
-    # one 'w' (wait) in it to wait before dialing. If you change that, the
-    # regex will break. Normally, we should always wait before dialing.
+    """
+    Callback function for DialBegin AMI events. Extracts DialString
+    and DestChannel and stores it to variables in each line.
+    Increments the "is_dialing" counter.
+    """
 
     output = str(event)
     DialString = re.compile('(?<=w)(\d{7})')
@@ -915,14 +918,13 @@ def api_stop(**kwargs):
         else:
             if instance.running == True:
                 deadlines = [l for l in lines if l.kind == switch]
-                dahdi_chan = [i.chan for i in deadlines if i.chan != '-']
                 lines = [l for l in lines if l.kind != switch]
                 instance.running = False
                 instance.is_dialing = 0
 
-                # Hang up and clean up spool.
-                for i in dahdi_chan:
-                    system("asterisk -rx \"channel request hangup DAHDI/{}-1\" > /dev/null 2>&1".format(i))
+            for i in deadlines:
+                i.hangup()
+
     except Exception as e:
         logging.info(e)
         return False
