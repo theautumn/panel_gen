@@ -2,7 +2,7 @@ from flask import abort
 import os
 import subprocess
 
-ENDPOINT='192.168.0.220'
+ENDPOINT='192.168.0.221'
 FNULL= open(os.devnull,'w')
 
 def read_status():
@@ -11,7 +11,10 @@ def read_status():
     Success:    Returns 200 OK + battery status boolean
     Failure:    Returns 406 Failed to get info
     """
-    ping = subprocess.call(['ping', '-c', '2', ENDPOINT], stdout=FNULL, stderr=subprocess.STDOUT)
+    try:
+        ping = subprocess.call(['ping', '-c', '2', ENDPOINT], stdout=FNULL, stderr=subprocess.STDOUT)
+    except Exception as e:
+        pass
 
     if ping == 0:
         status = True

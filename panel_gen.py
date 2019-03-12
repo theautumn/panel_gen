@@ -138,8 +138,10 @@ class Line():
         Asterisk's wait timer (which itself begins when the call goes from
         dialing to "UP").
         """
-
-        if args.d:
+	
+	CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        
+	if args.d:
             if args.z:
                 self.timer = args.z
             else:
@@ -148,7 +150,7 @@ class Line():
             self.timer = self.switch.newtimer()
 
             # Wait value to pass to Asterisk dialplan if not using API to start call
-            wait = self.timer - 10
+            wait = self.timer
 
             # The kwargs come in from the API. The following lines handle them and set up
             # the special call case outside of the normal program flow.
@@ -169,13 +171,13 @@ class Line():
                 self.api_indicator = "***"
 
             # Set the vars to actually pass to call file
-            vars = {'waittime': wait+5}
+            vars = {'waittime': wait}
 
         # Make the .call file amd throw it into the asterisk spool.
         # Pass control of the call to the sarah_callsim context in
         # the dialplan. This will allow me to better interact with
         # Asterisk from here.
-        c = Call('DAHDI/' + self.switch.dahdi_group + '/wwww%s' % self.term, variables=vars)
+        c = Call(CHANNEL, variables=vars)
         con = Context('sarah_callsim','s','1')
         cf = CallFile(c, con, user='asterisk')
         cf.spool()
