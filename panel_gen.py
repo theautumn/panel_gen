@@ -918,11 +918,10 @@ def api_stop(**kwargs):
             system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
 
         else:
-            if instance.running == True:
-                deadlines = [l for l in lines if l.kind == switch]
-                lines = [l for l in lines if l.kind != switch]
-                instance.running = False
-                instance.is_dialing = 0
+            deadlines = [l for l in lines if l.kind == switch]
+            lines = [l for l in lines if l.kind != switch]
+            instance.running = False
+            instance.is_dialing = 0
 
             for i in deadlines:
                 i.hangup()
