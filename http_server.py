@@ -11,7 +11,7 @@
 #
 #-----------------------------------------------
 
-from flask import Flask, render_template, redirect, request, flash
+from flask import Flask, render_template, request
 import connexion
 import logging
 import panel_gen
@@ -19,7 +19,7 @@ import panel_gen
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-app = connexion.App(__name__, specification_dir='./')
+app = connexion.App(__name__, specification_dir='api/')
 app.add_api('swagger.yml')
 
 # This starts the UI. Normally, when we import as

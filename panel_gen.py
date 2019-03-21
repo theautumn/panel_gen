@@ -23,7 +23,7 @@ from tabulate import tabulate
 from numpy import random
 from pathlib import Path
 from pycall import CallFile, Call, Application, Context
-from asterisk.ami import AMIClient, EventListener, SimpleAction
+from asterisk.ami import AMIClient, EventListener, SimpleAction, AMIClientAdapter
 
 class Line():
     """
@@ -195,8 +195,7 @@ class Line():
             logging.warning('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
 
-	action = SimpleAction('Hangup',Channel='DAHDI/{}-1'.format(self.chan),)
-	client.send_action(action) 
+	adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan),)
 
         logging.debug('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0
@@ -613,6 +612,14 @@ def on_DialEnd(event, **kwargs):
             l.ast_status = 'Ringing'
             l.switch.is_dialing -= 1
             # logging.info('on_DialEnd with %s calls dialing', n.switch.is_dialing)
+
+def on_CoreShowChannels(even, **kwargs):
+    """
+    Callback function for CoreShowChannels AMI event. Gathers information
+    about active channels and displays for user in exciting ways.
+    """
+    output = str(event)
+
 
 def parse_args():
     # Gets called at runtime and parses arguments given on command line.
@@ -1479,6 +1486,7 @@ if __name__ == "__main__":
 
     # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
+    adapter = AMIClientAdapter(client)
     future = client.login(username='panel_gen',secret='t431434')
     if future.response.is_error():
         raise Exception(str(future.response))
@@ -1536,6 +1544,7 @@ if __name__ == "panel_gen":
 
     # Connect to AMI
     client = AMIClient(address='127.0.0.1',port=5038)
+    adapter = AMIClientAdapter(client)
     future = client.login(username='panel_gen',secret='t431434')
     if future.response.is_error():
         raise Exception(str(future.response))
