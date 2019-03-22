@@ -37,7 +37,7 @@ client.add_event_listener(EventListener(on_event=event_notification))
 
 try:
     while True:
-        time.sleep(1)
+        time.sleep(5)
         adapter.Originate(Channel='SIP/sarah',Exten='sarah',Priority=1,Context='museum',CallerID='python')
         adapter.CoreShowChannels()
 except (KeyboardInterrupt, SystemExit):

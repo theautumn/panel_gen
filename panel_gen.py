@@ -138,9 +138,9 @@ class Line():
         Asterisk's wait timer (which itself begins when the call goes from
         dialing to "UP").
         """
-	
+
 	CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
-        
+
 	if args.d:
             if args.z:
                 self.timer = args.z
@@ -184,10 +184,10 @@ class Line():
 
     def hangup(self):
         """
-	Check if a call is being dialed during hangup. 
+	Check if a call is being dialed during hangup.
 	If so, we need to decrement the dialing counter.
         Then, send an AMI hangup request to Asterisk,
-	set status, chan, and ast_status back to normal values, 
+	set status, chan, and ast_status back to normal values,
 	set a new timer, and set the next called line.
 	"""
 
@@ -827,7 +827,7 @@ def api_start(**kwargs):
     """
     Creates new lines when started from API.
     switch: Generic switch type to create lines on.
-    
+
     mode:       'demo' or ''. Demo mode will start with preset params.
     source:     Used to log where the start request came from.
     switch:     Specifies which switch to start calls on.
@@ -887,7 +887,7 @@ def api_start(**kwargs):
 def api_stop(**kwargs):
     """
     Immediately hang up all calls, and destroy all lines.
-    
+
     switch:     Which switch to hangup and stop.
     source:     Where the request came from. Used for logging.
     """
@@ -961,7 +961,7 @@ def call_now(**kwargs):
     """
     Immediately places a call from switch to destination. The line is
     deleted when the call timer expires.
-    
+
     switch:     Switch to originate call on.
     term_line:  Destination number to call.
     """
@@ -1266,27 +1266,6 @@ class Screen():
         self.stdscr.refresh()
         self.draw(self.stdscr, lines, self.y, self.x)
 
-    def helpscreen(self):
-        # Draw the help screen when 'h' is pressed. Then, control goes back to
-        # getkey(), which waits for any key, and goes back to drawing the UI.
-
-        y, x = stdscr.getmaxyx()
-        half_cols = x/2
-        rows_size = 20
-        x_start_row = y - 40
-        y_start_col = half_cols - half_cols / 2
-        w
-        stdscr.nodelay(0)
-        stdscr.clear()
-        help_scr = stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
-        help_scr.box()
-        help_scr.bkgd(' ', curses.color_pair(1))
-        help_scr.addstr(2, half_cols/2 - 5, "HJAELP!", curses.color_pair(1))
-        help_scr.addstr(4, 5, "Spacebar         Run/Pause")
-        help_scr.addstr(5, 5, "u/d              Add/Remove Lines")
-        help_scr.addstr(6, 5, "h                Help")
-        help_scr.addstr(7, 5, "Ctrl + C         Quit")
-
 
     def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
@@ -1364,8 +1343,8 @@ class ui_thread(threading.Thread):
 
             # Draw the window
             screen.draw(stdscr, lines, y, x)
-
             stdscr.refresh()
+            sleep(1)
 
     def draw_paused(self):
         try:
