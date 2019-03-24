@@ -503,7 +503,7 @@ class xb5():
 
         if __name__ == 'panel_gen':
             if self.api_volume == 'heavy':
-                timer = int(round(random.gamma(4,5)))
+                timer = int(round(random.gamma(5,4)))
             elif self.api_volume == 'light':
                 timer = int(round(random.gamma(20,8)))
             else:
@@ -863,7 +863,7 @@ def api_start(**kwargs):
                 if instance == Rainier:
                     new_lines = make_lines(switch=instance, numlines=4, source='api')
                 elif instance == Adams:
-                    new_lines = make_lines(switch=instance, numlines=8, traffic_load='heavy',
+                    new_lines = make_lines(switch=instance, numlines=9, traffic_load='heavy',
                             source='api')
                     Adams.api_volume = 'heavy'
                 elif instance == Lakeview:
@@ -1209,22 +1209,12 @@ class Screen():
                     self.resumescreen()
             elif w.paused == True:
                 w.resume()
-        # h: Help
-        if key == ord('h'):
-            self.helpscreen(stdscr)
-            key = stdscr.getch()
-            if key:
-                self.stdscr.nodelay(1)
-                self.stdscr.erase()
-                self.stdscr.refresh()
         # u: add a line to the first switch.
         if key == ord('u'):
             lines.append(Line(7, orig_switch[0]))
         # d: delete the 0th line.
         if key == ord('d'):
-            if len(lines) <=1:
-                logging.warning("Tried to delete last remaining line. No.")
-            elif len(lines) > 1:
+            if len(lines) >= 1:
                 del lines[0]
 
     def update_size(self, stdscr, y, x):
@@ -1299,7 +1289,6 @@ class Screen():
 
         # Refresh the screen.
         stdscr.refresh()
-
 
 
 #-->                      <--#
