@@ -65,23 +65,27 @@ def stop(**kwargs):
     """
     source = kwargs.get("source", "")
     
-    result = panel_gen.api_stop(**kwargs)
+    try:    
+        result = panel_gen.api_stop(**kwargs)
 
-    if result != False:
-        if source == "web":
-            return 'See Other', 303, {'Location': '/'}
-        elif source == "dark":
-            return 'See Other', 303, {'Location': '/dark'}
+        if result != False:
+            if source == "web":
+                return 'See Other', 303, {'Location': '/'}
+            elif source == "dark":
+                return 'See Other', 303, {'Location': '/dark'}
+            else:
+                return result 
         else:
-            return result 
-    else:
-        if source == "web":
-            return 'See Other', 303, {'Location': '/'}
-        else:
-            abort(
-                406,
-                "Failed to stop switch. Ask Sarah to fix this.",
-            )
+            if source == "web":
+                return 'See Other', 303, {'Location': '/'}
+            else:
+                abort(
+                    406,
+                    "Failed to stop switch. Ask Sarah to fix this.",
+                )
+    except:
+        abort(406, "Shits all fucked up",)
+        pass
 
 def pause():
     """ Not currently used. """

@@ -49,7 +49,7 @@ class Line():
         self.kind = switch.kind
         self.status = 0
 
-	if args.l:
+        if args.l:
             self.term = args.l
         else:
             self.term = self.pick_called_line(term_choices)
@@ -88,7 +88,7 @@ class Line():
                 else:
                     self.timer = int(round(random.gamma(5,5)))
                     logging.warning("Exceeded sender limit: %s with %s calls dialing. Delaying call.",
-                        self.switch.max_dialing, self.switch.is_dialing)
+                            self.switch.max_dialing, self.switch.is_dialing)
             elif self.status == 1:
                 self.hangup()
         return self.timer
@@ -98,8 +98,8 @@ class Line():
         Returns a string containing a 7-digit number to call.
 
         term_choices:       List of office codes we can dial
-			    set as a global in __main__
-	"""
+                            set as a global in __main__
+        """
 
         if term_choices == []:
             term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)
@@ -129,7 +129,7 @@ class Line():
 
     def call(self, **kwargs):
         """
-	Places a call. Returns nothing.
+        Places a call. Returns nothing.
 
         Dialing takes ~10 to 12 seconds. We're going to set a timer
         for call duration here, and then a few lines down,
@@ -139,9 +139,9 @@ class Line():
         dialing to "UP").
         """
 
-	CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
 
-	if args.d:
+        if args.d:
             if args.z:
                 self.timer = args.z
             else:
@@ -184,18 +184,18 @@ class Line():
 
     def hangup(self):
         """
-	Check if a call is being dialed during hangup.
-	If so, we need to decrement the dialing counter.
+        Check if a call is being dialed during hangup.
+        If so, we need to decrement the dialing counter.
         Then, send an AMI hangup request to Asterisk,
-	set status, chan, and ast_status back to normal values,
-	set a new timer, and set the next called line.
-	"""
+        set status, chan, and ast_status back to normal values,
+        set a new timer, and set the next called line.
+        """
 
         if self.ast_status == 'Dialing':
-            logging.warning('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
+            logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
 
-	adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan),)
+        adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan),)
 
         logging.debug('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0
@@ -213,7 +213,7 @@ class Line():
 
         if args.d:                                              # Are we in deterministic mode?
             if args.w:                                          # args.w is wait time between calls
-               self.timer = args.w                              # Set length of the wait time before next call
+                self.timer = args.w                              # Set length of the wait time before next call
             else:
                 self.timer = 15                                 # If no args.w defined, use default value.
         else:
@@ -259,13 +259,13 @@ class panel():
     is_dialing:     Records current number of calls in Dialing state.
     dahdi_group:    Passed to Asterisk when call is made.
     api_volume:     String that contains "light", "heavy", or "".
-		    Sets the random.gamma distribution for generating
-		    new call timers.
+                    Sets the random.gamma distribution for generating
+                    new call timers.
     max_calls:      Maximum concurrent calls the switch can handle.
     max_nxx:        Values for trunk load. Determined by how many
                     outgoing trunks we have provisioned on the switch.
     nxx:            List of office codes we can dial. Corresponds directly
-		    to max_nxx.
+                    to max_nxx.
     trunk_load:	    List of max_nxx used to compute load on trunks.
     line_range:	    Range of acceptable lines to dial when calling this office.
     """
@@ -298,7 +298,7 @@ class panel():
         return("{}".format(self.__class__.__name__))
 
     def newtimer(self):
-	""" Returns timer back to Line() object """
+        """ Returns timer back to Line() object """
 
         if __name__ == '__main__':
             if args.v == 'light':
@@ -322,47 +322,47 @@ class panel():
         """ Used by the API PATCH method to update switch parameters."""
 
         try:
-	    for (key, value) in api["switch"].items():
-		if key == 'line_range':
-		    if value in range(1000, 9999):
-		    # Line range must be a tuple from 1000-9999
-			self.line_range = value
-		if key == 'nxx':
-		    # nxx must be 3 digits, matching codes we can dial
-		    # number of values in nxx must also match trunk_load
-		    for i in value:
-			self.nxx = value
-		if key == 'running':
-		    # Can be used to start and stop a particular switch.
-		    # This feature is not yet implemented fully.
-		    self.running = value
-		if key == 'max_dialing':
-		    # Must be <= 10
-		    if value >=10:
-			return "Fail: bad_max"
-		    else:
-			self.max_dialing = value
-		if key == 'max_calls':
-		    # Must be <= 10
-		    if value >= 10:
-			return "Fail: must be less than 10 max dialing"
-		    else:
-			self.max_calls = value
-		if key == 'dahdi_group':
-		    # Must be a group that we have hooked in to panel_gen
-		    self.dahdi_group = value
-		if key == 'trunk_load':
-		    # Total of all values must add up to 1
-		    # Number of values must equal number of NXXs
-		    self.trunk_load = value
-		if key == 'traffic_load':
-		    self.api_volume = value
+            for (key, value) in api["switch"].items():
+                if key == 'line_range':
+                    if value in range(1000, 9999):
+                        # Line range must be a tuple from 1000-9999
+                        self.line_range = value
+                if key == 'nxx':
+                    # nxx must be 3 digits, matching codes we can dial
+                    # number of values in nxx must also match trunk_load
+                    for i in value:
+                        self.nxx = value
+                if key == 'running':
+                    # Can be used to start and stop a particular switch.
+                    # This feature is not yet implemented fully.
+                    self.running = value
+                if key == 'max_dialing':
+                    # Must be <= 10
+                    if value >=10:
+                        return "Fail: bad_max"
+                    else:
+                        self.max_dialing = value
+                if key == 'max_calls':
+                    # Must be <= 10
+                    if value >= 10:
+                        return "Fail: must be less than 10 max dialing"
+                    else:
+                        self.max_calls = value
+                if key == 'dahdi_group':
+                    # Must be a group that we have hooked in to panel_gen
+                    self.dahdi_group = value
+                if key == 'trunk_load':
+                    # Total of all values must add up to 1
+                    # Number of values must equal number of NXXs
+                    self.trunk_load = value
+                if key == 'traffic_load':
+                    self.api_volume = value
 
-	except Exception as e:
-		logging.error(e)
-		return False
+        except Exception as e:
+            logging.error(e)
+            return False
 
-	return True
+        return True
 
 class xb1():
     # This class is for the No. 1 Crossbar.
@@ -417,47 +417,47 @@ class xb1():
         # Used by the API PATCH method to update switch parameters.
 
         try:
-	    for (key, value) in api["switch"].items():
-		if key == 'line_range':
-		    if value in range(1000, 9999):
-		    # Line range must be a tuple from 1000-9999
-			self.line_range = value
-		if key == 'nxx':
-		    # nxx must be 3 digits, matching codes we can dial
-		    # number of values in nxx must also match trunk_load
-		    for i in value:
-			self.nxx = value
-		if key == 'running':
-		    # Can be used to start and stop a particular switch.
-		    # This feature is not yet implemented fully.
-		    self.running = value
-		if key == 'max_dialing':
-		    # Must be <= 10
-		    if value >=10:
-			return "Fail: bad_max"
-		    else:
-			self.max_dialing = value
-		if key == 'max_calls':
-		    # Must be <= 10
-		    if value >= 10:
-			return "Fail: must be less than 10 max dialing"
-		    else:
-			self.max_calls = value
-		if key == 'dahdi_group':
-		    # Must be a group that we have hooked in to panel_gen
-		    self.dahdi_group = value
-		if key == 'trunk_load':
-		    # Total of all values must add up to 1
-		    # Number of values must equal number of NXXs
-		    self.trunk_load = value
-		if key == 'traffic_load':
-		    self.api_volume = value
+            for (key, value) in api["switch"].items():
+                if key == 'line_range':
+                    if value in range(1000, 9999):
+                        # Line range must be a tuple from 1000-9999
+                        self.line_range = value
+                if key == 'nxx':
+                    # nxx must be 3 digits, matching codes we can dial
+                    # number of values in nxx must also match trunk_load
+                    for i in value:
+                        self.nxx = value
+                if key == 'running':
+                    # Can be used to start and stop a particular switch.
+                    # This feature is not yet implemented fully.
+                    self.running = value
+                if key == 'max_dialing':
+                    # Must be <= 10
+                    if value >=10:
+                        return "Fail: bad_max"
+                    else:
+                        self.max_dialing = value
+                if key == 'max_calls':
+                    # Must be <= 10
+                    if value >= 10:
+                        return "Fail: must be less than 10 max dialing"
+                    else:
+                        self.max_calls = value
+                if key == 'dahdi_group':
+                    # Must be a group that we have hooked in to panel_gen
+                    self.dahdi_group = value
+                if key == 'trunk_load':
+                    # Total of all values must add up to 1
+                    # Number of values must equal number of NXXs
+                    self.trunk_load = value
+                if key == 'traffic_load':
+                    self.api_volume = value
 
-	except Exception as e:
-		logging.error(e)
-		return False
+        except Exception as e:
+            logging.error(e)
+            return False
 
-	return True
+        return True
 
 class xb5():
     # This class is for the No. 5 Crossbar.
@@ -485,9 +485,9 @@ class xb5():
         self.nxx = [722, 832, 232, 275]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
         self.line_range = [1330,1435,9072,9073,1274,1485,1020,5852,
-                        1003,6766,6564,1076,5018,1137,9138,1165,1309,9485,
-                        9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,
-                        4057,1055,1035,9267,1381,1470,9512,1663,9743,1841,1921]
+                1003,6766,6564,1076,5018,1137,9138,1165,1309,9485,
+                9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,
+                4057,1055,1035,9267,1381,1470,9512,1663,9743,1841,1921]
 
     def __repr__(self):
         return("{}('{}')".format(self.__class__.__name__, self.running))
@@ -515,47 +515,47 @@ class xb5():
         # Used by the API PATCH method to update switch parameters.
 
         try:
-	    for (key, value) in api["switch"].items():
-		if key == 'line_range':
-		    if value in range(1000, 9999):
-		    # Line range must be a tuple from 1000-9999
-			self.line_range = value
-		if key == 'nxx':
-		    # nxx must be 3 digits, matching codes we can dial
-		    # number of values in nxx must also match trunk_load
-		    for i in value:
-			self.nxx = value
-		if key == 'running':
-		    # Can be used to start and stop a particular switch.
-		    # This feature is not yet implemented fully.
-		    self.running = value
-		if key == 'max_dialing':
-		    # Must be <= 10
-		    if value >=10:
-			return "Fail: bad_max"
-		    else:
-			self.max_dialing = value
-		if key == 'max_calls':
-		    # Must be <= 10
-		    if value >= 10:
-			return "Fail: must be less than 10 max dialing"
-		    else:
-			self.max_calls = value
-		if key == 'dahdi_group':
-		    # Must be a group that we have hooked in to panel_gen
-		    self.dahdi_group = value
-		if key == 'trunk_load':
-		    # Total of all values must add up to 1
-		    # Number of values must equal number of NXXs
-		    self.trunk_load = value
-		if key == 'traffic_load':
-		    self.api_volume = value
+            for (key, value) in api["switch"].items():
+                if key == 'line_range':
+                    if value in range(1000, 9999):
+                        # Line range must be a tuple from 1000-9999
+                        self.line_range = value
+                if key == 'nxx':
+                    # nxx must be 3 digits, matching codes we can dial
+                    # number of values in nxx must also match trunk_load
+                    for i in value:
+                        self.nxx = value
+                if key == 'running':
+                    # Can be used to start and stop a particular switch.
+                    # This feature is not yet implemented fully.
+                    self.running = value
+                if key == 'max_dialing':
+                    # Must be <= 10
+                    if value >=10:
+                        return "Fail: bad_max"
+                    else:
+                        self.max_dialing = value
+                if key == 'max_calls':
+                    # Must be <= 10
+                    if value >= 10:
+                        return "Fail: must be less than 10 max dialing"
+                    else:
+                        self.max_calls = value
+                if key == 'dahdi_group':
+                    # Must be a group that we have hooked in to panel_gen
+                    self.dahdi_group = value
+                if key == 'trunk_load':
+                    # Total of all values must add up to 1
+                    # Number of values must equal number of NXXs
+                    self.trunk_load = value
+                if key == 'traffic_load':
+                    self.api_volume = value
 
-	except Exception as e:
-		logging.error(e)
-		return False
+        except Exception as e:
+            logging.error(e)
+            return False
 
-	return True
+        return True
 
 class step():
     # This class is for the SxS office. It's very minimal, as we are not currently
@@ -613,7 +613,7 @@ def on_DialEnd(event, **kwargs):
             l.switch.is_dialing -= 1
             # logging.info('on_DialEnd with %s calls dialing', n.switch.is_dialing)
 
-def on_CoreShowChannels(even, **kwargs):
+def on_CoreShowChannels(event, **kwargs):
     """
     Callback function for CoreShowChannels AMI event. Gathers information
     about active channels and displays for user in exciting ways.
@@ -627,28 +627,28 @@ def parse_args():
     # mostly sane options.
 
     parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. '
-	'Defaults to originate a sane amount of calls from the panel switch if no args are given.')
+            'Defaults to originate a sane amount of calls from the panel switch if no args are given.')
     parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7,8,9,10],
             help='Maximum number of active lines.')
     parser.add_argument('-d', action='store_true',
             help='Deterministic mode. Eliminate timing randomness. Places one call at a time. '
-	'Ignores -a and -v options entirely. Use with -l.')
+            'Ignores -a and -v options entirely. Use with -l.')
     parser.add_argument('-l', metavar='line', type=int,
             help='Call only a particular line. Can be used with the -d option for placing test '
-	'calls to a number over and over again.')
+            'calls to a number over and over again.')
     parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],
             choices=['1xb','5xb','panel','all','722', '832', '232'],
             help='Originate calls from a particular switch. Takes either 3 digit NXX values '
-	'or switch name.  1xb, 5xb, panel, or all. Default is panel.')
+            'or switch name.  1xb, 5xb, panel, or all. Default is panel.')
     parser.add_argument('-t', metavar='switch', type=str, nargs='?', action='append', default=[],
             choices=['1xb','5xb','panel','office','step', '722', '832', '232', '365', '275'],
             help='Terminate calls only on a particular switch. Takes either 3 digit NXX values '
-	'or switch name. Defaults to sane options for whichever switch you are originating from.')
+            'or switch name. Defaults to sane options for whichever switch you are originating from.')
     parser.add_argument('-v', metavar='volume', type=str, default='normal',
             help='Call volume is a proprietary blend of frequency and randomness. Can be light, '
-	'normal, or heavy. Default is normal, which is good for average load.')
+            'normal, or heavy. Default is normal, which is good for average load.')
     parser.add_argument('-w', metavar='seconds', type=int, help='Use with -d option to specify '
-	'wait time between calls.')
+            'wait time between calls.')
     parser.add_argument('-z', metavar='seconds', type=int,
             help='Use with -d option to specify call duration.')
     parser.add_argument('-log', metavar='loglevel', type=str, default='INFO',
@@ -808,7 +808,7 @@ def get_info():
 
     try:
         if t.started == True:
-           ui_running = True
+            ui_running = True
     except Exception as e:
         pass
 
@@ -869,7 +869,7 @@ def api_start(**kwargs):
                 elif instance == Lakeview:
                     new_lines = make_lines(switch=instance, numlines=2, source='api')
             elif mode != 'demo':
-#                new_lines = make_lines(switch=instance, source='main')
+                #                new_lines = make_lines(switch=instance, source='main')
                 new_lines = [Line(n, instance) for n in range(instance.max_calls)]
             for l in new_lines:
                 lines.append(l)
@@ -1080,10 +1080,10 @@ def update_line(**kwargs):
     # Pull the line ident out of the dict the API passed in.
     for i,  o in enumerate(lines):
         if o.ident == int(api_ident):
-           parameters = kwargs['line']
-           result = schema.load(parameters)
-           outcome = o.update(result)
-           return schema.dump(o)
+            parameters = kwargs['line']
+            result = schema.load(parameters)
+            outcome = o.update(result)
+            return schema.dump(o)
 
 def get_all_switches():
     """ Returns formatted list of all switches"""
@@ -1266,7 +1266,7 @@ class Screen():
         stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
         stdscr.addstr(3,5,"|__________________________________________|")
         stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk", "api"],
-        tablefmt="pipe", stralign = "right" ))
+            tablefmt="pipe", stralign = "right" ))
 
         # Print asterisk channels below the table so we can see what its actually doing.
         if y > 35:
@@ -1443,6 +1443,7 @@ if __name__ == "__main__":
             filename='/var/log/panel_gen/calls.log',level=logging.DEBUG, datefmt='%m/%d/%Y %I:%M:%S %p')
 
     logging.info('Originating calls on %s', orig_switch)
+
     if args.t != []:
         logging.info('Terminating calls on %s', term_choices)
     if args.d == True:
@@ -1471,7 +1472,7 @@ if __name__ == "__main__":
             sleep(0.5)
 
     except (KeyboardInterrupt, ServiceExit):
-    # Exception handler for console-based shutdown.
+        # Exception handler for console-based shutdown.
 
         t.shutdown_flag.set()
         t.join()
@@ -1496,8 +1497,8 @@ if __name__ == "__main__":
     except Exception as e:
         # Exception for any other errors that I'm not explicitly handling.
 
-	t.shutdown_flag.set()
-	t.join()
+        t.shutdown_flag.set()
+        t.join()
         w.shutdown_flag.set()
         w.join()
 
