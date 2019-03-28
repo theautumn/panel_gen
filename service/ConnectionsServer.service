@@ -1,0 +1,9 @@
+[Unit]
+Description=Connections Museum (panel_gen) Service
+
+[Service]
+Type=simple
+ExecStart=/home/sarah/panel_gen/http_server.py
+
+[Install]
+WantedBy=multi-user.target
