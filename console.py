@@ -1,0 +1,302 @@
+#---------------------------------------------------------------------#
+#                                                                     #
+#  A frontend console for panel_gen                                   #
+#                                                                     #
+#  Written by Sarah Autumn, 2017-2019                                 #
+#  sarah@connectionsmuseum.org                                        #
+#  github.com/theautumn/panel_gen                                     #
+#                                                                     #
+#---------------------------------------------------------------------#
+
+from time import sleep
+import signal
+import subprocess
+import curses
+import re
+import threading
+import requests
+from marshmallow import Schema, fields, post_load
+from pprint import pprint
+from tabulate import tabulate
+from pathlib import Path
+
+class Line(object):
+    """
+    This class defines Line objects.
+    self.switch:        Set to an instantiated switch object. Usually Rainier,
+                        Adams, or Lakeview
+    self.kind:          Type of switch for above objects. "panel, 1xb, 5xb"
+    self.status:        0 = OnHook, 1 = OffHook
+    self.term:          String containing the 7-digit terminating line.
+    self.timer:         Starts with a standard random.gamma, then gets set
+                        subsequently by the call volume attribute of the switch.
+    self.ident:         Integer starting with 0 that identifies the line.
+    self.chan:          DAHDI channel. We get this from asterisk.ami once the call
+                        is in progress. See on_DialBegin()
+    self.is_api:        Used to identify an API one-shot line in the console
+                        interface.
+    self.api_indicator: See above. Is set to "***" if a line is a temp API line.
+    """
+
+    def __init__(self, status, kind, term, timer, ident, chan, ast_status, **kwargs):
+        self.switch = switch
+        self.status = status
+        self.kind = kind
+        self.term = term
+        self.timer = timer
+        self.ident = ident
+        self.chan = chan
+        self.ast_status = ast_status
+        self.is_api = False
+        self.api_indicator = ""
+
+    def __repr__(self):
+        return '<Line(name={self.ident!r})>'.format(self=self)
+
+class switch(object):
+    """
+    This class is parameters and methods for the panel switch.
+    kind:           Generic name for type of switch.
+    running:        Whether or not switch is running.
+    """
+
+    def __init__(self, **kwargs):
+        self.kind = ""
+        self.running = False
+
+
+# +----------------------------------------------------+
+# |                                                    |
+# | The following chunk of code is for the             |
+# | panel_gen API, currently run from http_server.py   |
+# | The http server starts Flask, Connexion, which     |
+# | reads the API from swagger.yml, and executes HTTP  |
+# | requests using the code in switch.py and line.py   |
+# |                                                    |
+# | These functions return values to those two .py's   |
+# | when panel_gen is imported as a module.            |
+# |                                                    |
+# +----------------------------------------------------+
+
+class AppSchema(Schema):
+    name = fields.Str()
+    app_running = fields.Boolean()
+    panel_running = fields.Boolean()
+    xb5_running = fields.Boolean()
+    ui_running = fields.Boolean()
+    is_paused = fields.Boolean()
+    num_lines = fields.Integer()
+
+class LineSchema(Schema):
+#    line = fields.Dict()
+    ident = fields.Integer()
+    switch = fields.Str()
+    kind = fields.Str()
+    timer = fields.Integer()
+    is_dialing = fields.Boolean()
+    ast_status = fields.Str()
+    status = fields.Int()
+    chan = fields.Str()
+    term = fields.Str()
+    hook_state = fields.Integer()
+
+    @post_load
+    def make_line(self, data):
+        return Line(**data)
+
+class SwitchSchema(Schema):
+    switch = fields.Dict()
+    kind = fields.Str()
+    max_dialing = fields.Integer()
+    is_dialing = fields.Integer()
+    max_calls = fields.Integer()
+    dahdi_group = fields.Str()
+    nxx = fields.List(fields.Int())
+    trunk_load = fields.List(fields.Str())
+    line_range = fields.List(fields.Str())
+    running = fields.Boolean()
+    timer = fields.Str()
+    api_volume = fields.Str()
+
+
+
+# +-----------------------------------------------+
+# |                                               |
+# |  Below is the class for the screen. These     |
+# |  methods are called by the UI thread when     |
+# |  it needs to interact with the user, either   |
+# |  by getting keys, or drawing things.          |
+# |                                               |
+# +-----------------------------------------------+
+
+class Screen():
+    # Draw the screen, get user input.
+
+    def __init__(self, stdscr):
+        # For some reason when we init curses using wrapper(), we have to tell it
+        # to use terminal default colors, otherwise the display gets wonky.
+
+        curses.use_default_colors()
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
+        self.y, self.x = stdscr.getmaxyx()
+        stdscr.nodelay(1)
+        self.stdscr = stdscr
+
+    def update_size(self, stdscr, y, x):
+        # This gets called if the screen is resized. Makes it happy so exceptions don't get thrown.
+
+        self.stdscr.clear()
+        curses.resizeterm(y, x)
+        self.stdscr.refresh()
+
+    def draw(self, stdscr, lines, y, x):
+        # Output handling. make pretty things.
+        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.ast_status] for n in lines]
+        stdscr.erase()
+        stdscr.addstr(0,5," __________________________________________")
+        stdscr.addstr(1,5,"|                                          |")
+        stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
+        stdscr.addstr(3,5,"|__________________________________________|")
+        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk", "api"],
+        tablefmt="pipe", stralign = "right" ))
+
+        # Print asterisk channels below the table so we can see what its actually doing.
+#        if y > 35:
+#            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
+#            stdscr.addstr(20,5,"============ Asterisk output ===========")
+#            stdscr.addstr(22,0,ast_out)
+
+        # Print the contents of /var/log/panel_gen/calls.log
+        if y > 45:
+            try:
+                logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
+                stdscr.addstr(32,5,'================= Logs =================')
+                stdscr.addstr(34,0,logs)
+            except Exception as e:
+                pass
+
+        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
+        stdscr.addstr(y-1,x-20,"Lines:",curses.A_BOLD)
+        stdscr.addstr(y-1,x-13, str(len(lines)),curses.A_BOLD)
+
+        # Refresh the screen.
+        stdscr.refresh()
+
+
+#-->                      <--#
+# Work and UI threads are below
+#-->                      <--#
+
+class ui_thread(threading.Thread):
+    # The UI thread! Besides handling pause and resume, this also
+    # sets up a screen, and calls various things in Screen() to
+    # help with drawing.
+
+    def __init__(self):
+
+        threading.Thread.__init__(self)
+        self.shutdown_flag = threading.Event()
+        self.started = True
+
+    def run(self):
+        try:
+            curses.wrapper(self.ui_main)
+        except Exception as e:
+            print(e)
+
+    def ui_main(self, stdscr):
+
+        global screen
+        # Instantiate a screen, so we can play with it later.
+        screen = Screen(stdscr)
+
+        while not self.shutdown_flag.is_set():
+
+            # Check if screen has been resized. Handle it.
+            y, x = stdscr.getmaxyx()
+            resized = curses.is_term_resized(y, x)
+            if resized is True:
+                y, x = stdscr.getmaxyx()
+                screen.update_size(stdscr, y, x)
+
+            # Draw the window
+            screen.draw(stdscr, lines, y, x)
+            stdscr.refresh()
+            sleep(1)
+
+class work_thread(threading.Thread):
+    # Does all the work! Can be paused and resumed. Handles all of
+    # the exciting things, but most important is calling tick()
+    # once per second. This evaluates the timers and makes call processing
+    # decisions.
+
+    def __init__(self):
+
+        threading.Thread.__init__(self)
+        self.shutdown_flag = threading.Event()
+
+    def run(self):
+        global lines
+        while not self.shutdown_flag.is_set():
+            self.is_alive = True
+            
+            try:
+                r = requests.get(APISERVER, timeout=.5)
+                schema = LineSchema()
+                result = schema.loads(r.content, many=True)
+                lines = [i for i in result[0]]
+                sleep(1)
+            except requests.exceptions.RequestException as e:
+                sleep(10)
+                continue 
+
+class ServiceExit(Exception):
+    pass
+
+def app_shutdown(signum, frame):
+    raise ServiceExit
+
+
+if __name__ == "__main__":
+
+    # Set up signal handlers so we can shutdown cleanly later.
+    signal.signal(signal.SIGTERM, app_shutdown)
+    signal.signal(signal.SIGINT, app_shutdown)
+
+    APISERVER = "http://192.168.0.204:5000/api/lines"
+    switch = switch()
+    lines = []
+
+    try:
+        w = work_thread()
+        w.daemon = True
+        w.start()
+        t = ui_thread()
+        t.daemon = True
+        t.start()
+
+        while True:
+            sleep(0.5)
+
+    except (KeyboardInterrupt, ServiceExit):
+    # Exception handler for console-based shutdown.
+
+        t.shutdown_flag.set()
+        t.join()
+        w.shutdown_flag.set()
+        w.join()
+
+        # Log out of AMI
+#        client.logoff()
+        print('\n')
+
+    except Exception as e:
+        # Exception for any other errors that I'm not explicitly handling.
+        print(e)
+        t.shutdown_flag.set()
+        t.join()
+        w.shutdown_flag.set()
+        w.join()
+
+        print(("\nOS error {0}".format(e)))
