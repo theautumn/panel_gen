@@ -777,12 +777,14 @@ class AppSchema(Schema):
 class LineSchema(Schema):
     line = fields.Dict()
     ident = fields.Integer()
+    kind = fields.Str()
     switch = fields.Str()
     timer = fields.Integer()
     is_dialing = fields.Boolean()
     ast_status = fields.Str()
-    dahdi_chan = fields.Str()
-    called_no = fields.Str()
+    status = fields.Int()
+    chan = fields.Str()
+    term = fields.Str()
     hook_state = fields.Integer()
 
 class SwitchSchema(Schema):

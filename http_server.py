@@ -11,6 +11,10 @@
 #
 #-----------------------------------------------
 
+try:
+    from cheroot.wsgi import Server as WSGIServer, PathInfoDispatcher
+except ImportError:
+    from cherrypy.wsgiserver import CherryPyWSGIServer as WSGIServer, WSGIPathInfoDispatcher as PathInfoDispatcher
 from flask import Flask, render_template, request
 import connexion
 import logging
@@ -53,8 +57,13 @@ def xb5home():
 def panelhome():
     return render_template('panel.html')
 
+d = PathInfoDispatcher({'/': app})
+server = WSGIServer(('0.0.0.0', 5000), d)
+
 if __name__ == '__main__':
     try:
-        app.run(host='0.0.0.0')
+	server.start()
+    except KeyboardInterrupt:
+	server.stop()
     finally:
         panel_gen.module_shutdown()
