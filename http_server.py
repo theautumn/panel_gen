@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 #----------------------------------------------
 # HTTP server for panel_gen
 # Run with $sudo python http_server.py
@@ -29,7 +31,7 @@ app.add_api('swagger.yml')
 # This starts the UI. Normally, when we import as
 # a module, we don't want to start the UI and take
 # over the user's screen unless specifically asked.
-panel_gen.start_ui()
+#panel_gen.start_ui()
 
 class bcolors:
     HEADER = '\033[95m'

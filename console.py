@@ -1,3 +1,4 @@
+#!/usr/bin/python
 #---------------------------------------------------------------------#
 #                                                                     #
 #  A frontend console for panel_gen                                   #
@@ -16,7 +17,6 @@ import re
 import threading
 import requests
 from marshmallow import Schema, fields, post_load
-from pprint import pprint
 from tabulate import tabulate
 from pathlib import Path
 
@@ -33,22 +33,16 @@ class Line(object):
     self.ident:         Integer starting with 0 that identifies the line.
     self.chan:          DAHDI channel. We get this from asterisk.ami once the call
                         is in progress. See on_DialBegin()
-    self.is_api:        Used to identify an API one-shot line in the console
-                        interface.
-    self.api_indicator: See above. Is set to "***" if a line is a temp API line.
     """
 
-    def __init__(self, status, kind, term, timer, ident, chan, ast_status, **kwargs):
-        self.switch = switch
-        self.status = status
+    def __init__(self, kind, status, term, timer, ident, chan, ast_status, **kwargs):
         self.kind = kind
+        self.status = status
         self.term = term
         self.timer = timer
         self.ident = ident
         self.chan = chan
         self.ast_status = ast_status
-        self.is_api = False
-        self.api_indicator = ""
 
     def __repr__(self):
         return '<Line(name={self.ident!r})>'.format(self=self)
@@ -88,14 +82,12 @@ class AppSchema(Schema):
     num_lines = fields.Integer()
 
 class LineSchema(Schema):
-#    line = fields.Dict()
+    #    line = fields.Dict()
     ident = fields.Integer()
-    switch = fields.Str()
     kind = fields.Str()
+    status = fields.Integer()
     timer = fields.Integer()
-    is_dialing = fields.Boolean()
     ast_status = fields.Str()
-    status = fields.Int()
     chan = fields.Str()
     term = fields.Str()
     hook_state = fields.Integer()
@@ -137,8 +129,9 @@ class Screen():
         # to use terminal default colors, otherwise the display gets wonky.
 
         curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
-        curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_RED)
+        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_GREEN)
         self.y, self.x = stdscr.getmaxyx()
         stdscr.nodelay(1)
         self.stdscr = stdscr
@@ -152,20 +145,15 @@ class Screen():
 
     def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
-        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.ast_status] for n in lines]
+        table = [[n.ident, n.kind, n.chan, n.term, n.timer, n.status, n.ast_status] for n in lines]
         stdscr.erase()
         stdscr.addstr(0,5," __________________________________________")
         stdscr.addstr(1,5,"|                                          |")
         stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
         stdscr.addstr(3,5,"|__________________________________________|")
-        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk", "api"],
-        tablefmt="pipe", stralign = "right" ))
-
-        # Print asterisk channels below the table so we can see what its actually doing.
-#        if y > 35:
-#            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-#            stdscr.addstr(20,5,"============ Asterisk output ===========")
-#            stdscr.addstr(22,0,ast_out)
+        stdscr.addstr(6,0,tabulate(table, headers=["ident", "switch", "channel", "term",
+            "tick", "state", "asterisk"],
+            tablefmt="pipe", stralign = "right" ))
 
         # Print the contents of /var/log/panel_gen/calls.log
         if y > 45:
@@ -200,6 +188,7 @@ class ui_thread(threading.Thread):
         self.started = True
 
     def run(self):
+
         try:
             curses.wrapper(self.ui_main)
         except Exception as e:
@@ -237,19 +226,23 @@ class work_thread(threading.Thread):
         self.shutdown_flag = threading.Event()
 
     def run(self):
+
         global lines
+
         while not self.shutdown_flag.is_set():
             self.is_alive = True
-            
+
             try:
                 r = requests.get(APISERVER, timeout=.5)
                 schema = LineSchema()
-                result = schema.loads(r.content, many=True)
-                lines = [i for i in result[0]]
+                result = schema.loads(r.content,  many=True)
+                lines = result[0]
+                server_up = True
                 sleep(1)
-            except requests.exceptions.RequestException as e:
+            except requests.exceptions.RequestException:
+                server_up = False
                 sleep(10)
-                continue 
+                continue
 
 class ServiceExit(Exception):
     pass
@@ -267,6 +260,7 @@ if __name__ == "__main__":
     APISERVER = "http://192.168.0.204:5000/api/lines"
     switch = switch()
     lines = []
+    server_up = False
 
     try:
         w = work_thread()
@@ -280,15 +274,13 @@ if __name__ == "__main__":
             sleep(0.5)
 
     except (KeyboardInterrupt, ServiceExit):
-    # Exception handler for console-based shutdown.
+        # Exception handler for console-based shutdown.
 
         t.shutdown_flag.set()
         t.join()
         w.shutdown_flag.set()
         w.join()
 
-        # Log out of AMI
-#        client.logoff()
         print('\n')
 
     except Exception as e:
