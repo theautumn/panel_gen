@@ -242,6 +242,7 @@ class work_thread(threading.Thread):
     def run(self):
 
         global lines
+        global server_up
 
         while not self.shutdown_flag.is_set():
             self.is_alive = True
