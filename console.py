@@ -129,9 +129,10 @@ class Screen():
         # to use terminal default colors, otherwise the display gets wonky.
 
         curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
-        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_RED)
-        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_GREEN)
+        if curses.has_colors():
+            curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
+            curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_RED)
+            curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_GREEN)
         self.y, self.x = stdscr.getmaxyx()
         stdscr.nodelay(1)
         self.stdscr = stdscr
@@ -164,9 +165,22 @@ class Screen():
             except Exception as e:
                 pass
 
-        stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
-        stdscr.addstr(y-1,x-20,"Lines:",curses.A_BOLD)
-        stdscr.addstr(y-1,x-13, str(len(lines)),curses.A_BOLD)
+        y, x = self.stdscr.getmaxyx()
+        cols = x
+        rows_size = 1
+        x_start_row = y - 1
+        y_start_col = 0
+
+        statusbar = self.stdscr.subwin(rows_size, cols, x_start_row, y_start_col)
+        statusbar.bkgd(' ', curses.color_pair(1))
+        statusbar.addstr(0,0,"ctrl + c: quit", curses.A_BOLD)
+        statusbar.addstr(0,x/2,"Server status:", curses.A_BOLD)
+        if server_up == True:
+            statusbar.addstr(0,x/2+15,"ONLINE", curses.color_pair(3))
+        else:
+            statusbar.addstr(0,x/2+15,"OFFLINE", curses.color_pair(2))
+        statusbar.addstr(0,x-15,"Lines:",curses.A_BOLD)
+        statusbar.addstr(0,x-8, str(len(lines)),curses.A_BOLD)
 
         # Refresh the screen.
         stdscr.refresh()
