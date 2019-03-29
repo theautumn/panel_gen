@@ -31,8 +31,8 @@ class Line(object):
     self.timer:         Starts with a standard random.gamma, then gets set
                         subsequently by the call volume attribute of the switch.
     self.ident:         Integer starting with 0 that identifies the line.
-    self.chan:          DAHDI channel. We get this from asterisk.ami once the call
-                        is in progress. See on_DialBegin()
+    self.chan:          DAHDI channel being used for call in progress
+    self.ast_status:    Status of line according to Asterisk
     """
 
     def __init__(self, kind, status, term, timer, ident, chan, ast_status, **kwargs):
@@ -47,28 +47,9 @@ class Line(object):
     def __repr__(self):
         return '<Line(name={self.ident!r})>'.format(self=self)
 
-class switch(object):
-    """
-    This class is parameters and methods for the panel switch.
-    kind:           Generic name for type of switch.
-    running:        Whether or not switch is running.
-    """
-
-    def __init__(self, **kwargs):
-        self.kind = ""
-        self.running = False
-
 
 # +----------------------------------------------------+
 # |                                                    |
-# | The following chunk of code is for the             |
-# | panel_gen API, currently run from http_server.py   |
-# | The http server starts Flask, Connexion, which     |
-# | reads the API from swagger.yml, and executes HTTP  |
-# | requests using the code in switch.py and line.py   |
-# |                                                    |
-# | These functions return values to those two .py's   |
-# | when panel_gen is imported as a module.            |
 # |                                                    |
 # +----------------------------------------------------+
 
@@ -82,7 +63,6 @@ class AppSchema(Schema):
     num_lines = fields.Integer()
 
 class LineSchema(Schema):
-    #    line = fields.Dict()
     ident = fields.Integer()
     kind = fields.Str()
     status = fields.Integer()
@@ -229,10 +209,6 @@ class ui_thread(threading.Thread):
             sleep(1)
 
 class work_thread(threading.Thread):
-    # Does all the work! Can be paused and resumed. Handles all of
-    # the exciting things, but most important is calling tick()
-    # once per second. This evaluates the timers and makes call processing
-    # decisions.
 
     def __init__(self):
 
@@ -273,7 +249,6 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, app_shutdown)
 
     APISERVER = "http://192.168.0.204:5000/api/lines"
-    switch = switch()
     lines = []
     server_up = False
 
