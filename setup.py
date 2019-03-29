@@ -12,11 +12,12 @@ requires = [
     'asterisk-ami',
     'connexion',
     'marshmallow-code',
+    'pycherry',
 ]
 
 setup(
     name='panel_gen',
-    version='2.1',
+    version='2.5',
     description='A call generator for the Connections Museum',
     author='Sarah Autumn',
     author_email='sarah@connectionsmuseum.org',

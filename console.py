@@ -134,7 +134,7 @@ class Screen():
         # Print the contents of /var/log/panel_gen/calls.log
         if y > 45:
             try:
-                logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
+                logs = subprocess.check_output(['tail','-n', '15',  '/var/log/panel_gen/calls.log'])
                 stdscr.addstr(32,5,'================= Logs =================')
                 stdscr.addstr(34,0,logs)
             except Exception as e:
