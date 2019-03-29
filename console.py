@@ -18,7 +18,6 @@ import threading
 import requests
 from marshmallow import Schema, fields, post_load
 from tabulate import tabulate
-from pathlib import Path
 
 class Line(object):
     """
@@ -76,21 +75,8 @@ class LineSchema(Schema):
     def make_line(self, data):
         return Line(**data)
 
-class SwitchSchema(Schema):
-    switch = fields.Dict()
-    kind = fields.Str()
-    max_dialing = fields.Integer()
-    is_dialing = fields.Integer()
-    max_calls = fields.Integer()
-    dahdi_group = fields.Str()
-    nxx = fields.List(fields.Int())
-    trunk_load = fields.List(fields.Str())
-    line_range = fields.List(fields.Str())
-    running = fields.Boolean()
-    timer = fields.Str()
-    api_volume = fields.Str()
-
-
+class MuseumSchema(Schema):
+    status = fields.Boolean()
 
 # +-----------------------------------------------+
 # |                                               |
@@ -115,6 +101,8 @@ class Screen():
             curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_GREEN)
         self.y, self.x = stdscr.getmaxyx()
         stdscr.nodelay(1)
+        self.screen = stdscr
+
         self.stdscr = stdscr
 
     def update_size(self, stdscr, y, x):
@@ -123,6 +111,13 @@ class Screen():
         self.stdscr.clear()
         curses.resizeterm(y, x)
         self.stdscr.refresh()
+
+    def getkey(self, stdscr):
+        # Handles user input.
+
+        key = stdscr.getch()
+        if key == ord(' '):
+            pass
 
     def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
@@ -147,13 +142,18 @@ class Screen():
 
         y, x = self.stdscr.getmaxyx()
         cols = x
-        rows_size = 1
+        rows = 1
         x_start_row = y - 1
         y_start_col = 0
 
-        statusbar = self.stdscr.subwin(rows_size, cols, x_start_row, y_start_col)
+        statusbar = self.stdscr.subwin(rows, cols, x_start_row, y_start_col)
         statusbar.bkgd(' ', curses.color_pair(1))
         statusbar.addstr(0,0,"ctrl + c: quit", curses.A_BOLD)
+        statusbar.addstr(0,x/4,"Museum status:", curses.A_BOLD)
+        if museum_up == True:
+            statusbar.addstr(0,x/4+15,"ONLINE", curses.color_pair(3))
+        else:
+            statusbar.addstr(0,x/4+15,"OFFLINE", curses.color_pair(2))
         statusbar.addstr(0,x/2,"Server status:", curses.A_BOLD)
         if server_up == True:
             statusbar.addstr(0,x/2+15,"ONLINE", curses.color_pair(3))
@@ -164,7 +164,6 @@ class Screen():
 
         # Refresh the screen.
         stdscr.refresh()
-
 
 #-->                      <--#
 # Work and UI threads are below
@@ -195,6 +194,8 @@ class ui_thread(threading.Thread):
         screen = Screen(stdscr)
 
         while not self.shutdown_flag.is_set():
+
+            screen.getkey(stdscr)
 
             # Check if screen has been resized. Handle it.
             y, x = stdscr.getmaxyx()
@@ -235,6 +236,38 @@ class work_thread(threading.Thread):
                 sleep(10)
                 continue
 
+class museum_thread(threading.Thread):
+
+    def __init__(self):
+
+        threading.Thread.__init__(self)
+        self.shutdown_flag = threading.Event()
+
+    def run(self):
+
+        global museum_up
+        timer = 40
+
+        while not self.shutdown_flag.is_set():
+            self.is_alive = True
+
+            timer = timer - 1
+            sleep(.5)
+            if timer <= 0:
+                try:
+                    r = requests.get(MUSEUMSTATE, timeout=4)
+                    schema = MuseumSchema()
+                    result = schema.loads(r.content)
+                    museum = result[0]
+                    for k,v in museum.iteritems():
+                        museum_up = v
+                    timer = 40
+                except requests.exceptions.RequestException:
+                    museum_up = False
+                    print("timeout")
+                    timer = 40
+                    continue
+
 class ServiceExit(Exception):
     pass
 
@@ -249,13 +282,18 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, app_shutdown)
 
     APISERVER = "http://192.168.0.204:5000/api/lines"
+    MUSEUMSTATE = "http://192.168.0.204:5000/api/museum"
     lines = []
     server_up = False
+    museum_up = False
 
     try:
         w = work_thread()
         w.daemon = True
         w.start()
+        w2 = museum_thread()
+        w2.daemon = True
+        w2.start()
         t = ui_thread()
         t.daemon = True
         t.start()
@@ -270,6 +308,8 @@ if __name__ == "__main__":
         t.join()
         w.shutdown_flag.set()
         w.join()
+        w2.shutdown_flag.set()
+        w2.join()
 
         print('\n')
 
@@ -280,5 +320,7 @@ if __name__ == "__main__":
         t.join()
         w.shutdown_flag.set()
         w.join()
+        w2.shutdown_flag.set()
+        w2.join()
 
         print(("\nOS error {0}".format(e)))
