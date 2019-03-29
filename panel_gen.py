@@ -1,3 +1,4 @@
+#!/usr/bin/python
 #---------------------------------------------------------------------#
 #                                                                     #
 #  A call generator thing for the Rainier Panel switch at the         #
