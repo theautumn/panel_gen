@@ -49,7 +49,15 @@ This application requires a context in your dialplan to pass calls into. The sim
 
 Usage
 -----
-Setting up Asterisk and a channel bank is way beyond the scope of this readme so lets assume you've somehow managed to do that without losing all your marbles. It should be possible to grab the code, install the libraries, and run just <code>python panel_gen.py</code> as user 'asterisk', and have everything work out fine, (although you will have to edit the DAHDI group, and switch classes to suit your needs). There are command line arguments that have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them. I'll paste them here as well:
+Setting up Asterisk and a channel bank is way beyond the scope of this readme so lets assume you've somehow managed to do that without losing all your marbles.
+
+There are two ways to run panel_gen:
+* as a standalone application
+* as a systemd service
+
+Running the program as a standalone application will give you a nice curses UI, and accepts command line arguments outlined below. The application currently needs to be run with `sudo` in order to grab channel information from Asterisk. This will change when I get around to fixing it. The standalone application does not run the HTTP server, so all control must be done through passing arguments in to it.
+
+The command line arguments have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them. I'll paste them here as well:
 
 ```
 usage: panel_gen.py [-h] [-a lines] [-d] [-l line] [-o [switch]] [-t switch]
@@ -82,6 +90,8 @@ optional arguments:
 	       it's there for http-server.py to play with.
 ```
 
+Running as a systemd service requires using the .service file in the "service/" directory. This method will cause the application to run like any other system service, and includes an HTTP/API server with all of the extra bells and whistles. This is how we normally run it at the museum. While running as a systemd service, you can connect to it with `console.py` to get a curses UI. Exiting `console.py` will have no effect on the service itself.
+
 The program is capable of generating calls from, and terminating calls to, any of the switches in the museum. The switch classes determines what the rules for each switch are, and they're set up with the switch capacities and limitations baked in. This way, if you are originating or terminating on any switch, panel_gen is intelligent enough to know if it's possible to make the call it's about to make.
 
 The interface is divided into three areas, which should be mostly self-explanatory. The only bit that warrants some explanation is the main table at the top:
@@ -107,19 +117,16 @@ The interface is divided into three areas, which should be mostly self-explanato
 * **state**: line state according to Python
 * **asterisk**: line state according to Asterisk
 
-While running, there are a few magic keys you can use to control program flow. This feature is currently in alpha phase, and may break everything:
+While running as a standalone application, there are a few magic keys you can use to control program flow. These have no effect when running as a system service, as all control should be done through the API.
 * **spacebar**: pause/resume
 * **u/d**: add/remove lines
-* **h**: show help screen
 * **ctrl + c**: hang up all lines and quit
-
-Be aware that when paused, the program's timers stop, but Asterisk's timers keep going. This means that existing calls will eventually time out, and hang up, but no new calls will be originated until the program is unpaused. When panel_gen is unpaused, its timers will resume right from where they left off. This means that there may be a sync issue between what panel_gen thinks is happening, and what Asterisk thinks. This eventually resolves itself, when panel_gen's timers run down and new calls are originated.
 
 HTTP Server
 -----------
 There is a simple, insecure HTTP server provided in http-server.py which serves up a basic web page so panel_gen can be executed via a volunteer's smartphone. This should not be available to everybody, as there are no security or sanity checks, and there's probably a thousand ways to break it. I keep it limited to a secure network so only those with the WPA key can access it. The actual server is [Flask](https://github.com/pallets/flask), and the CSS framework is [Skeleton](https://github.com/dhg/Skeleton).
 
-This app now provides an API via `http_server.py`! How cool is that? You can find basic documentation [here](https://github.com/theautumn/panel_gen/wiki/API), and at some point soon, I will write something more complete. Use at your own risk :)
+This app also provides an API via `http_server.py`! You can find basic documentation [here](https://github.com/theautumn/panel_gen/wiki/API), and at some point soon, I will write something more complete. Use at your own risk :)
 
 Examples
 -------
