@@ -1,5 +1,6 @@
 [Unit]
 Description=Connections Museum (panel_gen) Service
+Documentation=https://www.github.com/theautumn/panel_gen
 
 [Service]
 Type=simple

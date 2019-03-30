@@ -15,6 +15,7 @@ import subprocess
 import curses
 import re
 import threading
+import logging
 import requests
 from marshmallow import Schema, fields, post_load
 from tabulate import tabulate
@@ -134,7 +135,7 @@ class Screen():
         # Print the contents of /var/log/panel_gen/calls.log
         if y > 45:
             try:
-                logs = subprocess.check_output(['tail', '/var/log/panel_gen/calls.log'])
+                logs = subprocess.check_output(['tail', '-n', '15', '/var/log/panel_gen/calls.log'])
                 stdscr.addstr(32,5,'================= Logs =================')
                 stdscr.addstr(34,0,logs)
             except Exception as e:
@@ -230,9 +231,13 @@ class work_thread(threading.Thread):
                 result = schema.loads(r.content,  many=True)
                 lines = result[0]
                 server_up = True
+                failcount = 0
                 sleep(1)
             except requests.exceptions.RequestException:
                 server_up = False
+                failcount += 1
+                if failcount == 1:
+                    logger.critical("Connections service not running!")
                 sleep(10)
                 continue
 
@@ -264,7 +269,7 @@ class museum_thread(threading.Thread):
                     timer = 40
                 except requests.exceptions.RequestException:
                     museum_up = False
-                    print("timeout")
+                    logger.error("Timeout reached while checking museum status")
                     timer = 40
                     continue
 
@@ -286,6 +291,17 @@ if __name__ == "__main__":
     lines = []
     server_up = False
     museum_up = False
+
+    try:
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s',
+                '%m/%d/%Y %I:%M:%S %p')
+        handler = logging.FileHandler('/var/log/panel_gen/calls.log')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    except IOError:
+        pass
 
     try:
         w = work_thread()
