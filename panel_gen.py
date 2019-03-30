@@ -24,7 +24,7 @@ from tabulate import tabulate
 from numpy import random
 from pathlib import Path
 from pycall import CallFile, Call, Application, Context
-from asterisk.ami import AMIClient, EventListener, SimpleAction, AMIClientAdapter
+from asterisk.ami import AMIClient, EventListener, AMIClientAdapter
 
 class Line():
     """
@@ -40,6 +40,8 @@ class Line():
     self.ident:         Integer starting with 0 that identifies the line.
     self.chan:          DAHDI channel. We get this from asterisk.ami once the call
                         is in progress. See on_DialBegin()
+    self.ast_status:    Returned from AMI. Indicates status of line from Asterisk's
+                        perspective.
     self.is_api:        Used to identify an API one-shot line in the console
                         interface.
     self.api_indicator: See above. Is set to "***" if a line is a temp API line.
@@ -64,11 +66,6 @@ class Line():
 
     def __repr__(self):
         return '<Line(name={self.ident!r})>'.format(self=self)
-
-    def set_timer(self):
-        """ Returns a new timer from whichever switch the line belongs to."""
-        self.timer = switch.newtimer
-        return self.timer
 
     def tick(self):
         """
@@ -212,18 +209,18 @@ class Line():
             if len(currentlines) <= 1:
                 self.switch.running = False
 
-        if args.d:                                              # Are we in deterministic mode?
-            if args.w:                                          # args.w is wait time between calls
-                self.timer = args.w                              # Set length of the wait time before next call
+        if args.d:                                  # Are we in deterministic mode?
+            if args.w:                              # args.w is wait time between calls
+                self.timer = args.w                 # Set length of the wait time before next call
             else:
-                self.timer = 15                                 # If no args.w defined, use default value.
+                self.timer = 15                     # If no args.w defined, use default value.
         else:
-            self.timer = self.switch.newtimer()                 # Normal call timer if args.d not specified.
+            self.timer = self.switch.newtimer()     # Normal call timer if args.d not specified.
 
-        if args.l:                                              # If user specified a line
-            self.term = args.l                                  # Set term line to user specified
+        if args.l:                                  # If user specified a line
+            self.term = args.l                      # Set term line to user specified
         else:
-            self.term = self.pick_called_line(term_choices)     # Pick a new terminating line.
+            self.term = self.pick_called_line(term_choices)
 
     def update(self, api):
         """ Used by the API PATCH method to update line parameters."""
@@ -592,11 +589,11 @@ def on_DialBegin(event, **kwargs):
 
     for l in lines:
         if DialString[0] == str(l.term) and l.ast_status == 'on_hook':
-            # logging.info('DialString match %s and %s', DialString[0], str(n.term))
+            logging.debug('DialString match %s and %s', DialString[0], str(l.term))
             l.chan = DB_DestChannel[0]
             l.ast_status = 'Dialing'
             l.switch.is_dialing += 1
-            logging.debug('Calling %s on DAHDI/%s from %s', l.term, l.chan, l.switch.kind)
+            logging.debug('Calling %s on DAHDI %s from %s', l.term, l.chan, l.switch.kind)
 
 def on_DialEnd(event, **kwargs):
     """
@@ -612,14 +609,7 @@ def on_DialEnd(event, **kwargs):
         if DE_DestChannel[0] == str(l.chan) and l.ast_status == 'Dialing':
             l.ast_status = 'Ringing'
             l.switch.is_dialing -= 1
-            # logging.info('on_DialEnd with %s calls dialing', n.switch.is_dialing)
-
-def on_CoreShowChannels(event, **kwargs):
-    """
-    Callback function for CoreShowChannels AMI event. Gathers information
-    about active channels and displays for user in exciting ways.
-    """
-    output = str(event)
+            logging.debug('on_DialEnd with %s calls dialing', l.switch.is_dialing)
 
 
 def parse_args():

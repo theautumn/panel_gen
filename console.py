@@ -303,6 +303,8 @@ if __name__ == "__main__":
     except IOError:
         pass
 
+    logger.info('Started console')
+
     try:
         w = work_thread()
         w.daemon = True
