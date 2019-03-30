@@ -614,17 +614,13 @@ def on_DialEnd(event, **kwargs):
             l.switch.is_dialing -= 1
             # logging.info('on_DialEnd with %s calls dialing', n.switch.is_dialing)
 
-def CoreShowChannels():
+def on_CoreShowChannels(event, **kwargs):
     """
     Callback function for CoreShowChannels AMI event. Gathers information
     about active channels and displays for user in exciting ways.
     """
-    action = SimpleAction('CoreShowChannels')
-    future = client.send_action(action, callback=OnShowChannels)
-    response = future.response
+    output = str(event)
 
-def OnShowChannels(response):
-    print(response)
 
 def parse_args():
     # Gets called at runtime and parses arguments given on command line.
