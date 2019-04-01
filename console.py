@@ -255,17 +255,20 @@ class museum_thread(threading.Thread):
 
         while not self.shutdown_flag.is_set():
             self.is_alive = True
-
             timer = timer - 1
             sleep(.5)
             if timer <= 0:
                 try:
+                    museum_pstate = museum_up
                     r = requests.get(MUSEUMSTATE, timeout=4)
                     schema = MuseumSchema()
                     result = schema.loads(r.content)
                     museum = result[0]
                     for k,v in museum.iteritems():
                         museum_up = v
+                    if museum_pstate != museum_up:
+                        logger.warning("Museum state changed from %s to %s",
+                                museum_pstate, museum_up)
                     timer = 40
                 except requests.exceptions.RequestException:
                     museum_up = False

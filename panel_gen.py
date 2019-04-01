@@ -1399,7 +1399,7 @@ def module_shutdown():
     w.shutdown_flag.set()
     w.join()
 
-    logging.info("Exited due to web interface shutdown")
+    logging.warning("Exited due to service shutdown")
 
     # Hang up and clean up spool.
     system("asterisk -rx \"channel request hangup all\"")
