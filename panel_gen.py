@@ -177,7 +177,7 @@ class Line():
         # Asterisk from here.
         c = Call(CHANNEL, variables=vars)
         con = Context('sarah_callsim','s','1')
-        cf = CallFile(c, con, user='asterisk')
+        cf = CallFile(c, con)
         cf.spool()
 
     def hangup(self):
@@ -1263,10 +1263,12 @@ class Screen():
 
         # Print asterisk channels below the table so we can see what its actually doing.
         if y > 35:
-            ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
-            stdscr.addstr(20,5,"============ Asterisk output ===========")
-            stdscr.addstr(22,0,ast_out)
-
+            try:
+                ast_out = subprocess.check_output(['asterisk', '-rx', 'core show channels'])
+                stdscr.addstr(22,0,ast_out)
+            except Exception:
+                stdscr.addstr(22,0,"** MUST BE RUNNING AS ROOT FOR ASTERISK OUTPUT **")
+                stdscr.addstr(20,5,"============ Asterisk output ===========")
         # Print the contents of /var/log/panel_gen/calls.log
         if y > 45:
             try:
