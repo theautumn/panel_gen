@@ -20,10 +20,11 @@ except ImportError:
 from flask import Flask, render_template, request
 import connexion
 import logging
+import ConfigParser
 import panel_gen
 
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+#log = logging.getLogger('werkzeug')
+#log.setLevel(logging.ERROR)
 
 app = connexion.App(__name__, specification_dir='api/')
 app.add_api('swagger.yml')
