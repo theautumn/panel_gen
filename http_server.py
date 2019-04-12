@@ -20,7 +20,6 @@ except ImportError:
 from flask import Flask, render_template, request
 import connexion
 import logging
-import ConfigParser
 import panel_gen
 
 #log = logging.getLogger('werkzeug')

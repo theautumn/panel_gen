@@ -6,6 +6,9 @@ requires = [
     'logging',
     'requests',
     'tabulate',
+    'subprocess'
+    're'
+    'curses'
     'numpy',
     'pathlib',
     'pycall',
@@ -19,8 +22,10 @@ setup(
     name='panel_gen',
     version='2.5',
     description='A call generator for the Connections Museum',
+    long_description=read('README.md'),
     author='Sarah Autumn',
     author_email='sarah@connectionsmuseum.org',
+    license='GPLv3'
     keywords='connections museum call simulator',
     packages=find_packages(),
     include_package_data=True,

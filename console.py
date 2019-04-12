@@ -260,7 +260,7 @@ class museum_thread(threading.Thread):
             if timer <= 0:
                 try:
                     museum_pstate = museum_up
-                    r = requests.get(MUSEUMSTATE, timeout=4)
+                    r = requests.get(MUSEUMSTATE, timeout=5)
                     schema = MuseumSchema()
                     result = schema.loads(r.content)
                     museum = result[0]
