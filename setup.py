@@ -1,3 +1,4 @@
+import os
 from setuptools import setup, find_packages
 
 requires = [
@@ -25,7 +26,7 @@ setup(
     long_description=read('README.md'),
     author='Sarah Autumn',
     author_email='sarah@connectionsmuseum.org',
-    license='GPLv3'
+    license='GPLv3',
     keywords='connections museum call simulator',
     packages=find_packages(),
     include_package_data=True,
