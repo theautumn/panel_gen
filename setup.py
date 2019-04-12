@@ -18,7 +18,7 @@ requires = [
     'pycall',
     'asterisk-ami',
     'connexion',
-    'marshmallow-code',
+    'marshmallow',
     'cherrypy',
 ]
 
