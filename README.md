@@ -57,40 +57,9 @@ There are two ways to run panel_gen:
 
 Running the program as a standalone application will give you a nice curses UI, and accepts command line arguments outlined below. The application currently needs to be run with `sudo` in order to grab channel information from Asterisk. This will change when I get around to fixing it. The standalone application does not run the HTTP server, so all control must be done through passing arguments in to it.
 
-The command line arguments have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them. I'll paste them here as well:
+The command line arguments have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them.
 
-```
-usage: panel_gen.py [-h] [-a lines] [-d] [-l line] [-o [switch]] [-t switch]
-                    [-v volume]
-
-Generate calls to electromechanical switches. Defaults to originate a sane
-amount of calls from the panel switch if no args are given.
-
-optional arguments:
-  -h, --help   show this help message and exit
-  -a lines     Maximum number of active lines.
-  -d           Deterministic mode. Eliminate timing randomness so various
-               functions of the switch can be tested at-will. Will ignore -a
-               and -v options entirely.
-  -l line      Call only a particular line. Can be used with the -d option for
-               placing test calls to a number over and over again.
-  -o [switch]  Originate calls from a particular switch. Takes either 3 digit
-               NXX values or switch name. 1xb, 5xb, panel, or all. Default is
-               panel.
-  -t switch    Terminate calls only on a particular switch. Takes either 3
-               digit NXX values or switch name. Defaults to options for
-               whichever switch you are originating from.
-  -v volume    Call volume is a proprietary blend of frequency and randomness.
-               Can be light, normal, or heavy. Default is normal, which is
-               good for average load.
-  -w seconds   Use with -d option to specify wait time between calls.
-  -z seconds   Use with -d option to specify call duration.
-  --http       Run in headless HTTP server mode for remote control. This
-  	       is not normally something a user would run manually. Instead
-	       it's there for http-server.py to play with.
-```
-
-Running as a systemd service requires using the .service file in the "service/" directory. This method will cause the application to run like any other system service, and includes an HTTP/API server with all of the extra bells and whistles. This is how we normally run it at the museum. While running as a systemd service, you can connect to it with `console.py` to get a curses UI. Exiting `console.py` will have no effect on the service itself.
+Running as a systemd service requires using the .service file in the "service/" directory. This method will cause the application to run like any other system service, and includes an HTTP/API server with all of the extra bells and whistles. This is how we normally run it at the museum. While running as a systemd service, you can connect to it with `console.py` to get a curses UI. Exiting `console.py` will have no effect on the service itself. If you want to go this route, you'll need to do the legwork to configure the service for your machine, as I've only tested this on mine.
 
 The program is capable of generating calls from, and terminating calls to, any of the switches in the museum. The switch classes determines what the rules for each switch are, and they're set up with the switch capacities and limitations baked in. This way, if you are originating or terminating on any switch, panel_gen is intelligent enough to know if it's possible to make the call it's about to make.
 

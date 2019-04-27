@@ -148,7 +148,7 @@ class Line():
             self.timer = self.switch.newtimer()
 
             # Wait value to pass to Asterisk dialplan if not using API to start call
-            wait = self.timer
+            wait = self.timer + 15
 
             # The kwargs come in from the API. The following lines handle them and set up
             # the special call case outside of the normal program flow.
@@ -193,7 +193,7 @@ class Line():
             logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
 
-        adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan),)
+        adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
 
         logging.debug('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0

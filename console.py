@@ -272,7 +272,7 @@ class museum_thread(threading.Thread):
                     timer = 40
                 except requests.exceptions.RequestException:
                     museum_up = False
-                    logger.error("Timeout reached while checking museum status")
+                    #logger.error("Timeout reached while checking museum status")
                     timer = 40
                     continue
 
