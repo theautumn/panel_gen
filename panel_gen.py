@@ -26,6 +26,7 @@ from pathlib import Path
 from pycall import CallFile, Call, Application, Context
 from asterisk.ami import AMIClient, EventListener, AMIClientAdapter
 
+
 class Line():
     """
     This class defines Line objects.
@@ -65,7 +66,7 @@ class Line():
         self.api_indicator = ""
 
     def __repr__(self):
-        return '<Line(name={self.ident!r})>'.format(self=self)
+        return '<Line({self.ident!r})>'.format(self=self)
 
     def tick(self):
         """
@@ -95,33 +96,37 @@ class Line():
         """
         Returns a string containing a 7-digit number to call.
 
+        args.l:             Command line arg for called line
         term_choices:       List of office codes we can dial
                             set as a global in __main__
         """
 
-        if term_choices == []:
-            term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)
+        if args.l:                      # If user specified a line
+            term = args.l               # Set term line to user specified
         else:
-            term_office = random.choice(term_choices)
+            if term_choices == []:
+                term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)
+            else:
+                term_office = random.choice(term_choices)
 
-        # Choose a sane number that appears on the line link or final frame of the switches
-        # that we're actually calling. If something's wrong, then assert false so it will get caught.
-        # Whenever possible, these values should be defined in the switch class, and pulled from there.
-        # This makes it so we can change these values more easily.
-        if term_office == 722 or term_office == 365:
-            term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
-        elif term_office == 832:
-            term_station = "%04d" % random.choice(Lakeview.line_range)
-        elif term_office == 232:
-            term_station = random.choice(Adams.line_range)
-        elif term_office == 275:
-            term_station = random.randint(Step.line_range[0], Step.line_range[1])
-        else:
-            logging.error("No terminating line available for this office.")
-            assert False
+            # Choose a sane number that appears on the line link or final frame of the switches
+            # that we're actually calling. If something's wrong, then assert false so it will get caught.
+            # Whenever possible, these values should be defined in the switch class, and pulled from there.
+            # This makes it so we can change these values more easily.
+            if term_office == 722 or term_office == 365:
+                term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
+            elif term_office == 832:
+                term_station = "%04d" % random.choice(Lakeview.line_range)
+            elif term_office == 232:
+                term_station = random.choice(Adams.line_range)
+            elif term_office == 275:
+                term_station = random.randint(Step.line_range[0], Step.line_range[1])
+            else:
+                logging.error("No terminating line available for this office.")
+                assert False
 
 
-        term = int(str(term_office) + str(term_station))
+            term = int(str(term_office) + str(term_station))
         #logging.info('Terminating line selected: %s', term)
         return term
 
@@ -129,47 +134,40 @@ class Line():
         """
         Places a call. Returns nothing.
 
-        Dialing takes ~10 to 12 seconds. We're going to set a timer
-        for call duration here, and then a few lines down,
-        we're gonna tell Asterisk to set its own wait timer to the same value - 10.
-        This should give us a reasonable buffer between the program's counter and
-        Asterisk's wait timer (which itself begins when the call goes from
-        dialing to "UP").
+        kwargs:
+            orig_switch:     switch call is coming from
+            line:            line placing the call
+            timer:           duration of the call
+
         """
 
         CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
 
-        if args.d:
-            if args.z:
-                self.timer = args.z
-            else:
-                self.timer = 15
-        else:
-            self.timer = self.switch.newtimer()
+        self.timer = self.switch.newtimer()
 
-            # Wait value to pass to Asterisk dialplan if not using API to start call
-            wait = self.timer + 15
+        # Wait value to pass to Asterisk dialplan if not using API to start call
+        wait = self.timer + 15
 
-            # The kwargs come in from the API. The following lines handle them and set up
-            # the special call case outside of the normal program flow.
-            for key, value in kwargs.items():
-                if key == 'orig_switch':
-                    switch = value
-                if key == 'line':
-                    line = value
-                if key == 'timer':
-                    self.timer = value
-                    wait = value
+        # The kwargs come in from the API. The following lines handle them and set up
+        # the special call case outside of the normal program flow.
+        for key, value in kwargs.items():
+            if key == 'orig_switch':
+                switch = value
+            if key == 'line':
+                line = value
+            if key == 'timer':
+                self.timer = value
+                wait = value
 
-            # If the line comes from the API /call/{switch}/{line} then this line is temporary.
-            # This sets up special handling so that the status starts at "1", which will cause
-            # hangup() to hang up the call and delete the line when the call is done.
-            if self.is_api == True:
-                self.status = 1
-                self.api_indicator = "***"
+        # If the line comes from the API /call/{switch}/{line} then this line is temporary.
+        # This sets up special handling so that the status starts at "1", which will cause
+        # hangup() to hang up the call and delete the line when the call is done.
+        if self.is_api == True:
+            self.status = 1
+            self.api_indicator = "***"
 
-            # Set the vars to actually pass to call file
-            vars = {'waittime': wait}
+        # Set the vars to actually pass to call file
+        vars = {'waittime': wait}
 
         # Make the .call file amd throw it into the asterisk spool.
         # Pass control of the call to the sarah_callsim context in
@@ -179,6 +177,7 @@ class Line():
         con = Context('sarah_callsim','s','1')
         cf = CallFile(c, con)
         cf.spool()
+
 
     def hangup(self):
         """
@@ -209,18 +208,8 @@ class Line():
             if len(currentlines) <= 1:
                 self.switch.running = False
 
-        if args.d:                                  # Are we in deterministic mode?
-            if args.w:                              # args.w is wait time between calls
-                self.timer = args.w                 # Set length of the wait time before next call
-            else:
-                self.timer = 15                     # If no args.w defined, use default value.
-        else:
-            self.timer = self.switch.newtimer()     # Normal call timer if args.d not specified.
-
-        if args.l:                                  # If user specified a line
-            self.term = args.l                      # Set term line to user specified
-        else:
-            self.term = self.pick_called_line(term_choices)
+        self.timer = self.switch.newtimer()
+        self.term = self.pick_called_line(term_choices)
 
     def update(self, api):
         """ Used by the API PATCH method to update line parameters."""
@@ -296,23 +285,39 @@ class panel():
         return("{}".format(self.__class__.__name__))
 
     def newtimer(self):
-        """ Returns timer back to Line() object """
+        """
+        Returns timer back to Line() object. Checks to see
+        if arguments have been passed in at runtime. If so,
+            args.d:         Deterministic Mode
+            args.w:         User-specified wait time
+            args.v:         User-specified call volume
 
-        if __name__ == '__main__':
-            if args.v == 'light':
-                timer = int(round(random.gamma(20,8)))
-            elif args.v == 'heavy':
-                timer = int(round(random.gamma(5,7)))
-            else:
-                timer = int(round(random.gamma(4,14)))
+        If no args have been passed in (the more likely situation)
+        Then see if running as __main__ or as a module and act
+        accordingly.
+        """
 
-        if __name__ == 'panel_gen':
-            if self.api_volume == 'light':
-                timer = int(round(random.gamma(20,8)))
-            elif self.api_volume == 'heavy':
-                timer = int(round(random.gamma(5,7)))
+        if args.d:
+            if args.w:
+                self.timer = args.w
             else:
-                timer = int(round(random.gamma(4,14)))
+                self.timer = 15
+        else:
+            if __name__ == '__main__':
+                if args.v == 'light':
+                    timer = int(round(random.gamma(20,8)))
+                elif args.v == 'heavy':
+                    timer = int(round(random.gamma(5,7)))
+                else:
+                    timer = int(round(random.gamma(4,14)))
+
+            if __name__ == 'panel_gen':
+                if self.api_volume == 'light':
+                    timer = int(round(random.gamma(20,8)))
+                elif self.api_volume == 'heavy':
+                    timer = int(round(random.gamma(5,7)))
+                else:
+                    timer = int(round(random.gamma(4,14)))
 
         return timer
 
@@ -393,21 +398,31 @@ class xb1():
         return("{}('{}')".format(self.__class__.__name__, self.running))
 
     def newtimer(self):
-        if __name__ == '__main__':
-            if args.v == 'light':
-                timer = int(round(random.gamma(20,8)))
-            elif args.v == 'heavy':
-                timer = int(round(random.gamma(5,7)))
-            else:
-                timer = int(round(random.gamma(4,14)))
+        """
+        See similar function in panel() class for documentation.
+        """
 
-        if __name__ == 'panel_gen':
-            if self.api_volume == 'heavy':
-                timer = int(round(random.gamma(5,7)))
-            elif self.api_volume == 'light':
-                timer = int(round(random.gamma(20,8)))
+        if args.d:
+            if args.w:
+                self.timer = args.w
             else:
-                timer = int(round(random.gamma(4,14)))
+                self.timer = 15
+        else:
+            if __name__ == '__main__':
+                if args.v == 'light':
+                    timer = int(round(random.gamma(20,8)))
+                elif args.v == 'heavy':
+                    timer = int(round(random.gamma(5,7)))
+                else:
+                    timer = int(round(random.gamma(4,14)))
+
+            if __name__ == 'panel_gen':
+                if self.api_volume == 'heavy':
+                    timer = int(round(random.gamma(5,7)))
+                elif self.api_volume == 'light':
+                    timer = int(round(random.gamma(20,8)))
+                else:
+                    timer = int(round(random.gamma(4,14)))
 
         return timer
 
@@ -491,21 +506,31 @@ class xb5():
         return("{}('{}')".format(self.__class__.__name__, self.running))
 
     def newtimer(self):
-        if __name__ == '__main__':
-            if args.v == 'light':
-                timer = int(round(random.gamma(20,8)))
-            elif args.v == 'heavy':
-                timer = int(round(random.gamma(5,7)))
-            else:
-                timer = int(round(random.gamma(4,14)))
+        """
+        See similar function in panel() class for documentation.
+        """
 
-        if __name__ == 'panel_gen':
-            if self.api_volume == 'heavy':
-                timer = int(round(random.gamma(5,4)))
-            elif self.api_volume == 'light':
-                timer = int(round(random.gamma(20,8)))
+        if args.d:
+            if args.w:
+                self.timer = args.w
             else:
-                timer = int(round(random.gamma(4,14)))
+                self.timer = 15
+        else:
+            if __name__ == '__main__':
+                if args.v == 'light':
+                    timer = int(round(random.gamma(20,8)))
+                elif args.v == 'heavy':
+                    timer = int(round(random.gamma(5,7)))
+                else:
+                    timer = int(round(random.gamma(4,14)))
+
+            if __name__ == 'panel_gen':
+                if self.api_volume == 'heavy':
+                    timer = int(round(random.gamma(5,4)))
+                elif self.api_volume == 'light':
+                    timer = int(round(random.gamma(20,8)))
+                else:
+                    timer = int(round(random.gamma(4,14)))
 
         return timer
 
@@ -702,7 +727,8 @@ def make_switch(args):
 
 def make_lines(**kwargs):
     """
-    Takes several kwargs:
+    Takes several kwargs. Returns a bunch of lines.
+
     source:         the origin of the call to this function
     switch:         the switch where the lines will originate on
     orig_switch:    list of originating switches passed in from args
@@ -816,6 +842,7 @@ def get_info():
         ])
     return schema.dump(result)
 
+
 def api_start(**kwargs):
     """
     Creates new lines when started from API.
@@ -825,6 +852,7 @@ def api_start(**kwargs):
     source:     Used to log where the start request came from.
     switch:     Specifies which switch to start calls on.
     """
+
 
     global lines
     mode = kwargs.get('mode', '')
@@ -854,7 +882,7 @@ def api_start(**kwargs):
         elif instance.running == False:
             if mode == 'demo':
                 if instance == Rainier:
-                    new_lines = make_lines(switch=instance, numlines=4, source='api')
+                    new_lines = make_lines(switch=instance, numlines=5, source='api')
                 elif instance == Adams:
                     new_lines = make_lines(switch=instance, numlines=9, traffic_load='heavy',
                             source='api')
