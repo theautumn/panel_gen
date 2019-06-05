@@ -113,8 +113,17 @@ class Line():
             # that we're actually calling. If something's wrong, then assert false so it will get caught.
             # Whenever possible, these values should be defined in the switch class, and pulled from there.
             # This makes it so we can change these values more easily.
+
+            # >> Had to bodge this for now, because we have final selectors in the
+            # >> 4000-4499 and 5000-5999 group but nothing in the 4500-4999 group.
+            # >> We need to choose a hundreds range, and a units range and combine them
+            # >> instead of simply choosing a random int between 4000-5999.
             if term_office == 722 or term_office == 365:
-                term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
+                term_final = random.choice(Rainier.hundreds_range)
+                term_units = random.randint(0, 99)
+                term_station = int(str(term_final) + str(term_units).zfill(2))
+
+#                term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
             elif term_office == 832:
                 term_station = "%04d" % random.choice(Lakeview.line_range)
             elif term_office == 232:
@@ -280,6 +289,10 @@ class panel():
         self.trunk_load = [self.max_nxx1, self.max_nxx2,
                 self.max_nxx3, self.max_nxx4]
         self.line_range = [5000,5999]
+
+        self.hundreds_range = [40, 41, 42, 43, 44,
+                             50, 51, 52, 53, 54,
+                             55, 56, 57, 58, 59]
 
     def __repr__(self):
         return("{}".format(self.__class__.__name__))
@@ -500,7 +513,7 @@ class xb5():
         self.line_range = [1330,1435,9072,9073,1274,1485,1020,5852,
                 1003,6766,6564,1076,5018,1137,9138,1165,1309,9485,
                 9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,
-                4057,1055,1035,9267,1381,1470,9512,1663,9743,1841,1921]
+                4057,1055,1035,9267,1381,1470,9512,1663,1841,1921]
 
     def __repr__(self):
         return("{}('{}')".format(self.__class__.__name__, self.running))
@@ -586,7 +599,7 @@ class step():
 
     def __init__(self):
         self.kind = "Step"
-        self.line_range = [4124,4129]
+        self.line_range = [4124,4127]
 
 
 # +-----------------------------------------------+
