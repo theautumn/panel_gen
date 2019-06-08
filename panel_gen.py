@@ -110,20 +110,13 @@ class Line():
                 term_office = random.choice(term_choices)
 
             # Choose a sane number that appears on the line link or final frame of the switches
-            # that we're actually calling. If something's wrong, then assert false so it will get caught.
-            # Whenever possible, these values should be defined in the switch class, and pulled from there.
+            # that we're actually calling. If something's wrong, then assert false,
+            # so it will get caught.
+            # Whenever possible, these values should be defined in the switch class.
             # This makes it so we can change these values more easily.
 
-            # >> Had to bodge this for now, because we have final selectors in the
-            # >> 4000-4499 and 5000-5999 group but nothing in the 4500-4999 group.
-            # >> We need to choose a hundreds range, and a units range and combine them
-            # >> instead of simply choosing a random int between 4000-5999.
             if term_office == 722 or term_office == 365:
-                term_final = random.choice(Rainier.hundreds_range)
-                term_units = random.randint(0, 99)
-                term_station = int(str(term_final) + str(term_units).zfill(2))
-
-#                term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
+                term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
             elif term_office == 832:
                 term_station = "%04d" % random.choice(Lakeview.line_range)
             elif term_office == 232:
@@ -136,7 +129,7 @@ class Line():
 
 
             term = int(str(term_office) + str(term_station))
-        #logging.info('Terminating line selected: %s', term)
+        logging.debug('Terminating line selected: %s', term)
         return term
 
     def call(self, **kwargs):
@@ -288,11 +281,7 @@ class panel():
         self.nxx = [722, 365, 232, 832]
         self.trunk_load = [self.max_nxx1, self.max_nxx2,
                 self.max_nxx3, self.max_nxx4]
-        self.line_range = [5000,5999]
-
-        self.hundreds_range = [40, 41, 42, 43, 44,
-                             50, 51, 52, 53, 54,
-                             55, 56, 57, 58, 59]
+        self.line_range = [4000,5999]
 
     def __repr__(self):
         return("{}".format(self.__class__.__name__))
