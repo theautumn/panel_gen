@@ -39,10 +39,10 @@ class Line():
     self.timer:         Starts with a standard random.gamma, then gets set
                         subsequently by the call volume attribute of the switch.
     self.ident:         Integer starting with 0 that identifies the line.
-    self.chan:          DAHDI channel. We get this from asterisk.ami once the call
+    self.chan:          DAHDI channel. We get this from asterisk.ami once call
                         is in progress. See on_DialBegin()
-    self.ast_status:    Returned from AMI. Indicates status of line from Asterisk's
-                        perspective.
+    self.ast_status:    Returned from AMI. Indicates status of line from
+                        Asterisk's perspective.
     self.is_api:        Used to identify an API one-shot line in the console
                         interface.
     self.api_indicator: See above. Is set to "***" if a line is a temp API line.
@@ -109,9 +109,9 @@ class Line():
             else:
                 term_office = random.choice(term_choices)
 
-            # Choose a sane number that appears on the line link or final frame of the switches
-            # that we're actually calling. If something's wrong, then assert false,
-            # so it will get caught.
+            # Choose a sane number that appears on the line link or final
+            # frame of the switches that we're actually calling. If something's
+            # wrong, then assert false, so it will get caught.
             # Whenever possible, these values should be defined in the switch class.
             # This makes it so we can change these values more easily.
 
@@ -150,8 +150,8 @@ class Line():
         # Wait value to pass to Asterisk dialplan if not using API to start call
         wait = self.timer + 15
 
-        # The kwargs come in from the API. The following lines handle them and set up
-        # the special call case outside of the normal program flow.
+        # The kwargs come in from the API. The following lines handle them
+        # and set up the special call case outside of the normal program flow.
         for key, value in kwargs.items():
             if key == 'orig_switch':
                 switch = value
@@ -161,9 +161,10 @@ class Line():
                 self.timer = value
                 wait = value
 
-        # If the line comes from the API /call/{switch}/{line} then this line is temporary.
-        # This sets up special handling so that the status starts at "1", which will cause
-        # hangup() to hang up the call and delete the line when the call is done.
+        # If the line comes from the API /call/{switch}/{line} then this
+        # line is temporary. This sets up special handling so that the status
+        # starts at "1", which will cause hangup() to hang up the call and
+        # delete the line when the call is done.
         if self.is_api == True:
             self.status = 1
             self.api_indicator = "***"
@@ -677,7 +678,7 @@ def parse_args():
     make_switch(args)
 
 def make_switch(args):
-    """ Instantiate some switches. This is so we can ask to get their parameters later."""
+    """ Instantiate some switches so we can work with them later."""
 
     global Rainier
     global Adams
@@ -1423,6 +1424,9 @@ def app_shutdown(signum, frame):
     raise ServiceExit
 
 def module_shutdown():
+
+    logging.info("--Exited due to service shutdown--")
+
     try:
         t.shutdown_flag.set()
         t.join()
@@ -1430,8 +1434,6 @@ def module_shutdown():
         pass
     w.shutdown_flag.set()
     w.join()
-
-    logging.warning("Exited due to service shutdown")
 
     # Hang up and clean up spool.
     system("asterisk -rx \"channel request hangup all\"")
@@ -1461,11 +1463,13 @@ if __name__ == "__main__":
     try:
         with open('/var/log/panel_gen/calls.log', 'a') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-            filename='/var/log/panel_gen/calls.log',level=logging.DEBUG, datefmt='%m/%d/%Y %I:%M:%S %p')
+            filename='/var/log/panel_gen/calls.log',level=logging.DEBUG,
+            datefmt='%m/%d/%Y %I:%M:%S %p')
     except IOError:
         with open('/var/log/panel_gen/calls.log', 'w') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-            filename='/var/log/panel_gen/calls.log',level=logging.DEBUG, datefmt='%m/%d/%Y %I:%M:%S %p')
+            filename='/var/log/panel_gen/calls.log',level=logging.DEBUG,
+            datefmt='%m/%d/%Y %I:%M:%S %p')
 
     logging.info('Originating calls on %s', orig_switch)
 
@@ -1499,25 +1503,8 @@ if __name__ == "__main__":
     except (KeyboardInterrupt, ServiceExit):
         # Exception handler for console-based shutdown.
 
-        t.shutdown_flag.set()
-        t.join()
-        w.shutdown_flag.set()
-        w.join()
-
         logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
-
-        # Hang up and clean up spool.
-        system("asterisk -rx \"channel request hangup all\"")
-        system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-
-        # Clean exit from logging.
-        logging.shutdown()
-
-        # Log out of AMI
-        client.logoff()
-
-        print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
-        print("Thank you for playing Wing Commander!\n\n")
+        module_shutdown()
 
     except Exception as e:
         # Exception for any other errors that I'm not explicitly handling.
@@ -1547,11 +1534,13 @@ if __name__ == "panel_gen":
     try:
         with open('/var/log/panel_gen/calls.log', 'a') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+            filename='/var/log/panel_gen/calls.log',level=logging.INFO,
+            datefmt='%m/%d/%Y %I:%M:%S %p')
     except IOError:
         with open('/var/log/panel_gen/calls.log', 'w') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-            filename='/var/log/panel_gen/calls.log',level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+            filename='/var/log/panel_gen/calls.log',level=logging.INFO,
+            datefmt='%m/%d/%Y %I:%M:%S %p')
 
     lines = []
     logging.info('Starting panel_gen as thread from http_server')
@@ -1565,24 +1554,4 @@ if __name__ == "panel_gen":
 
     except Exception:
         # Exception handler for any exception
-
-        t.shutdown_flag.set()
-        t.join()
-        w.shutdown_flag.set()
-        w.join()
-
-        logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
-
-        # Hang up and clean up spool.
-        system("asterisk -rx \"channel request hangup all\"")
-        system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-
-        # Clean exit for logging
-        logging.shutdown()
-
-        # Log out of AMI
-        client.logoff()
-
-        print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
-        print("Thank you for playing Wing Commander!\n\n")
-
+        module_shutdown()
