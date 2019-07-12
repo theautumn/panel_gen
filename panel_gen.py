@@ -86,7 +86,8 @@ class Line():
                     self.status = 1
                 else:
                     self.timer = int(round(random.gamma(5,5)))
-                    logging.warning("Exceeded sender limit: %s with %s calls dialing. Delaying call.",
+                    logging.warning("Exceeded sender limit: %s with %s calls " +
+                    "dialing. Delaying call.",
                             self.switch.max_dialing, self.switch.is_dialing)
             elif self.status == 1:
                 self.hangup()
@@ -219,7 +220,8 @@ class Line():
 
         for (key, value) in api.items():
             if key == 'switch':
-                # Would this even work? Can you change a switch without breaking it?
+                # Would this even work? Can you change a switch
+                # without breaking it?
                 if value == 'panel':
                     self.switch = Rainier
                 if value == '5xb':
@@ -230,7 +232,8 @@ class Line():
                 # Change the current timer of the line.
                 self.timer = value
             if key == 'dahdi_chan':
-                # Change which channel a line belongs to. Also might break everything.
+                # Change which channel a line belongs to.
+                # Also might break everything.
                 self.chan = value
             if key == 'called_no':
                 self.term = value
@@ -263,7 +266,7 @@ class panel():
     def __init__(self):
         self.kind = "panel"
         self.running = False
-        self.max_dialing = 6
+        self.max_dialing = 5
         self.is_dialing = 0
         self.dahdi_group = "r6"
         self.api_volume = ""
@@ -365,7 +368,7 @@ class panel():
                     self.api_volume = value
 
         except Exception as e:
-            logging.error(e)
+            logging.exception()
             return False
 
         return True
@@ -470,7 +473,7 @@ class xb1():
                     self.api_volume = value
 
         except Exception as e:
-            logging.error(e)
+            logging.exception()
             return False
 
         return True
@@ -578,7 +581,7 @@ class xb5():
                     self.api_volume = value
 
         except Exception as e:
-            logging.error(e)
+            logging.exception()
             return False
 
         return True
@@ -958,7 +961,7 @@ def api_stop(**kwargs):
                 i.hangup()
 
     except Exception as e:
-        logging.info(e)
+        logging.exception("Exception thrown while stopping calls.")
         return False
 
     return get_info()
@@ -1242,7 +1245,8 @@ class Screen():
                 del lines[0]
 
     def update_size(self, stdscr, y, x):
-        # This gets called if the screen is resized. Makes it happy so exceptions don't get thrown.
+        # This gets called if the screen is resized. Makes it happy so
+        # exceptions don't get thrown.
 
         self.stdscr.clear()
         curses.resizeterm(y, x)
@@ -1283,14 +1287,16 @@ class Screen():
 
     def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
-        table = [[n.kind, n.chan, n.term, n.timer, n.status, n.ast_status, n.api_indicator] for n in lines]
+        table = [[n.kind, n.chan, n.term, n.timer,
+                n.status, n.ast_status, n.api_indicator] for n in lines]
         stdscr.erase()
         stdscr.addstr(0,5," __________________________________________")
         stdscr.addstr(1,5,"|                                          |")
         stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
         stdscr.addstr(3,5,"|__________________________________________|")
-        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term", "tick", "state", "asterisk", "api"],
-            tablefmt="pipe", stralign = "right" ))
+        stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term",
+                    "tick", "state", "asterisk", "api"],
+                    tablefmt="pipe", stralign = "right" ))
 
         # Print asterisk channels below the table so we can see what its actually doing.
         if y > 35:
@@ -1423,9 +1429,17 @@ class ServiceExit(Exception):
 def app_shutdown(signum, frame):
     raise ServiceExit
 
-def module_shutdown():
+def module_shutdown(service_killed):
+    """
+    Attempts to cleanly exit panel_gen, either from __main__
+    or when called from http_server.py.
 
-    logging.info("--Exited due to service shutdown--")
+    service_killed:   BOOLEAN   True if running as service
+                                False if running as main
+    """
+
+    if service_killed == True:
+        logging.info("--Exited due to service shutdown--")
 
     try:
         t.shutdown_flag.set()
@@ -1504,7 +1518,8 @@ if __name__ == "__main__":
         # Exception handler for console-based shutdown.
 
         logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
-        module_shutdown()
+        service_killed= False
+        module_shutdown(service_killed)
 
     except Exception as e:
         # Exception for any other errors that I'm not explicitly handling.
@@ -1515,8 +1530,7 @@ if __name__ == "__main__":
         w.join()
 
         print("\nOS error {0}".format(e))
-        logging.error('**** OS Error ****')
-        logging.error('{0}'.format(e))
+        logging.exception('**** OS Error ****')
 
 if __name__ == "panel_gen":
     # The below gets run if this code is imported as a module.
@@ -1554,4 +1568,6 @@ if __name__ == "panel_gen":
 
     except Exception:
         # Exception handler for any exception
-        module_shutdown()
+        logging.exception("Exception thrown in main try loop.")
+        service_killed = True
+        module_shutdown(service_killed)
