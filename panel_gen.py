@@ -19,6 +19,7 @@ import logging
 import curses
 import re
 import threading
+from datetime import datetime
 from marshmallow import Schema, fields
 from tabulate import tabulate
 from numpy import random
@@ -852,11 +853,17 @@ def get_info():
 def api_start(**kwargs):
     """
     Creates new lines when started from API.
-    switch: Generic switch type to create lines on.
+
+    - Checks to see if work thread is running
+    - Assigns generic switch type to instantiated name
+    - Checks to see if the switch is already running
+    - A special case is created for Sunday. See further notes
+    below.
 
     mode:       'demo' or ''. Demo mode will start with preset params.
     source:     Used to log where the start request came from.
     switch:     Specifies which switch to start calls on.
+
     """
 
 
@@ -890,13 +897,23 @@ def api_start(**kwargs):
                 if instance == Rainier:
                     new_lines = make_lines(switch=instance, numlines=5, source='api')
                 elif instance == Adams:
+                    
+                    # Carve out a special case for Sundays. This was requested
+                    # by museum volunteers so that we can give tours of the
+                    # step and 1XB without interruption by the this program.
+                    # This will only be effective if the key is operated.
+                    # Will have no impact when using web app.
+                    if datetime.today().weekday() == 6:
+                        if source == 'key':
+                            Adams.nxx = [232, 722]
+                            Adams.trunk_load = [.7, .3]
+                            logging.info("Its Sunday!")
                     new_lines = make_lines(switch=instance, numlines=9, traffic_load='heavy',
                             source='api')
                     Adams.api_volume = 'heavy'
                 elif instance == Lakeview:
                     new_lines = make_lines(switch=instance, numlines=2, source='api')
             elif mode != 'demo':
-                #                new_lines = make_lines(switch=instance, source='main')
                 new_lines = [Line(n, instance) for n in range(instance.max_calls)]
             for l in new_lines:
                 lines.append(l)

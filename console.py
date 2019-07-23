@@ -294,6 +294,7 @@ if __name__ == "__main__":
     lines = []
     server_up = False
     museum_up = False
+    failcount = 0
 
     try:
         logger = logging.getLogger(__name__)
