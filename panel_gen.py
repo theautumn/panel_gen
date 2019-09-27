@@ -221,14 +221,19 @@ class Line():
 
         for (key, value) in api.items():
             if key == 'switch':
-                # Would this even work? Can you change a switch
-                # without breaking it?
+               # 1XB doesn't work for some reason
+               # also this needs to validate and return a 406 on failure
                 if value == 'panel':
                     self.switch = Rainier
+                    self.kind = 'panel'
                 if value == '5xb':
                     self.switch = Adams
+                    self.kind = '5xb'
                 if value == '1xb':
                     self.switch = Lakeivew
+                    self.kind = '1xb'
+                else:
+                    return False
             if key == 'timer':
                 # Change the current timer of the line.
                 self.timer = value
@@ -279,10 +284,10 @@ class panel():
         else:
             self.max_calls = 4
 
-        self.max_nxx1 = .6
-        self.max_nxx2 = .2
-        self.max_nxx3 = .1
-        self.max_nxx4 = .1
+        self.max_nxx1 = .5
+        self.max_nxx2 = .3
+        self.max_nxx3 = .2
+        self.max_nxx4 = .0
         self.nxx = [722, 365, 232, 832]
         self.trunk_load = [self.max_nxx1, self.max_nxx2,
                 self.max_nxx3, self.max_nxx4]
@@ -328,51 +333,6 @@ class panel():
 
         return timer
 
-    def update(self, api):
-        """ Used by the API PATCH method to update switch parameters."""
-
-        try:
-            for (key, value) in api["switch"].items():
-                if key == 'line_range':
-                    if value in range(1000, 9999):
-                        # Line range must be a tuple from 1000-9999
-                        self.line_range = value
-                if key == 'nxx':
-                    # nxx must be 3 digits, matching codes we can dial
-                    # number of values in nxx must also match trunk_load
-                    for i in value:
-                        self.nxx = value
-                if key == 'running':
-                    # Can be used to start and stop a particular switch.
-                    # This feature is not yet implemented fully.
-                    self.running = value
-                if key == 'max_dialing':
-                    # Must be <= 10
-                    if value >=10:
-                        return "Fail: bad_max"
-                    else:
-                        self.max_dialing = value
-                if key == 'max_calls':
-                    # Must be <= 10
-                    if value >= 10:
-                        return "Fail: must be less than 10 max dialing"
-                    else:
-                        self.max_calls = value
-                if key == 'dahdi_group':
-                    # Must be a group that we have hooked in to panel_gen
-                    self.dahdi_group = value
-                if key == 'trunk_load':
-                    # Total of all values must add up to 1
-                    # Number of values must equal number of NXXs
-                    self.trunk_load = value
-                if key == 'traffic_load':
-                    self.api_volume = value
-
-        except Exception as e:
-            logging.exception()
-            return False
-
-        return True
 
 class xb1():
     # This class is for the No. 1 Crossbar.
@@ -433,51 +393,6 @@ class xb1():
 
         return timer
 
-    def update(self, api):
-        # Used by the API PATCH method to update switch parameters.
-
-        try:
-            for (key, value) in api["switch"].items():
-                if key == 'line_range':
-                    if value in range(1000, 9999):
-                        # Line range must be a tuple from 1000-9999
-                        self.line_range = value
-                if key == 'nxx':
-                    # nxx must be 3 digits, matching codes we can dial
-                    # number of values in nxx must also match trunk_load
-                    for i in value:
-                        self.nxx = value
-                if key == 'running':
-                    # Can be used to start and stop a particular switch.
-                    # This feature is not yet implemented fully.
-                    self.running = value
-                if key == 'max_dialing':
-                    # Must be <= 10
-                    if value >=10:
-                        return "Fail: bad_max"
-                    else:
-                        self.max_dialing = value
-                if key == 'max_calls':
-                    # Must be <= 10
-                    if value >= 10:
-                        return "Fail: must be less than 10 max dialing"
-                    else:
-                        self.max_calls = value
-                if key == 'dahdi_group':
-                    # Must be a group that we have hooked in to panel_gen
-                    self.dahdi_group = value
-                if key == 'trunk_load':
-                    # Total of all values must add up to 1
-                    # Number of values must equal number of NXXs
-                    self.trunk_load = value
-                if key == 'traffic_load':
-                    self.api_volume = value
-
-        except Exception as e:
-            logging.exception()
-            return False
-
-        return True
 
 class xb5():
     # This class is for the No. 5 Crossbar.
@@ -541,51 +456,6 @@ class xb5():
 
         return timer
 
-    def update(self, api):
-        # Used by the API PATCH method to update switch parameters.
-
-        try:
-            for (key, value) in api["switch"].items():
-                if key == 'line_range':
-                    if value in range(1000, 9999):
-                        # Line range must be a tuple from 1000-9999
-                        self.line_range = value
-                if key == 'nxx':
-                    # nxx must be 3 digits, matching codes we can dial
-                    # number of values in nxx must also match trunk_load
-                    for i in value:
-                        self.nxx = value
-                if key == 'running':
-                    # Can be used to start and stop a particular switch.
-                    # This feature is not yet implemented fully.
-                    self.running = value
-                if key == 'max_dialing':
-                    # Must be <= 10
-                    if value >=10:
-                        return "Fail: bad_max"
-                    else:
-                        self.max_dialing = value
-                if key == 'max_calls':
-                    # Must be <= 10
-                    if value >= 10:
-                        return "Fail: must be less than 10 max dialing"
-                    else:
-                        self.max_calls = value
-                if key == 'dahdi_group':
-                    # Must be a group that we have hooked in to panel_gen
-                    self.dahdi_group = value
-                if key == 'trunk_load':
-                    # Total of all values must add up to 1
-                    # Number of values must equal number of NXXs
-                    self.trunk_load = value
-                if key == 'traffic_load':
-                    self.api_volume = value
-
-        except Exception as e:
-            logging.exception()
-            return False
-
-        return True
 
 class step():
     # This class is for the SxS office. It's very minimal, as we are not currently
@@ -1141,14 +1011,13 @@ def get_switch(kind):
 
     schema = SwitchSchema()
     result = []
-    for n in orig_switch:
-        if kind == n.kind:
-            if n.kind == 'panel':
-                result.append(schema.dump(Rainier))
-            if n.kind == '5xb':
-                result.append(schema.dump(Adams))
-            if n.kind == '1xb':
-                result.append(schema.dump(Lakeview))
+
+    if kind == 'panel':
+        result.append(schema.dump(Rainier))
+    if kind == '5xb':
+        result.append(schema.dump(Adams))
+    if kind == '1xb':
+        result.append(schema.dump(Lakeview))
 
     if result == []:
         return False
@@ -1156,6 +1025,7 @@ def get_switch(kind):
         return result
 
 def create_switch(kind):
+
     if 'panel' not in orig_switch:
         if kind == 'panel':
             orig_switch.append(Rainier)
@@ -1165,12 +1035,15 @@ def create_switch(kind):
     if '1xb' not in orig_switch:
         if kind == '1xb':
             orig_switch.append(Lakeview)
+    
     if orig_switch != []:
         return orig_switch
     else:
         return False
 
 def update_switch(**kwargs):
+    # Not used at the moment. Broken.
+
     schema = SwitchSchema()
 
     # Pull the switch type out of the dict the API passed in.
@@ -1193,7 +1066,7 @@ def update_switch(**kwargs):
     # Wipe out the top parameter, because I said so
     del parameters['kind']
     result = schema.load(parameters)
-    outcome = switch.update(result)
+    logging.info(result)
 
     return schema.dump(switch)
 
