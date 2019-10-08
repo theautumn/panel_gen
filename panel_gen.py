@@ -154,7 +154,7 @@ class Line():
 
         # The kwargs come in from the API. The following lines handle them
         # and set up the special call case outside of the normal program flow.
-        for key, value in kwargs.items():
+        for key, value in list(kwargs.items()):
             if key == 'orig_switch':
                 switch = value
             if key == 'line':
@@ -219,7 +219,7 @@ class Line():
     def update(self, api):
         """ Used by the API PATCH method to update line parameters."""
 
-        for (key, value) in api.items():
+        for (key, value) in list(api.items()):
             if key == 'switch':
                # 1XB doesn't work for some reason
                # also this needs to validate and return a 406 on failure
@@ -644,7 +644,7 @@ def start_ui():
         t.daemon = True
         t.start()
     except Exception as e:
-        print e
+        print(e)
 
 # +----------------------------------------------------+
 # |                                                    |
@@ -1419,7 +1419,7 @@ if __name__ == "__main__":
         w.shutdown_flag.set()
         w.join()
 
-        print("\nOS error {0}".format(e))
+        print(("\nOS error {0}".format(e)))
         logging.exception('**** OS Error ****')
 
 if __name__ == "panel_gen":

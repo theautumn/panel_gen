@@ -264,7 +264,7 @@ class museum_thread(threading.Thread):
                     schema = MuseumSchema()
                     result = schema.loads(r.content)
                     museum = result[0]
-                    for k,v in museum.iteritems():
+                    for k,v in museum.items():
                         museum_up = v
                     if museum_pstate != museum_up:
                         logger.warning("Museum state changed from %s to %s",
