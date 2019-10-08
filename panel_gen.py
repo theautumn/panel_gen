@@ -649,12 +649,13 @@ def start_ui():
 # +----------------------------------------------------+
 # |                                                    |
 # | The following chunk of code is for the             |
-# | panel_gen API, currently run from http_server.py   |
+# | panel_gen API, run from http_server.py             |
 # | The http server starts Flask, Connexion, which     |
 # | reads the API from swagger.yml, and executes HTTP  |
-# | requests using the code in switch.py and line.py   |
+# | requests using the code in switch.py, line.py and  |
+# | app.py.                                            |
 # |                                                    |
-# | These functions return values to those two .py's   |
+# | These functions return values to those .py's       |
 # | when panel_gen is imported as a module.            |
 # |                                                    |
 # +----------------------------------------------------+
@@ -736,7 +737,6 @@ def api_start(**kwargs):
 
     """
 
-
     global lines
     mode = kwargs.get('mode', '')
     source = kwargs.get('source', '')
@@ -777,9 +777,9 @@ def api_start(**kwargs):
                         if source == 'key':
                             Adams.nxx = [232, 722]
                             Adams.trunk_load = [.7, .3]
-                            logging.info("Its Sunday!")
-                    new_lines = make_lines(switch=instance, numlines=9, traffic_load='heavy',
-                            source='api')
+                            logging.info('Its Sunday!')
+                    new_lines = make_lines(switch=instance, numlines=9,
+                                traffic_load='heavy', source='api')
                     Adams.api_volume = 'heavy'
                 elif instance == Lakeview:
                     new_lines = make_lines(switch=instance, numlines=2, source='api')
@@ -788,7 +788,7 @@ def api_start(**kwargs):
             for l in new_lines:
                 lines.append(l)
             instance.running = True
-            logging.info("Appending %s lines to %s", len(new_lines), switch)
+            logging.info('Appending %s lines to %s', len(new_lines), switch)
 
         try:
             new_lines

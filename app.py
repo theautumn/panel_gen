@@ -24,11 +24,13 @@ def start(**kwargs):
                 Also returns JSON formatted switch status message.
     Failure:    Returns 406
     If launched from web browser at http://0.0.0.0:5000, returns 303
-    redirect back to same page with no status message.
+    redirect back to same page with no status message. This is so the
+    smartphone browser app will refresh the same page. It's an ugly hack
+    but it works.
 
     **kwargs allow the POST to be parsed for specifics
     switch:     In URI path, Can be "1xb", "5xb", "panel"
-    mode:       In URI query string. Can be "demo", empty.
+    mode:       In URI query string. Can be "demo", <empty>.
     source:     In URI query string. "web", "dark", "key"
     """
     switch = kwargs.get("switch", "")
