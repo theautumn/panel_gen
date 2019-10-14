@@ -93,9 +93,12 @@ While running as a standalone application, there are a few magic keys you can us
 
 HTTP Server
 -----------
-There is a simple, insecure HTTP server provided in http-server.py which serves up a basic web page so panel_gen can be executed via a volunteer's smartphone. This should not be available to everybody, as there are no security or sanity checks, and there's probably a thousand ways to break it. I keep it limited to a secure network so only those with the WPA key can access it. The actual server is [Flask](https://github.com/pallets/flask), and the CSS framework is [Skeleton](https://github.com/dhg/Skeleton).
+There is a simple, insecure HTTP server provided in `http-server.py` which serves up a basic web page so panel_gen can be executed via a volunteer's smartphone. This should not be available to everybody, as there are no security or sanity checks, and there's probably a thousand ways to break it. I keep it limited to a secure network so only those with the WPA key can access it. The actual server is [Flask](https://github.com/pallets/flask), and the CSS framework is [Skeleton](https://github.com/dhg/Skeleton). The smartphone interface pretends to be an app, but its really just a browser with a web page. It looks something like this:
+<p align="center">
+  <img src="samples/IMG_0588.png">
+</p>
 
-This app also provides an API via `http_server.py`! You can find basic documentation [here](https://github.com/theautumn/panel_gen/wiki/API), and at some point soon, I will write something more complete. Use at your own risk :)
+Panel_gen also provides an API via `http_server.py`! I launch this as a system service in Debian, which keeps it running 24/7. The API can be used to control the behavior of panel_gen externally, either using the aforementioned smartphone, or a key and lamp. You can poke the API with Postman, or with http://127.0.0.1/api/ui. We mostly use it to start and stop the demo during tours with a key and lamp discreetly mounted in our switches. See https://github.com/theautumn/tinyrobot for the code for that.
 
 Examples
 -------
@@ -112,3 +115,5 @@ There are several different arguments you can use when running the program. Wher
 Caveats
 -------
 This program is designed to control a 100 year old, motor-driven analog switch. The fact that it has so many moving parts means that what looks good on paper is not always the way it behaves in real life. This is especially true when it comes to timing and control. Asterisk has no way of knowing what the switch is doing, outside of the normal subscriber supervision (on hook/off hook). The switch may return various call progress tones back to the caller, but there is currently no easy way for those tones to be recognized and acted upon. Because of this, I've tried to make sanity a priority, so the program should rarely--if ever--do things that the switches can't handle. I've also taken steps to make sure that the program won't "desync" from what Asterisk and the electromechanical switches are actually doing in real life. This element is a constant work in progress, as I discover more and more subtle bugs.
+
+Secondly, this program is currently only compatible with Python 2.75. I've tried to convert to 3, but its just too much hassle. Sorry about that.
