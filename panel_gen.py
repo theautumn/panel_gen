@@ -848,7 +848,7 @@ def api_stop(**kwargs):
                 i.hangup()
 
         # Delete all remaining files in spool.
-        os.remove("/var/spool/asterisk/outgoing/*")
+        system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
 
     except Exception as e:
         logging.exception("Exception thrown while stopping calls.")
