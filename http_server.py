@@ -54,9 +54,9 @@ server = WSGIServer(('0.0.0.0', 5000), d)
 
 if __name__ == '__main__':
     try:
-	server.start()
+        server.start()
     except KeyboardInterrupt:
-	server.stop()
+        server.stop()
     finally:
         service_exit = True
         panel_gen.module_shutdown(service_exit)

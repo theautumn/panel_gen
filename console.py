@@ -124,11 +124,11 @@ class Screen():
         # Output handling. make pretty things.
         table = [[n.ident, n.kind, n.chan, n.term, n.timer, n.status, n.ast_status] for n in lines]
         stdscr.erase()
-        stdscr.addstr(0,5," __________________________________________")
-        stdscr.addstr(1,5,"|                                          |")
-        stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
-        stdscr.addstr(3,5,"|__________________________________________|")
-        stdscr.addstr(6,0,tabulate(table, headers=["ident", "switch", "channel", "term",
+        stdscr.addstr(0, 5, " __________________________________________")
+        stdscr.addstr(1, 5, "|                                          |")
+        stdscr.addstr(2, 5, "|  Rainier Full Mechanical Call Simulator  |")
+        stdscr.addstr(3, 5, "|__________________________________________|")
+        stdscr.addstr(6, 0, tabulate(table, headers=["ident", "switch", "channel", "term",
             "tick", "state", "asterisk"],
             tablefmt="pipe", stralign = "right" ))
 
@@ -136,8 +136,8 @@ class Screen():
         if y > 45:
             try:
                 logs = subprocess.check_output(['tail', '-n', '15', '/var/log/panel_gen/calls.log'])
-                stdscr.addstr(32,5,'================= Logs =================')
-                stdscr.addstr(34,0,logs)
+                stdscr.addstr(32, 5, '================= Logs =================')
+                stdscr.addstr(34, 0, logs)
             except Exception as e:
                 pass
 
@@ -149,19 +149,19 @@ class Screen():
 
         statusbar = self.stdscr.subwin(rows, cols, x_start_row, y_start_col)
         statusbar.bkgd(' ', curses.color_pair(1))
-        statusbar.addstr(0,0,"ctrl + c: quit", curses.A_BOLD)
-        statusbar.addstr(0,x/4,"Museum status:", curses.A_BOLD)
+        statusbar.addstr(0, 0, "ctrl + c: quit", curses.A_BOLD)
+        statusbar.addstr(0, x/4, "Museum status:", curses.A_BOLD)
         if museum_up == True:
-            statusbar.addstr(0,x/4+15,"ONLINE", curses.color_pair(3))
+            statusbar.addstr(0, x/4+15, "ONLINE", curses.color_pair(3))
         else:
-            statusbar.addstr(0,x/4+15,"OFFLINE", curses.color_pair(2))
-        statusbar.addstr(0,x/2,"Server status:", curses.A_BOLD)
+            statusbar.addstr(0, x/4+15, "OFFLINE", curses.color_pair(2))
+        statusbar.addstr(0, x/2, "Server status:", curses.A_BOLD)
         if server_up == True:
-            statusbar.addstr(0,x/2+15,"ONLINE", curses.color_pair(3))
+            statusbar.addstr(0, x/2+15, "ONLINE", curses.color_pair(3))
         else:
-            statusbar.addstr(0,x/2+15,"OFFLINE", curses.color_pair(2))
-        statusbar.addstr(0,x-15,"Lines:",curses.A_BOLD)
-        statusbar.addstr(0,x-8, str(len(lines)),curses.A_BOLD)
+            statusbar.addstr(0, x/2+15, "OFFLINE", curses.color_pair(2))
+        statusbar.addstr(0, x-15, "Lines:", curses.A_BOLD)
+        statusbar.addstr(0, x-8, str(len(lines)), curses.A_BOLD)
 
         # Refresh the screen.
         stdscr.refresh()
@@ -228,7 +228,7 @@ class work_thread(threading.Thread):
             try:
                 r = requests.get(APISERVER, timeout=.5)
                 schema = LineSchema()
-                result = schema.loads(r.content,  many=True)
+                result = schema.loads(r.content.decode('utf-8'),  many=True)
                 lines = result[0]
                 server_up = True
                 failcount = 0
@@ -264,7 +264,7 @@ class museum_thread(threading.Thread):
                     schema = MuseumSchema()
                     result = schema.loads(r.content)
                     museum = result[0]
-                    for k,v in museum.items():
+                    for k, v in list(museum.items()):
                         museum_up = v
                     if museum_pstate != museum_up:
                         logger.warning("Museum state changed from %s to %s",

@@ -285,9 +285,9 @@ class panel():
             self.max_calls = 4
 
         self.max_nxx1 = .5
-        self.max_nxx2 = .3
+        self.max_nxx2 = .2
         self.max_nxx3 = .2
-        self.max_nxx4 = .0
+        self.max_nxx4 = .1
         self.nxx = [722, 365, 232, 832]
         self.trunk_load = [self.max_nxx1, self.max_nxx2,
                 self.max_nxx3, self.max_nxx4]
@@ -442,7 +442,7 @@ class xb5():
                 if args.v == 'light':
                     timer = int(round(random.gamma(20,8)))
                 elif args.v == 'heavy':
-                    timer = int(round(random.gamma(5,7)))
+                    timer = int(round(random.gamma(6,7)))
                 else:
                     timer = int(round(random.gamma(4,14)))
 
@@ -846,6 +846,9 @@ def api_stop(**kwargs):
 
             for i in deadlines:
                 i.hangup()
+
+        # Delete all remaining files in spool.
+        os.remove("/var/spool/asterisk/outgoing/*")
 
     except Exception as e:
         logging.exception("Exception thrown while stopping calls.")
