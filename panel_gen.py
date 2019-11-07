@@ -473,7 +473,7 @@ class ess():
     def __init__(self):
         self.kind = "3ess"
         self.running = False
-        self.max_dialing = 10
+        self.max_dialing = 4
         self.is_dialing = 0
         self.dahdi_group = "r12"
         self.api_volume = ""
