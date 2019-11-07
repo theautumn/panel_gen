@@ -466,6 +466,65 @@ class step():
         self.line_range = [4124,4127]
 
 
+class ess():
+    # This class is for the 3ESS.
+    # For a description of these line, see the panel class, above.
+
+    def __init__(self):
+        self.kind = "3ess"
+        self.running = False
+        self.max_dialing = 10
+        self.is_dialing = 0
+        self.dahdi_group = "r12"
+        self.api_volume = ""
+
+        if args.d:
+            self.max_calls = 1
+        elif args.a:
+            self.max_calls = args.a
+        else:
+            self.max_calls = 10
+
+        self.max_nxx1 = .6
+        self.max_nxx2 = .1
+        self.max_nxx3 = .2
+        self.max_nxx4 = .1
+        self.nxx = [830, 832, 232, 275]
+        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
+        self.line_range = [4900,5900] 
+
+    def __repr__(self):
+        return("{}('{}')".format(self.__class__.__name__, self.running))
+
+    def newtimer(self):
+        """
+        See similar function in panel() class for documentation.
+        """
+
+        if args.d:
+            if args.w:
+                self.timer = args.w
+            else:
+                self.timer = 15
+        else:
+            if __name__ == '__main__':
+                if args.v == 'light':
+                    timer = int(round(random.gamma(20,8)))
+                elif args.v == 'heavy':
+                    timer = int(round(random.gamma(6,7)))
+                else:
+                    timer = int(round(random.gamma(4,14)))
+
+            if __name__ == 'panel_gen':
+                if self.api_volume == 'heavy':
+                    timer = int(round(random.gamma(5,4)))
+                elif self.api_volume == 'light':
+                    timer = int(round(random.gamma(20,8)))
+                else:
+                    timer = int(round(random.gamma(4,14)))
+
+        return timer
+
 # +-----------------------------------------------+
 # |                                               |
 # | # <----- BEGIN BOOKKEEPING STUFF -----> #     |
