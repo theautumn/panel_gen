@@ -870,6 +870,9 @@ def api_stop(**kwargs):
 
             system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
 
+            # Delete all remaining files in spool.
+            system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+
         else:
             deadlines = [l for l in lines if l.kind == switch]
             lines = [l for l in lines if l.kind != switch]
@@ -879,32 +882,11 @@ def api_stop(**kwargs):
             for i in deadlines:
                 i.hangup()
 
-        # Delete all remaining files in spool.
-        system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-
     except Exception as e:
         logging.exception("Exception thrown while stopping calls.")
         return False
 
     return get_info()
-
-def api_pause():
-    # Not used at the moment. Broken.
-
-    if w.paused == False:
-        w.pause()
-        return get_info()
-    else:
-        return False
-
-def api_resume():
-    # Not used at the moment. Broken.
-
-    if w.paused == True:
-        w.resume()
-        return get_info()
-    else:
-        return False
 
 def call_now(**kwargs):
     """
@@ -1385,6 +1367,7 @@ def module_shutdown(service_killed):
     client.logoff()
 
     print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
+
 
 if __name__ == "__main__":
     # Init a bunch of things if we're running as a standalone app.
