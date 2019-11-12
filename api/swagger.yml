@@ -357,43 +357,6 @@ paths:
         404:        
           description: Line does not exist.
 
-    patch:
-      operationId: lines.update
-      tags:
-        - lines
-      summary: Update a line in the lines list
-      description: Update an already existing line in the lines list
-      parameters:
-        - name: ident
-          in: path
-          description: Identity of line to update in the list. Normally an integer, starting at 0
-          type: string
-          required: True
-        - name: line
-          in: body
-          schema:
-            type: object
-            properties:
-              switch:
-                type: string
-              timer:
-                type: integer
-              hook_state:
-                type: integer
-              ast_status:
-                type: string
-              is_dialing:
-                type: boolean
-              dahdi_chan:
-                type: string
-              called_no:
-                type: string
-      responses:
-        200:
-          description: Successfully updated line
-        406:
-          description: Line could not be updated
-
     delete:
       operationId: lines.delete
       tags:

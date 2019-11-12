@@ -19,6 +19,7 @@ import logging
 import curses
 import re
 import threading
+from configparser import ConfigParser
 from datetime import datetime
 from marshmallow import Schema, fields
 from tabulate import tabulate
@@ -215,34 +216,6 @@ class Line():
 
         self.timer = self.switch.newtimer()
         self.term = self.pick_called_line(term_choices)
-
-    def update(self, api):
-        """ Used by the API PATCH method to update line parameters."""
-
-        for (key, value) in list(api.items()):
-            if key == 'switch':
-               # 1XB doesn't work for some reason
-               # also this needs to validate and return a 406 on failure
-                if value == 'panel':
-                    self.switch = Rainier
-                    self.kind = 'panel'
-                if value == '5xb':
-                    self.switch = Adams
-                    self.kind = '5xb'
-                if value == '1xb':
-                    self.switch = Lakeivew
-                    self.kind = '1xb'
-                else:
-                    return False
-            if key == 'timer':
-                # Change the current timer of the line.
-                self.timer = value
-            if key == 'dahdi_chan':
-                # Change which channel a line belongs to.
-                # Also might break everything.
-                self.chan = value
-            if key == 'called_no':
-                self.term = value
 
 # <----- END LINE CLASS -----> #
 
@@ -1422,6 +1395,20 @@ if __name__ == "__main__":
 
     paused = None
 
+    config = ConfigParser()
+    config.read('/etc/panel_gen.conf')
+    AMI_ADDRESS = config.get('ami', 'address')
+    AMI_PORT = config.get('ami', 'port')
+    AMI_USER = config.get('ami', 'user')
+    AMI_SECRET = config.get('ami', 'secret')
+
+    # Connect to AMI
+    client = AMIClient(address=AMI_ADDRESS, port=int(AMI_PORT))
+    adapter = AMIClientAdapter(client)
+    future = client.login(username=AMI_USER, secret=AMI_SECRET)
+    if future.response.is_error():
+        raise Exception(str(future.response))
+
     # Parse any arguments the user gave us.
     parse_args()
 
@@ -1447,13 +1434,6 @@ if __name__ == "__main__":
 
     # Here is where we actually make the lines.
     lines = make_lines(source='main',orig_switch=orig_switch)
-
-    # Connect to AMI
-    client = AMIClient(address='127.0.0.1',port=5038)
-    adapter = AMIClientAdapter(client)
-    future = client.login(username='panel_gen',secret='t431434')
-    if future.response.is_error():
-        raise Exception(str(future.response))
 
     try:
         t = ui_thread()
@@ -1487,14 +1467,23 @@ if __name__ == "__main__":
 if __name__ == "panel_gen":
     # The below gets run if this code is imported as a module.
     # It skips lots of setup steps.
-    parse_args()
 
+    config = ConfigParser()
+    config.read('/etc/panel_gen.conf')
+    AMI_ADDRESS = config.get('ami', 'address')
+    AMI_PORT = config.get('ami', 'port')
+    AMI_USER = config.get('ami', 'user')
+    AMI_SECRET = config.get('ami', 'secret')
+    
     # Connect to AMI
-    client = AMIClient(address='127.0.0.1',port=5038)
+    client = AMIClient(address=AMI_ADDRESS, port=int(AMI_PORT))
     adapter = AMIClientAdapter(client)
-    future = client.login(username='panel_gen',secret='t431434')
+    future = client.login(username=AMI_USER, secret=AMI_SECRET)
     if future.response.is_error():
         raise Exception(str(future.response))
+
+    parse_args()
+
 
     # If logfile does not exist, create it so logging can write to it.
     try:
