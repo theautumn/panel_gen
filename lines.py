@@ -49,23 +49,6 @@ def create(switch):
             "Line could not be created",
         )
 
-def update(**kwargs):
-    """
-    This function updates an existing line in the lines structure
-    :param key:   key of line to update in the lines structure
-    :return:      updated line structure
-    """
-    result = panel_gen.update_line(**kwargs)
-
-    if result != False:
-        return result
-    # otherwise, nope, that's an error
-    else:
-        abort(
-            406, "Line {ident} not found".format(ident=ident)
-            )
-
-
 def delete(ident):
     """
     This function deletes a line from the lines structure

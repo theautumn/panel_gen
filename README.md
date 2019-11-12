@@ -19,6 +19,7 @@ This project assumes you have the following:
 	* pycall
 	* logging
 	* curses
+	* configparser
 	* asterisk.ami
 
 The DAHDI configs are part of this repo in the <code>etc</code> directory, and the Adit configs are part of this repository also. Please note that your hardware and software may vary from what I used, but the configs should be a good starting place nonetheless.
@@ -46,6 +47,8 @@ This application requires a context in your dialplan to pass calls into. The sim
 	exten => s,1,Wait(${waittime})
         exten => s,n,Hangup()
 ```
+
+Additionally, you must copy panel_gen.conf from ./samples and into /etc/. I finally got around to moving the AMI configuration *out* of the application and into a seperate file. If you forget to do this, panel_gen/ConfigParser will give you a mean error.
 
 Usage
 -----
