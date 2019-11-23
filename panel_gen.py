@@ -332,7 +332,7 @@ class xb1():
         self.max_nxx4 = 0
         self.nxx = [722, 832, 232]
         self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.line_range = [105,107,108,109,110,111]
+        self.line_range = [105,107,108,110,111,113]
 
     def __repr__(self):
         return("{}('{}')".format(self.__class__.__name__, self.running))
