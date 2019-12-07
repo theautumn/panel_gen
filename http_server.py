@@ -17,7 +17,7 @@ try:
     from cheroot.wsgi import Server as WSGIServer, PathInfoDispatcher
 except ImportError:
     from cherrypy.wsgiserver import CherryPyWSGIServer as WSGIServer, WSGIPathInfoDispatcher as PathInfoDispatcher
-from flask import Flask, render_template, request
+from flask import render_template 
 import connexion
 import logging
 import panel_gen
