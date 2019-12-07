@@ -1,7 +1,7 @@
 # panel_gen 
 Auto call generator for the telephone switches at Connections Museum, Seattle.
 
-Connections Museum has in its collection the last remaining "Panel" type telephone switch in the world. The switch functions, but mostly sits idle all day, since there is very little human-generated traffic to keep it busy. This program is my attempt to create a small load on the panel switch (and others at the museum) during idle time, so it appears to be processing calls from subscribers.
+Connections Museum has in its collection the last remaining Panel-type telephone switch in the world. The switch functions, but mostly sits idle all day, since there is very little human-generated traffic to keep it busy. This program is my attempt to create a small load on the panel switch (and others at the museum) during idle time, so it appears to be processing calls from subscribers.
 ![screenshot of panel_gen](samples/panel_gen.png "panel_gen main window")
 
 Requirements
@@ -48,7 +48,7 @@ This application requires a context in your dialplan to pass calls into. The sim
         exten => s,n,Hangup()
 ```
 
-Additionally, you must copy panel_gen.conf from ./samples and into /etc/. I finally got around to moving the AMI configuration *out* of the application and into a seperate file. If you forget to do this, panel_gen/ConfigParser will give you a mean error.
+Additionally, you must copy panel_gen.conf from ./samples/configs and into /etc/. I finally got around to moving the AMI configuration *out* of the application and into a seperate file. If you forget to do this, panel_gen/ConfigParser will give you a mean error.
 
 Usage
 -----
@@ -96,17 +96,15 @@ While running as a standalone application, there are a few magic keys you can us
 
 HTTP Server
 -----------
-There is a simple, insecure HTTP server provided in `http-server.py` which serves up a basic web page so panel_gen can be executed via a volunteer's smartphone. This should not be available to everybody, as there are no security or sanity checks, and there's probably a thousand ways to break it. I keep it limited to a secure network so only those with the WPA key can access it. The actual server is [Flask](https://github.com/pallets/flask), and the CSS framework is [Skeleton](https://github.com/dhg/Skeleton). The smartphone interface pretends to be an app, but its really just a browser with a web page. It looks something like this:
+There is a simple, insecure HTTP server provided in `http-server.py` which serves up a basic web page so panel_gen can be executed via a volunteer's smartphone. This should not be available to everybody, as there are no security or sanity checks, and there's probably a thousand ways to break it. I keep it limited to a secure network so only those with the WPA key can access it. The smartphone interface pretends to be an app, but its really just a browser with a web page. It looks something like this:
 <p align="center">
   <img src="samples/IMG_0588.png">
 </p>
 
-Panel_gen also provides an API via `http_server.py`! I launch this as a system service in Debian, which keeps it running 24/7. The API can be used to control the behavior of panel_gen externally, either using the aforementioned smartphone, or a key and lamp. You can poke the API with Postman, or with http://127.0.0.1/api/ui. We mostly use it to start and stop the demo during tours with a key and lamp discreetly mounted in our switches. See https://github.com/theautumn/tinyrobot for the code for that.
+The API can be used to control the behavior of panel_gen externally, either using the aforementioned smartphone, or a key and lamp. You can poke the API with Postman, or with http://127.0.0.1/api/ui. We mostly use it to start and stop the demo during tours with a key and lamp discreetly mounted in our switches. See https://github.com/theautumn/tinyrobot for the code for that.
 
 Examples
 -------
-I've created a bash alias to make this easier to run, but the following examples assume you've not done that. If you'd like to create one, you can edit ~/.bashrc, and add <code>alias panel_gen='sudo -u asterisk python ~/panel_gen/panel_gen.py'</code> to the end of the file. Change the directory where panel_gen lives, as necessary.
-
 There are several different arguments you can use when running the program. Where arguments are not given by the user at runtime, defaults are assumed.
 
 * ````python panel_gen.py```` Originates calls from the panel switch in random order.
