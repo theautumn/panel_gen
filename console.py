@@ -17,7 +17,7 @@ import re
 import threading
 import logging
 import requests
-from marshmallow import Schema, fields, post_load
+from marshmallow import Schema, fields, post_load, ValidationError
 from tabulate import tabulate
 
 class Line(object):
@@ -228,7 +228,11 @@ class work_thread(threading.Thread):
             try:
                 r = requests.get(APISERVER, timeout=.5)
                 schema = LineSchema()
-                result = schema.loads(r.content.decode('utf-8'),  many=True)
+                try:
+                    result = schema.loads(r.content.decode('UTF-8'), many=True)
+                except ValidationError as err:
+                        print(err.messages)  # => {"email": ['"foo" is not a valid email address.']}
+                        print(err.valid_data)  # => {"name": "John"}
                 lines = result[0]
                 server_up = True
                 failcount = 0
@@ -262,7 +266,7 @@ class museum_thread(threading.Thread):
                     museum_pstate = museum_up
                     r = requests.get(MUSEUMSTATE, timeout=5)
                     schema = MuseumSchema()
-                    result = schema.loads(r.content)
+                    result = schema.loads(r.content.decode())
                     museum = result[0]
                     for k, v in list(museum.items()):
                         museum_up = v

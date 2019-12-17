@@ -37,18 +37,6 @@ app.add_api('swagger.yml')
 def home():
     return render_template('home.html')
 
-@app.route('/dark', methods=['GET'])
-def darkt():
-    return render_template('dark.html')
-
-@app.route('/5xb', methods=['GET'])
-def xb5home():
-    return render_template('5xb.html')
-
-@app.route('/panel', methods=['GET'])
-def panelhome():
-    return render_template('panel.html')
-
 d = PathInfoDispatcher({'/': app})
 server = WSGIServer(('0.0.0.0', 5000), d)
 

@@ -103,12 +103,13 @@ class Line():
         term_choices:       List of office codes we can dial
                             set as a global in __main__
         """
+        nxx = [722,232,832,275,365]
 
         if args.l:                      # If user specified a line
             term = args.l               # Set term line to user specified
         else:
             if term_choices == []:
-                term_office = random.choice(self.switch.nxx, p=self.switch.trunk_load)
+                term_office = random.choice(nxx, p=self.switch.trunk_load)
             else:
                 term_office = random.choice(term_choices)
 
@@ -140,7 +141,7 @@ class Line():
         Places a call. Returns nothing.
 
         kwargs:
-            orig_switch:     switch call is coming from
+            originating_switches:     switch call is coming from
             line:            line placing the call
             timer:           duration of the call
 
@@ -156,7 +157,7 @@ class Line():
         # The kwargs come in from the API. The following lines handle them
         # and set up the special call case outside of the normal program flow.
         for key, value in list(kwargs.items()):
-            if key == 'orig_switch':
+            if key == 'originating_switches':
                 switch = value
             if key == 'line':
                 line = value
@@ -395,7 +396,7 @@ class xb5():
         self.line_range = [1330,1435,9072,9073,1274,1485,1020,5852,
                 1003,6766,6564,1076,5018,1137,9138,1165,1309,9485,
                 9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,
-                4057,1055,1035,9267,1381,1470,9512,1663,1841,1921]
+                4057,1035,9267,1381,1470,9512,1663,1841,1921] # Remv 1955
 
     def __repr__(self):
         return("{}('{}')".format(self.__class__.__name__, self.running))
@@ -498,6 +499,94 @@ class ess():
 
         return timer
 
+class Switch():
+    """
+    This class is parameters and methods for a switch.
+
+    kind:           Generic name for type of switch.
+    running:        Whether or not switch is running.
+    max_dialing:    Set based on sender capacity.
+    is_dialing:     Records current number of calls in Dialing state.
+    dahdi_group:    Passed to Asterisk when call is made.
+    api_volume:     String that contains "light", "heavy", or "".
+                    Sets the random.gamma distribution for generating
+                    new call timers.
+    max_calls:      Maximum concurrent calls the switch can handle.
+    max_nxx:        Values for trunk load. Determined by how many
+                    outgoing trunks we have provisioned on the switch.
+    nxx:            List of office codes we can dial. Corresponds directly
+                    to max_nxx.
+    trunk_load:	    List of max_nxx used to compute load on trunks.
+    line_range:	    Range of acceptable lines to dial when calling this office.
+    """
+
+    def __init__(self, kind):
+        self.kind = kind
+        self.running = False
+        self.max_dialing = config.getint(kind,'max_dialing')
+        self.is_dialing = 0
+        self.dahdi_group = config.get(kind, 'dahdi_group')
+        self.api_volume = ""
+
+        if args.d:
+            self.max_calls = 1
+        elif args.a:
+            self.max_calls = args.a
+        else:
+            self.max_calls = 4
+
+        self.max_722 = float(config[kind]['max_722'])
+        self.max_232 = float(config[kind]['max_232'])
+        self.max_832 = float(config[kind]['max_832'])
+        self.max_275 = float(config[kind]['max_275'])
+        self.max_365 = float(config[kind]['max_365'])
+        self.trunk_load = [self.max_722, self.max_232,
+                self.max_832, self.max_275, self.max_365]
+        lrstring = config.get(kind, 'line_range')
+        self.line_range = lrstring.split(",")
+        logging.info(self.line_range)
+        
+
+    def __repr__(self):
+        return("{}".format(self.__class__.__name__))
+
+    def newtimer(self):
+        """
+        Returns timer back to Line() object. Checks to see
+        if arguments have been passed in at runtime. If so,
+            args.d:         Deterministic Mode
+            args.w:         User-specified wait time
+            args.v:         User-specified call volume
+
+        If no args have been passed in (the more likely situation)
+        Then see if running as __main__ or as a module and act
+        accordingly.
+        """
+
+        if args.d:
+            if args.w:
+                self.timer = args.w
+            else:
+                self.timer = 15
+        else:
+            if __name__ == '__main__':
+                if args.v == 'light':
+                    timer = int(round(random.gamma(20,8)))
+                elif args.v == 'heavy':
+                    timer = int(round(random.gamma(5,7)))
+                else:
+                    timer = int(round(random.gamma(4,14)))
+
+            if __name__ == 'panel_gen':
+                if self.api_volume == 'light':
+                    timer = int(round(random.gamma(20,8)))
+                elif self.api_volume == 'heavy':
+                    timer = int(round(random.gamma(5,7)))
+                else:
+                    timer = int(round(random.gamma(4,14)))
+
+        return timer
+
 # +-----------------------------------------------+
 # |                                               |
 # | # <----- BEGIN BOOKKEEPING STUFF -----> #     |
@@ -581,7 +670,8 @@ def parse_args():
 
     global args
     args = parser.parse_args()
-    make_switch(args)
+    logging.debug(args)
+    return args
 
 def make_switch(args):
     """ Instantiate some switches so we can work with them later."""
@@ -591,33 +681,33 @@ def make_switch(args):
     global Lakeview
     global Step
 
+#    Rainier = Switch('panel')
     Rainier = panel()
     Adams = xb5()
     Lakeview = xb1()
     Step = step()
 
-    global orig_switch
-    orig_switch = []
+    global originating_switches
+    originating_switches = []
 
     if __name__ == 'panel_gen':
-        orig_switch.append(Rainier)
-        orig_switch.append(Adams)
-        orig_switch.append(Lakeview)
+        originating_switches.append(Rainier)
+        originating_switches.append(Adams)
+        originating_switches.append(Lakeview)
 
     if __name__ == '__main__':
-
         for o in args.o:
             if o == 'panel' or o == '722':
-                orig_switch.append(Rainier)
+                originating_switches.append(Rainier)
             elif o == '5xb' or o == '232':
-                orig_switch.append(Adams)
+                originating_switches.append(Adams)
             elif o == '1xb' or o == '832':
-                orig_switch.append(Lakeview)
+                originating_switches.append(Lakeview)
             elif o == 'all':
-                orig_switch.extend((Lakeview, Adams, Rainier))
+                originating_switches.extend((Lakeview, Adams, Rainier))
 
         if args.o == []:
-            orig_switch.append(Rainier)
+            originating_switches.append(Rainier)
 
     global term_choices
     term_choices = []
@@ -632,7 +722,6 @@ def make_switch(args):
         elif t == 'office' or t == '365':
             term_choices.append(365)
 
-    return args
 
 def make_lines(**kwargs):
     """
@@ -640,7 +729,7 @@ def make_lines(**kwargs):
 
     source:         the origin of the call to this function
     switch:         the switch where the lines will originate on
-    orig_switch:    list of originating switches passed in from args
+    originating_switches:    list of originating switches passed in from args
     traffic_load:   light, medium, or heavy
     numlines:       number of lines we should create
     """
@@ -648,13 +737,13 @@ def make_lines(**kwargs):
     source = kwargs.get('source', '')
     switch = kwargs.get('switch', '')
     traffic_load = kwargs.get('traffic_load', '')
-    orig_switch = kwargs.get('orig_switch','')
+    originating_switches = kwargs.get('originating_switches','')
     numlines = kwargs.get('numlines', '')
 
     new_lines = []
 
     if source == 'main':
-        new_lines = [Line(n, switch) for switch in orig_switch for n in range(switch.max_calls)]
+        new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.max_calls)]
     elif source == 'api':
         new_lines = [Line(n, switch) for n in range(numlines)]
         if traffic_load != '':
@@ -864,7 +953,7 @@ def api_stop(**kwargs):
     try:
         if switch == 'all':
             lines = []
-            for s in orig_switch:
+            for s in originating_switches:
                 s.running = False
                 s.is_dialing = 0
 
@@ -925,7 +1014,7 @@ def call_now(**kwargs):
         lines[calling_line].is_api = True
         lines[calling_line].timer = 1
         lines[calling_line].term = term_line
-        lines[calling_line].call(orig_switch=switch, timer=on_call_time)
+        lines[calling_line].call(originating_switches=switch, timer=on_call_time)
 
         result = schema.dump(lines[calling_line])
         return result
@@ -1020,7 +1109,7 @@ def get_all_switches():
     """ Returns formatted list of all switches"""
 
     schema = SwitchSchema()
-    result = [schema.dump(n) for n in orig_switch]
+    result = [schema.dump(n) for n in originating_switches]
     return result
 
 def get_switch(kind):
@@ -1043,18 +1132,18 @@ def get_switch(kind):
 
 def create_switch(kind):
 
-    if 'panel' not in orig_switch:
+    if 'panel' not in originating_switches:
         if kind == 'panel':
-            orig_switch.append(Rainier)
-    if '5xb' not in orig_switch:
+            originating_switches.append(Rainier)
+    if '5xb' not in originating_switches:
         if kind == '5xb':
-            orig_switch.append(Adams)
-    if '1xb' not in orig_switch:
+            originating_switches.append(Adams)
+    if '1xb' not in originating_switches:
         if kind == '1xb':
-            orig_switch.append(Lakeview)
+            originating_switches.append(Lakeview)
     
-    if orig_switch != []:
-        return orig_switch
+    if originating_switches != []:
+        return originating_switches
     else:
         return False
 
@@ -1066,9 +1155,9 @@ def update_switch(**kwargs):
     # Pull the switch type out of the dict the API passed in.
     api_switch_type = kwargs.get("kind", "")
 
-    # Enumerate our local orig_switch and see if the switch
+    # Enumerate our local originating_switches and see if the switch
     # that the API asked for matches an existing switch.
-    for i, o in enumerate(orig_switch):
+    for i, o in enumerate(originating_switches):
         # If the type of switch matches the type we're trying to edit
         if o.kind == api_switch_type:
             # Make sure we're editing the instance of the switch
@@ -1089,15 +1178,15 @@ def update_switch(**kwargs):
 
 def delete_switch(kind):
     # This "works" but it actually doesn't cause calls to stop on a switch.
-    # orig_switch is only used with line creation at the start of execution.
+    # originating_switches is only used with line creation at the start of execution.
     # after that, lines already have the property of their switch, so
     # I need to find a way to actually stop calls to a switch when it
     # no longer exists.
 
     result = []
-    for i, o in enumerate(orig_switch):
+    for i, o in enumerate(originating_switches):
         if o.kind == kind:
-            del orig_switch[i]
+            del originating_switches[i]
             result.append(o.kind)
             logging.info("API requested delete switch %s", o.kind)
 
@@ -1145,7 +1234,7 @@ class Screen():
                 w.resume()
         # u: add a line to the first switch.
         if key == ord('u'):
-            lines.append(Line(7, orig_switch[0]))
+            lines.append(Line(7, originating_switches[0]))
         # d: delete the 0th line.
         if key == ord('d'):
             if len(lines) >= 1:
@@ -1385,15 +1474,13 @@ if __name__ == "__main__":
     AMI_USER = config.get('ami', 'user')
     AMI_SECRET = config.get('ami', 'secret')
 
+
     # Connect to AMI
     client = AMIClient(address=AMI_ADDRESS, port=int(AMI_PORT))
     adapter = AMIClientAdapter(client)
     future = client.login(username=AMI_USER, secret=AMI_SECRET)
     if future.response.is_error():
         raise Exception(str(future.response))
-
-    # Parse any arguments the user gave us.
-    parse_args()
 
     # If logfile does not exist, create it so logging can write to it.
     try:
@@ -1407,7 +1494,11 @@ if __name__ == "__main__":
             filename='/var/log/panel_gen/calls.log',level=logging.DEBUG,
             datefmt='%m/%d/%Y %I:%M:%S %p')
 
-    logging.info('Originating calls on %s', orig_switch)
+    # Parse any arguments the user gave us.
+    parse_args()
+    make_switch(args)
+
+    logging.info('Originating calls on %s', originating_switches)
 
     if args.t != []:
         logging.info('Terminating calls on %s', term_choices)
@@ -1416,7 +1507,7 @@ if __name__ == "__main__":
     logging.info('Call volume set to %s', args.v)
 
     # Here is where we actually make the lines.
-    lines = make_lines(source='main',orig_switch=orig_switch)
+    lines = make_lines(source='main', originating_switches=originating_switches)
 
     try:
         t = ui_thread()
@@ -1465,7 +1556,8 @@ if __name__ == "panel_gen":
     if future.response.is_error():
         raise Exception(str(future.response))
 
-    parse_args()
+    parse_args()    # No args when running as daemon so just set defaults.
+    make_switch(args)
 
 
     # If logfile does not exist, create it so logging can write to it.
