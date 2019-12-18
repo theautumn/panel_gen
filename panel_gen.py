@@ -604,16 +604,17 @@ def on_DialBegin(event, **kwargs):
     """
 
     output = str(event)
+    logging.debug(str(event))
     DialString = re.compile('(?<=w)(\d{7})')
-    DB_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
+    DB_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
 
     DialString = DialString.findall(output)
     DB_DestChannel = DB_DestChannel.findall(output)
 
     for l in lines:
         if DialString[0] == str(l.term) and l.ast_status == 'on_hook':
-            logging.debug('DialString match %s and %s', DialString[0], str(l.term))
             l.chan = DB_DestChannel[0]
+            logging.debug('Line %s is on channel %s', l.ident, l.chan)
             l.ast_status = 'Dialing'
             l.switch.is_dialing += 1
             logging.debug('Calling %s on DAHDI %s from %s', l.term, l.chan, l.switch.kind)
@@ -681,8 +682,7 @@ def make_switch(args):
     global Lakeview
     global Step
 
-#    Rainier = Switch('panel')
-    Rainier = panel()
+    Rainier = Switch('panel')
     Adams = xb5()
     Lakeview = xb1()
     Step = step()
