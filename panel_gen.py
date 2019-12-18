@@ -116,13 +116,14 @@ class Line():
             # Choose a sane number that appears on the line link or final
             # frame of the switches that we're actually calling. If something's
             # wrong, then assert false, so it will get caught.
-            # Whenever possible, these values should be defined in the switch class.
-            # This makes it so we can change these values more easily.
+            # Some number wackiness going on here because when we pull from
+            # config, the values are always str() so we have to int() them if
+            # we are calling thru Lakeview. This is so we can prepend a '0'.
 
             if term_office == 722 or term_office == 365:
                 term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
             elif term_office == 832:
-                term_station = "%04d" % random.choice(Lakeview.line_range)
+                term_station = "%04d" % int(random.choice(Lakeview.line_range))
             elif term_office == 232:
                 term_station = random.choice(Adams.line_range)
             elif term_office == 275:
@@ -218,276 +219,6 @@ class Line():
         self.timer = self.switch.newtimer()
         self.term = self.pick_called_line(term_choices)
 
-# <----- END LINE CLASS -----> #
-
-# <----- BEGIN SWITCH CLASSES ------> #
-
-class panel():
-    """
-    This class is parameters and methods for the panel switch.
-
-    kind:           Generic name for type of switch.
-    running:        Whether or not switch is running.
-    max_dialing:    Set based on sender capacity.
-    is_dialing:     Records current number of calls in Dialing state.
-    dahdi_group:    Passed to Asterisk when call is made.
-    api_volume:     String that contains "light", "heavy", or "".
-                    Sets the random.gamma distribution for generating
-                    new call timers.
-    max_calls:      Maximum concurrent calls the switch can handle.
-    max_nxx:        Values for trunk load. Determined by how many
-                    outgoing trunks we have provisioned on the switch.
-    nxx:            List of office codes we can dial. Corresponds directly
-                    to max_nxx.
-    trunk_load:	    List of max_nxx used to compute load on trunks.
-    line_range:	    Range of acceptable lines to dial when calling this office.
-    """
-
-    def __init__(self):
-        self.kind = "panel"
-        self.running = False
-        self.max_dialing = 5
-        self.is_dialing = 0
-        self.dahdi_group = "r6"
-        self.api_volume = ""
-
-        if args.d:
-            self.max_calls = 1
-        elif args.a:
-            self.max_calls = args.a
-        else:
-            self.max_calls = 4
-
-        self.max_nxx1 = .5
-        self.max_nxx2 = .2
-        self.max_nxx3 = .2
-        self.max_nxx4 = .1
-        self.nxx = [722, 365, 232, 832]
-        self.trunk_load = [self.max_nxx1, self.max_nxx2,
-                self.max_nxx3, self.max_nxx4]
-        self.line_range = [4000,5999]
-
-    def __repr__(self):
-        return("{}".format(self.__class__.__name__))
-
-    def newtimer(self):
-        """
-        Returns timer back to Line() object. Checks to see
-        if arguments have been passed in at runtime. If so,
-            args.d:         Deterministic Mode
-            args.w:         User-specified wait time
-            args.v:         User-specified call volume
-
-        If no args have been passed in (the more likely situation)
-        Then see if running as __main__ or as a module and act
-        accordingly.
-        """
-
-        if args.d:
-            if args.w:
-                self.timer = args.w
-            else:
-                self.timer = 15
-        else:
-            if __name__ == '__main__':
-                if args.v == 'light':
-                    timer = int(round(random.gamma(20,8)))
-                elif args.v == 'heavy':
-                    timer = int(round(random.gamma(5,7)))
-                else:
-                    timer = int(round(random.gamma(4,14)))
-
-            if __name__ == 'panel_gen':
-                if self.api_volume == 'light':
-                    timer = int(round(random.gamma(20,8)))
-                elif self.api_volume == 'heavy':
-                    timer = int(round(random.gamma(5,7)))
-                else:
-                    timer = int(round(random.gamma(4,14)))
-
-        return timer
-
-
-class xb1():
-    # This class is for the No. 1 Crossbar.
-    # For a description of each of these lines, see the panel class above.
-
-    def __init__(self):
-        self.kind = "1xb"
-        self.running = False
-        self.max_dialing = 2
-        self.is_dialing = 0
-        self.dahdi_group = "r11"
-        self.api_volume = ""
-
-        if args.d:
-            self.max_calls = 1
-        elif args.a:
-            self.max_calls = args.a
-        else:
-            self.max_calls = 2
-
-        self.max_nxx1 = .5
-        self.max_nxx2 = .5
-        self.max_nxx3 = 0
-        self.max_nxx4 = 0
-        self.nxx = [722, 832, 232]
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3]
-        self.line_range = [105,107,108,110,111,113]
-
-    def __repr__(self):
-        return("{}('{}')".format(self.__class__.__name__, self.running))
-
-    def newtimer(self):
-        """
-        See similar function in panel() class for documentation.
-        """
-
-        if args.d:
-            if args.w:
-                self.timer = args.w
-            else:
-                self.timer = 15
-        else:
-            if __name__ == '__main__':
-                if args.v == 'light':
-                    timer = int(round(random.gamma(20,8)))
-                elif args.v == 'heavy':
-                    timer = int(round(random.gamma(5,7)))
-                else:
-                    timer = int(round(random.gamma(4,14)))
-
-            if __name__ == 'panel_gen':
-                if self.api_volume == 'heavy':
-                    timer = int(round(random.gamma(5,7)))
-                elif self.api_volume == 'light':
-                    timer = int(round(random.gamma(20,8)))
-                else:
-                    timer = int(round(random.gamma(4,14)))
-
-        return timer
-
-
-class xb5():
-    # This class is for the No. 5 Crossbar.
-    # For a description of these line, see the panel class, above.
-
-    def __init__(self):
-        self.kind = "5xb"
-        self.running = False
-        self.max_dialing = 7
-        self.is_dialing = 0
-        self.dahdi_group = "r5"
-        self.api_volume = ""
-
-        if args.d:
-            self.max_calls = 1
-        elif args.a:
-            self.max_calls = args.a
-        else:
-            self.max_calls = 4
-
-        self.max_nxx1 = .2
-        self.max_nxx2 = .1
-        self.max_nxx3 = .6
-        self.max_nxx4 = .1
-        self.nxx = [722, 832, 232, 275]
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
-        self.line_range = [1330,1435,9072,9073,1274,1485,1020,5852,
-                1003,6766,6564,1076,5018,1137,9138,1165,1309,9485,
-                9522,9361,1603,1704,9929,1939,1546,1800,5118,9552,
-                4057,1035,9267,1381,1470,9512,1663,1841,1921] # Remv 1955
-
-    def __repr__(self):
-        return("{}('{}')".format(self.__class__.__name__, self.running))
-
-    def newtimer(self):
-        """
-        See similar function in panel() class for documentation.
-        """
-
-        if args.d:
-            if args.w:
-                self.timer = args.w
-            else:
-                self.timer = 15
-        else:
-            if __name__ == '__main__':
-                if args.v == 'light':
-                    timer = int(round(random.gamma(20,8)))
-                elif args.v == 'heavy':
-                    timer = int(round(random.gamma(6,7)))
-                else:
-                    timer = int(round(random.gamma(4,14)))
-
-            if __name__ == 'panel_gen':
-                if self.api_volume == 'heavy':
-                    timer = int(round(random.gamma(5,4)))
-                elif self.api_volume == 'light':
-                    timer = int(round(random.gamma(20,8)))
-                else:
-                    timer = int(round(random.gamma(4,14)))
-
-        return timer
-
-
-class step():
-    # This class is for the SxS office. It's very minimal, as we are not currently
-    # originating calls from there, only completing them from the 5XB.
-
-    def __init__(self):
-        self.kind = "Step"
-        self.line_range = [4124,4127]
-
-
-class ess():
-    # This class is for the 3ESS.
-    # For a description of these line, see the panel class, above.
-
-    def __init__(self):
-        self.kind = "3ess"
-        self.running = False
-        self.max_dialing = 4
-        self.is_dialing = 0
-        self.dahdi_group = "r12"
-        self.api_volume = ""
-
-        if args.d:
-            self.max_calls = 1
-        elif args.a:
-            self.max_calls = args.a
-        else:
-            self.max_calls = 10
-
-        self.max_nxx1 = .6
-        self.max_nxx2 = .1
-        self.max_nxx3 = .2
-        self.max_nxx4 = .1
-        self.nxx = [830, 832, 232, 275]
-        self.trunk_load = [self.max_nxx1, self.max_nxx2, self.max_nxx3, self.max_nxx4]
-        self.line_range = [4900,5900] 
-
-    def __repr__(self):
-        return("{}('{}')".format(self.__class__.__name__, self.running))
-
-    def newtimer(self):
-        """
-        See similar function in panel() class for documentation.
-        """
-
-        if args.d:
-            if args.w:
-                self.timer = args.w
-            else:
-                self.timer = 15
-        else:
-            if args.v == 'light' or self.api_volume == 'light':
-                timer = int(round(random.gamma(20,8)))
-            elif args.v == 'heavy' or self.api_volume == 'heavy':
-                timer = int(round(random.gamma(6,7)))
-            else:
-                timer = int(round(random.gamma(4,14)))
-        return timer
 
 class Switch():
     """
@@ -668,8 +399,8 @@ def make_switch(args):
 
     Rainier = Switch('panel')
     Adams = Switch('5xb')
-    Lakeview = xb1()
-    Step = step()
+    Lakeview = Switch('1xb')
+    Step = Switch('step')
 
     global originating_switches
     originating_switches = []
