@@ -103,7 +103,7 @@ class Line():
         term_choices:       List of office codes we can dial
                             set as a global in __main__
         """
-        nxx = [722,232,832,275,365]
+        nxx = [722,232,832,275,365,830]
 
         if args.l:                      # If user specified a line
             term = args.l               # Set term line to user specified
@@ -481,22 +481,12 @@ class ess():
             else:
                 self.timer = 15
         else:
-            if __name__ == '__main__':
-                if args.v == 'light':
-                    timer = int(round(random.gamma(20,8)))
-                elif args.v == 'heavy':
-                    timer = int(round(random.gamma(6,7)))
-                else:
-                    timer = int(round(random.gamma(4,14)))
-
-            if __name__ == 'panel_gen':
-                if self.api_volume == 'heavy':
-                    timer = int(round(random.gamma(5,4)))
-                elif self.api_volume == 'light':
-                    timer = int(round(random.gamma(20,8)))
-                else:
-                    timer = int(round(random.gamma(4,14)))
-
+            if args.v == 'light' or self.api_volume == 'light':
+                timer = int(round(random.gamma(20,8)))
+            elif args.v == 'heavy' or self.api_volume == 'heavy':
+                timer = int(round(random.gamma(6,7)))
+            else:
+                timer = int(round(random.gamma(4,14)))
         return timer
 
 class Switch():
@@ -540,12 +530,14 @@ class Switch():
         self.max_832 = float(config[kind]['max_832'])
         self.max_275 = float(config[kind]['max_275'])
         self.max_365 = float(config[kind]['max_365'])
+        self.max_830 = float(config[kind]['max_830'])
         self.trunk_load = [self.max_722, self.max_232,
-                self.max_832, self.max_275, self.max_365]
-        lrstring = config.get(kind, 'line_range')
-        self.line_range = lrstring.split(",")
-        logging.info(self.line_range)
-        
+                self.max_832, self.max_275, self.max_365, self.max_830]
+        lr = config.get(kind, 'line_range')
+        self.line_range = lr.split(",")
+        self.l_ga = config.get(kind, 'l_gamma')
+        self.n_ga = config.get(kind, 'n_gamma')
+        self.h_ga = config.get(kind, 'h_gamma')
 
     def __repr__(self):
         return("{}".format(self.__class__.__name__))
@@ -569,22 +561,15 @@ class Switch():
             else:
                 self.timer = 15
         else:
-            if __name__ == '__main__':
-                if args.v == 'light':
-                    timer = int(round(random.gamma(20,8)))
-                elif args.v == 'heavy':
-                    timer = int(round(random.gamma(5,7)))
-                else:
-                    timer = int(round(random.gamma(4,14)))
-
-            if __name__ == 'panel_gen':
-                if self.api_volume == 'light':
-                    timer = int(round(random.gamma(20,8)))
-                elif self.api_volume == 'heavy':
-                    timer = int(round(random.gamma(5,7)))
-                else:
-                    timer = int(round(random.gamma(4,14)))
-
+            if args.v == 'light' or self.api_volume == 'light':
+                a,b = (int(x) for x in self.l_ga.split(","))
+                timer = int(round(random.gamma(a,b)))
+            elif args.v == 'heavy' or self.api_volume == 'heavy':
+                a,b = (int(x) for x in self.h_ga.split(","))
+                timer = int(round(random.gamma(a,b)))
+            else:
+                a,b = (int(x) for x in self.n_ga.split(","))
+                timer = int(round(random.gamma(a,b)))
         return timer
 
 # +-----------------------------------------------+
@@ -604,7 +589,6 @@ def on_DialBegin(event, **kwargs):
     """
 
     output = str(event)
-    logging.debug(str(event))
     DialString = re.compile('(?<=w)(\d{7})')
     DB_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
 
@@ -617,7 +601,7 @@ def on_DialBegin(event, **kwargs):
             logging.debug('Line %s is on channel %s', l.ident, l.chan)
             l.ast_status = 'Dialing'
             l.switch.is_dialing += 1
-            logging.debug('Calling %s on DAHDI %s from %s', l.term, l.chan, l.switch.kind)
+            logging.debug('Calling %s on DAHDI/%s from %s', l.term, l.chan, l.switch.kind)
 
 def on_DialEnd(event, **kwargs):
     """
@@ -626,7 +610,7 @@ def on_DialEnd(event, **kwargs):
 
     """
     output = str(event)
-    DE_DestChannel = re.compile('(?<=DestChannel\'\:\su.{7})([^-]*)')
+    DE_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
     DE_DestChannel = DE_DestChannel.findall(output)
 
     for l in lines:
@@ -683,7 +667,7 @@ def make_switch(args):
     global Step
 
     Rainier = Switch('panel')
-    Adams = xb5()
+    Adams = Switch('5xb')
     Lakeview = xb1()
     Step = step()
 
