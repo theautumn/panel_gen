@@ -73,7 +73,7 @@ class LineSchema(Schema):
     hook_state = fields.Integer()
 
     @post_load
-    def make_line(self, data):
+    def make_line(self, data, **kwargs):
         return Line(**data)
 
 class MuseumSchema(Schema):
@@ -150,16 +150,16 @@ class Screen():
         statusbar = self.stdscr.subwin(rows, cols, x_start_row, y_start_col)
         statusbar.bkgd(' ', curses.color_pair(1))
         statusbar.addstr(0, 0, "ctrl + c: quit", curses.A_BOLD)
-        statusbar.addstr(0, x/4, "Museum status:", curses.A_BOLD)
+        statusbar.addstr(0, int(x/4), "Museum status:", curses.A_BOLD)
         if museum_up == True:
-            statusbar.addstr(0, x/4+15, "ONLINE", curses.color_pair(3))
+            statusbar.addstr(0, int(x/4+15), "ONLINE", curses.color_pair(3))
         else:
-            statusbar.addstr(0, x/4+15, "OFFLINE", curses.color_pair(2))
-        statusbar.addstr(0, x/2, "Server status:", curses.A_BOLD)
+            statusbar.addstr(0, int(x/4+15), "OFFLINE", curses.color_pair(2))
+        statusbar.addstr(0, int(x/2), "Server status:", curses.A_BOLD)
         if server_up == True:
-            statusbar.addstr(0, x/2+15, "ONLINE", curses.color_pair(3))
+            statusbar.addstr(0, int(x/2+15), "ONLINE", curses.color_pair(3))
         else:
-            statusbar.addstr(0, x/2+15, "OFFLINE", curses.color_pair(2))
+            statusbar.addstr(0, int(x/2+15), "OFFLINE", curses.color_pair(2))
         statusbar.addstr(0, x-15, "Lines:", curses.A_BOLD)
         statusbar.addstr(0, x-8, str(len(lines)), curses.A_BOLD)
 
@@ -167,12 +167,12 @@ class Screen():
         stdscr.refresh()
 
 #-->                      <--#
-# Work and UI threads are below
+#           THREADS 
 #-->                      <--#
 
 class ui_thread(threading.Thread):
-    # The UI thread! Besides handling pause and resume, this also
-    # sets up a screen, and calls various things in Screen() to
+    # The UI thread! 
+    # Sets up a screen, and calls various things in Screen() to
     # help with drawing.
 
     def __init__(self):
@@ -183,10 +183,7 @@ class ui_thread(threading.Thread):
 
     def run(self):
 
-        try:
-            curses.wrapper(self.ui_main)
-        except Exception as e:
-            print(e)
+        curses.wrapper(self.ui_main)
 
     def ui_main(self, stdscr):
 
@@ -229,11 +226,10 @@ class work_thread(threading.Thread):
                 r = requests.get(APISERVER, timeout=.5)
                 schema = LineSchema()
                 try:
-                    result = schema.loads(r.content.decode('UTF-8'), many=True)
+                    lines = schema.loads(r.content.decode('UTF-8'), many=True)
                 except ValidationError as err:
-                        print(err.messages)  # => {"email": ['"foo" is not a valid email address.']}
-                        print(err.valid_data)  # => {"name": "John"}
-                lines = result[0]
+                        print(err.messages)
+                        print(err.valid_data)
                 server_up = True
                 failcount = 0
                 sleep(1)

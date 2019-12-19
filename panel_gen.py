@@ -386,7 +386,6 @@ def parse_args():
 
     global args
     args = parser.parse_args()
-    logging.debug(args)
     return args
 
 def make_switch(args):
@@ -509,7 +508,6 @@ class LineSchema(Schema):
     line = fields.Dict()
     ident = fields.Integer()
     kind = fields.Str()
-    switch = fields.Str()
     timer = fields.Integer()
     is_dialing = fields.Boolean()
     ast_status = fields.Str()
@@ -749,11 +747,11 @@ def get_line(ident):
 
     api_ident = int(ident)
     schema = LineSchema()
+    result = None
     for l in lines:
         if api_ident == l.ident:
-            result.append(schema.dump(lines[api_ident]))
-
-    if result == []:
+            result = (schema.dump(l))
+    if result == None:
         return False
     else:
         return result
