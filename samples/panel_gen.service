@@ -3,8 +3,10 @@ Description=Connections Museum (panel_gen) Service
 Documentation=https://www.github.com/theautumn/panel_gen
 
 [Service]
+User=SOMEUSER
 Type=simple
-ExecStart=/home/sarah/panel_gen/http_server.py
+WorkingDirectory=/path/to/panel_gen/
+ExecStart=/path/to/.local/share/virtualenvs/panel_gen-ORoWpvfo/bin/python /path/to/panel_gen/http_server.py
 Restart=always
 
 [Install]

@@ -263,7 +263,7 @@ class museum_thread(threading.Thread):
                     r = requests.get(MUSEUMSTATE, timeout=5)
                     schema = MuseumSchema()
                     result = schema.loads(r.content.decode())
-                    museum = result[0]
+                    museum = result
                     for k, v in list(museum.items()):
                         museum_up = v
                     if museum_pstate != museum_up:
