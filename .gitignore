@@ -5,3 +5,5 @@ museum.pyc
 panel_gen.pyc
 switches.pyc
 __pycache__
+Pipfile
+Pipfile.lock

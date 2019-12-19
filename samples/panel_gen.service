@@ -7,6 +7,8 @@ User=SOMEUSER
 Type=simple
 WorkingDirectory=/path/to/panel_gen/
 ExecStart=/path/to/.local/share/virtualenvs/panel_gen-ORoWpvfo/bin/python /path/to/panel_gen/http_server.py
+ExecStop=/bin/kill -2 $MAINPID
+KillSignal=SIGINT
 Restart=always
 
 [Install]

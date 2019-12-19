@@ -46,5 +46,4 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         server.stop()
     finally:
-        service_exit = True
-        panel_gen.module_shutdown(service_exit)
+        panel_gen.api_stop(switch="all", source="module")

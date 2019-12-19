@@ -58,7 +58,7 @@ class Line():
         if args.l:
             self.term = args.l
         else:
-            self.term = self.pick_called_line(term_choices)
+            self.term = self.pick_next_called(term_choices)
 
         self.timer = int(random.gamma(3,4))
         self.ident = ident
@@ -95,7 +95,7 @@ class Line():
                 self.hangup()
         return self.timer
 
-    def pick_called_line(self, term_choices):
+    def pick_next_called(self, term_choices):
         """
         Returns a string containing a 7-digit number to call.
 
@@ -217,7 +217,7 @@ class Line():
                 self.switch.running = False
 
         self.timer = self.switch.newtimer()
-        self.term = self.pick_called_line(term_choices)
+        self.term = self.pick_next_called(term_choices)
 
 
 class Switch():
@@ -634,9 +634,11 @@ def api_start(**kwargs):
 
 def api_stop(**kwargs):
     """
-    Immediately hang up all calls, and destroy all lines.
+    Immediately hang up calls, and destroy lines.
 
-    switch:     Which switch to hangup and stop.
+    switch:     Which switch to hangup and stop. Can be 
+                'panel', '5xb', '1xb' 'all'. Other switches not
+                yet implemented.
     source:     Where the request came from. Used for logging.
     """
 
@@ -647,8 +649,8 @@ def api_stop(**kwargs):
         logging.info("App requested STOP on %s", switch)
     elif source == 'key':
         logging.info('Key operated: STOP on %s', switch)
-    else:
-        logging.info('Stopping, but not sure why!')
+    elif source == 'module':
+        logging.info('Module exited. Hanging up!')
 
     global lines
 
@@ -665,12 +667,15 @@ def api_stop(**kwargs):
         return False
     try:
         if switch == 'all':
+            for l in lines:
+                l.hangup()
             lines = []
             for s in originating_switches:
                 s.running = False
                 s.is_dialing = 0
 
-            system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
+            # Can't do this unless we're running as root.
+            #system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
 
             # Delete all remaining files in spool.
             system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
@@ -1138,17 +1143,10 @@ class ServiceExit(Exception):
 def app_shutdown(signum, frame):
     raise ServiceExit
 
-def module_shutdown(service_killed):
+def module_shutdown():
     """
-    Attempts to cleanly exit panel_gen, either from __main__
-    or when called from http_server.py.
-
-    service_killed:   BOOLEAN   True if running as service
-                                False if running as main
+    Attempts to cleanly exit panel_gen
     """
-
-    if service_killed == True:
-        logging.info("--Exited due to service shutdown--")
 
     try:
         t.shutdown_flag.set()
@@ -1157,10 +1155,6 @@ def module_shutdown(service_killed):
         pass
     w.shutdown_flag.set()
     w.join()
-
-    # Hang up and clean up spool.
-    system("asterisk -rx \"channel request hangup all\"")
-    system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
 
     # Clean exit for logging
     logging.shutdown()
@@ -1237,8 +1231,8 @@ if __name__ == "__main__":
         # Exception handler for console-based shutdown.
 
         logging.info("--- Caught keyboard interrupt! Shutting down gracefully. ---")
-        service_killed= False
-        module_shutdown(service_killed)
+        api_stop(switch='all')
+        module_shutdown()
 
     except Exception as e:
         # Exception for any other errors that I'm not explicitly handling.
@@ -1296,7 +1290,4 @@ if __name__ == "panel_gen":
         sleep(.5)
 
     except Exception:
-        # Exception handler for any exception
-        logging.exception("Exception thrown in main try loop.")
-        service_killed = True
-        module_shutdown(service_killed)
+        api_stop(switch='all')

@@ -29,9 +29,9 @@ def start(**kwargs):
     but it works.
 
     **kwargs allow the POST to be parsed for specifics
-    switch:     In URI path, Can be "1xb", "5xb", "panel"
+    switch:     In URI path, Can be "1xb", "5xb", "panel", "all"
     mode:       In URI query string. Can be "demo", <empty>.
-    source:     In URI query string. "web", "dark", "key"
+    source:     In URI query string. "web", "key"
     """
     switch = kwargs.get("switch", "")
     mode = kwargs.get("mode", "")
@@ -71,8 +71,6 @@ def stop(**kwargs):
         if result != False:
             if source == "web":
                 return 'See Other', 303, {'Location': '/'}
-            elif source == "dark":
-                return 'See Other', 303, {'Location': '/dark'}
             else:
                 return result 
         else:
@@ -86,29 +84,6 @@ def stop(**kwargs):
     except:
         abort(406, "Shits all fucked up",)
         pass
-
-def pause():
-    """ Not currently used. """
-    result = panel_gen.api_pause()
-    if result != False:
-        return result
-    else:
-        abort(
-            406,
-            "Failed to pause app. May already be paused.",
-        )
-
-
-def resume():
-    """ Not currently used. """
-    result = panel_gen.api_resume()
-    if result != False:
-        return result
-    else:
-        abort(
-            406,
-            "Failed to resume app. May already be running.",
-        )
 
 def call(**kwargs):
     """
