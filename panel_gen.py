@@ -24,7 +24,6 @@ from datetime import datetime
 from marshmallow import Schema, fields
 from tabulate import tabulate
 from numpy import random
-from pathlib import Path
 from pycall import CallFile, Call, Application, Context
 from asterisk.ami import AMIClient, EventListener, AMIClientAdapter
 
@@ -89,8 +88,8 @@ class Line():
                 else:
                     self.timer = int(round(random.gamma(5,5)))
                     logging.warning("Exceeded sender limit: %s with %s calls " +
-                    "dialing. Delaying call.",
-                            self.switch.max_dialing, self.switch.is_dialing)
+                        "dialing. Delaying call.",
+                        self.switch.max_dialing, self.switch.is_dialing)
             elif self.status == 1:
                 self.hangup()
         return self.timer
@@ -650,7 +649,7 @@ def api_stop(**kwargs):
     elif source == 'key':
         logging.info('Key operated: STOP on %s', switch)
     elif source == 'module':
-        logging.info('Module exited. Hanging up!')
+        logging.info('Module exited. Hanging up.')
 
     global lines
 
@@ -893,25 +892,6 @@ def update_switch(**kwargs):
     logging.info(result)
 
     return schema.dump(switch)
-
-def delete_switch(kind):
-    # This "works" but it actually doesn't cause calls to stop on a switch.
-    # originating_switches is only used with line creation at the start of execution.
-    # after that, lines already have the property of their switch, so
-    # I need to find a way to actually stop calls to a switch when it
-    # no longer exists.
-
-    result = []
-    for i, o in enumerate(originating_switches):
-        if o.kind == kind:
-            del originating_switches[i]
-            result.append(o.kind)
-            logging.info("API requested delete switch %s", o.kind)
-
-    if result == []:
-        return False
-    else:
-        return result
 
 
 # +-----------------------------------------------+
@@ -1225,7 +1205,7 @@ if __name__ == "__main__":
         w.start()
 
         while True:
-            sleep(0.5)
+            sleep(.5)
 
     except (KeyboardInterrupt, ServiceExit):
         # Exception handler for console-based shutdown.

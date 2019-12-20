@@ -10,22 +10,12 @@ This project assumes you have the following:
 * a computer running Asterisk (this has been tested on 11 and 13)
 * a T1 card with DAHDI and libpri installed
 * a channel bank of some sort containing FXO cards
-* the required python modules installed:
-	* tabulate
-	* subprocess
-	* numpy
-	* pathlib
-	* argparse
-	* pycall
-	* logging
-	* curses
-	* configparser
-	* asterisk.ami
+* the required python modules installed (see requirements.txt)
 
-The DAHDI configs are part of this repo in the <code>etc</code> directory, and the Adit configs are part of this repository also. Please note that your hardware and software may vary from what I used, but the configs should be a good starting place nonetheless.
+The DAHDI configs are part of this repo in the <code>samples/etc</code> directory, and the Adit configs are part of this repository also. Please note that your hardware and software may vary from what I used, but the configs should be a good starting place nonetheless.
 
 This program must be run as a user who is able to write to the following directories:
-<code>/var/spool/asterisk</code> and <code>/var/log/panel_gen</code>. 
+<code>/var/spool/asterisk</code> and <code>/var/log/panel_gen</code>.
 It also requires the ability to run <code>asterisk</code> and <code>tail</code>.
 
 Setting up permissions on your system is an exercise left to the reader.<br />

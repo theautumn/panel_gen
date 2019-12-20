@@ -3,7 +3,7 @@ swagger: "2.0"
 info:
   description: API for panel_gen, a telephone traffic 
                 generator for Connections Museum, Seattle.
-  version: "1.1.0"
+  version: "2.1.0"
   title: panel_gen
 consumes:
   - application/json
@@ -98,30 +98,6 @@ paths:
         406:
           description: Failed to stop calls on switch.
 
-
-#  /app/pause:
-#    post:
-#      operationId: app.pause
-#      tags:
-#        - app
-#      summary: Pause execution but leave app running to unpause later.         
-#      description: Pause app but leave things in a resumable state.
-
-#      responses:
-#        201:
-#          description: Successfully paused work thread
-
-#  /app/resume:
-#    post:
-#      operationId: app.resume
-#      tags:
-#        - app
-#      summary: Resume from paused state. Picks up where it left off.
-#      description: Resume from last state.
-
-#      responses:
-#        201:
-#          description: Successfully resumed work thread
 
   /call/{switch}/{destination}:
     post:
@@ -286,7 +262,7 @@ paths:
       operationId: lines.read_all
       tags:
         - lines
-      summary: Represents line objects
+      summary: Returns all active lines, regardless of switch
       description: Read all lines
       responses:
         200:
@@ -314,7 +290,7 @@ paths:
       operationId: lines.delete_all
       tags:
         - lines
-      summary: Represents line objects
+      summary: Deletes all active lines, and stops calls.
       description: Deletes all lines
       responses:
         204:
