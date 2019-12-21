@@ -141,27 +141,28 @@ class Screen():
             except Exception as e:
                 pass
 
-        y, x = self.stdscr.getmaxyx()
+        y,x = stdscr.getmaxyx()
         cols = x
         rows = 1
         x_start_row = y - 1
         y_start_col = 0
 
-        statusbar = self.stdscr.subwin(rows, cols, x_start_row, y_start_col)
-        statusbar.bkgd(' ', curses.color_pair(1))
-        statusbar.addstr(0, 0, "ctrl + c: quit", curses.A_BOLD)
-        statusbar.addstr(0, int(x/4), "Museum status:", curses.A_BOLD)
-        if museum_up == True:
-            statusbar.addstr(0, int(x/4+15), "ONLINE", curses.color_pair(3))
-        else:
-            statusbar.addstr(0, int(x/4+15), "OFFLINE", curses.color_pair(2))
-        statusbar.addstr(0, int(x/2), "Server status:", curses.A_BOLD)
-        if server_up == True:
-            statusbar.addstr(0, int(x/2+15), "ONLINE", curses.color_pair(3))
-        else:
-            statusbar.addstr(0, int(x/2+15), "OFFLINE", curses.color_pair(2))
-        statusbar.addstr(0, x-15, "Lines:", curses.A_BOLD)
-        statusbar.addstr(0, x-8, str(len(lines)), curses.A_BOLD)
+        if x > 60:
+            statusbar = self.stdscr.subwin(rows, cols, x_start_row, y_start_col)
+            statusbar.bkgd(' ', curses.color_pair(1))
+            statusbar.addstr(0, 0, "ctrl + c: quit", curses.A_BOLD)
+            statusbar.addstr(0, int(x/4), "Museum status:", curses.A_BOLD)
+            if museum_up == True:
+                statusbar.addstr(0, int(x/4+15), "ONLINE", curses.color_pair(3))
+            else:
+                statusbar.addstr(0, int(x/4+15), "OFFLINE", curses.color_pair(2))
+            statusbar.addstr(0, int(x/2), "Server status:", curses.A_BOLD)
+            if server_up == True:
+                statusbar.addstr(0, int(x/2+15), "ONLINE", curses.color_pair(3))
+            else:
+                statusbar.addstr(0, int(x/2+15), "OFFLINE", curses.color_pair(2))
+            statusbar.addstr(0, x-15, "Lines:", curses.A_BOLD)
+            statusbar.addstr(0, x-8, str(len(lines)), curses.A_BOLD)
 
         # Refresh the screen.
         stdscr.refresh()
@@ -256,7 +257,7 @@ class museum_thread(threading.Thread):
         while not self.shutdown_flag.is_set():
             self.is_alive = True
             timer = timer - 1
-            sleep(.5)
+            sleep(1)
             if timer <= 0:
                 try:
                     museum_pstate = museum_up

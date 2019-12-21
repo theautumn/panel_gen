@@ -12,7 +12,7 @@ def read_status():
     Failure:    Returns 406 Failed to get info
     """
     try:
-        ping = subprocess.call(['ping', '-c', '2', ENDPOINT], stdout=FNULL, stderr=subprocess.STDOUT)
+        ping = subprocess.call(['ping', '-c', '4', ENDPOINT], stdout=FNULL, stderr=subprocess.STDOUT)
     except Exception as e:
         pass
 
