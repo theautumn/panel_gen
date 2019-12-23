@@ -48,7 +48,7 @@ def start(**kwargs):
     except Exception as e:
         abort(
             406,
-            "Failed to create switch. May already be running.",
+            "Failed to create new lines. Check api_start()"
         )
 
 def stop(**kwargs):

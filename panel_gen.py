@@ -574,6 +574,7 @@ def api_start(**kwargs):
     mode = kwargs.get('mode', '')
     source = kwargs.get('source', '')
     switch = kwargs.get('switch', '')
+    numlines = config.getint(switch, 'demo_lines')
 
     if source == 'web':
         logging.info("App requested START on %s", switch)
@@ -583,59 +584,46 @@ def api_start(**kwargs):
         logging.info('I dont know why, but we are starting on %s', switch)
 
     if w.is_alive == True:
+        for i in originating_switches:
+            if switch == i.kind:
+                if i.running == True:
+                    logging.warning("%s is running. Can't start twice.", i)
+                elif i.running == False:
+                    if mode == 'demo':
+                        if i == Adams:
+                            # Carve out a special case for Sundays. This was requested
+                            # by museum volunteers so that we can give tours of the
+                            # step and 1XB without interruption by the this program.
+                            # This will only be effective if the key is operated.
+                            # Will have no impact when using web app.
+                            if datetime.today().weekday() == 6:
+                                if source == 'key':
+                                    i.trunk_load = [.3, .7, .0, .0, .0, .0]
+                                    logging.info('Its Sunday!')
+                            new_lines = make_lines(switch=i, numlines,
+                                        traffic_load='heavy', source='api')
+                        else:
+                            new_lines = make_lines(switch=i, numlines, source='api')
+                    elif mode != 'demo':
+                        new_lines = [Line(n, i) for n in range(i.max_calls)]
+                    for l in new_lines:
+                        lines.append(l)
+                    i.running = True
+                    logging.info('Appending %s lines to %s', len(new_lines), switch)
 
-        if switch == 'panel':
-            instance = Rainier
-        elif switch == '5xb':
-            instance = Adams
-        elif switch == '1xb':
-            instance = Lakeview
-        else:
-            return False
-
-        if instance.running == True:
-            logging.warning("%s is running. Can't start twice.", instance)
-        elif instance.running == False:
-            if mode == 'demo':
-                if instance == Rainier:
-                    new_lines = make_lines(switch=instance, numlines=5, source='api')
-                elif instance == Adams:
-                    
-                    # Carve out a special case for Sundays. This was requested
-                    # by museum volunteers so that we can give tours of the
-                    # step and 1XB without interruption by the this program.
-                    # This will only be effective if the key is operated.
-                    # Will have no impact when using web app.
-                    if datetime.today().weekday() == 6:
-                        if source == 'key':
-                            Adams.nxx = [232, 722]
-                            Adams.trunk_load = [.7, .3]
-                            logging.info('Its Sunday!')
-                    new_lines = make_lines(switch=instance, numlines=9,
-                                traffic_load='heavy', source='api')
-                    Adams.api_volume = 'heavy'
-                elif instance == Lakeview:
-                    new_lines = make_lines(switch=instance, numlines=2, source='api')
-            elif mode != 'demo':
-                new_lines = [Line(n, instance) for n in range(instance.max_calls)]
-            for l in new_lines:
-                lines.append(l)
-            instance.running = True
-            logging.info('Appending %s lines to %s', len(new_lines), switch)
-
-        try:
-            new_lines
-            lines_created = len(new_lines)
-            result = get_info()
-            return result
-        except NameError:
-            return False
+                try:
+                    new_lines
+                    lines_created = len(new_lines)
+                    result = get_info()
+                    return result
+                except NameError as e:
+                    return False
 
 def api_stop(**kwargs):
     """
     Immediately hang up calls, and destroy lines.
 
-    switch:     Which switch to hangup and stop. Can be 
+    switch:     Which switch to hangup and stop. Can be
                 'panel', '5xb', '1xb' 'all'. Other switches not
                 yet implemented.
     source:     Where the request came from. Used for logging.
@@ -858,7 +846,7 @@ def create_switch(kind):
     if '1xb' not in originating_switches:
         if kind == '1xb':
             originating_switches.append(Lakeview)
-    
+
     if originating_switches != []:
         return originating_switches
     else:
@@ -1235,7 +1223,7 @@ if __name__ == "panel_gen":
     AMI_PORT = config.get('ami', 'port')
     AMI_USER = config.get('ami', 'user')
     AMI_SECRET = config.get('ami', 'secret')
-    
+
     # Connect to AMI
     client = AMIClient(address=AMI_ADDRESS, port=int(AMI_PORT))
     adapter = AMIClientAdapter(client)
