@@ -14,7 +14,7 @@ def read_status():
     else:
        abort(
             406,
-            "Failed to get info",
+            "Failed to get info. Probably an issue with panel_gen",
         )
 
 def start(**kwargs):
@@ -73,14 +73,11 @@ def stop(**kwargs):
                 return 'See Other', 303, {'Location': '/'}
             else:
                 return result 
-        else:
-            if source == "web":
-                return 'See Other', 303, {'Location': '/'}
-            else:
-                abort(
-                    406,
-                    "Failed to stop switch. Ask Sarah to fix this.",
-                )
+        elif result == False:
+            abort(
+                406,
+                "Failed to stop switch. Ask Sarah to fix this.",
+            )
     except:
         abort(406, "Shits all fucked up",)
         pass

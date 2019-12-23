@@ -1,10 +1,10 @@
 #!/usr/bin/python
 #---------------------------------------------------------------------#
 #                                                                     #
-#  A call generator thing for the Rainier Panel switch at the         #
+#  A call generator thing for the telephone switches at the           #
 #  Connections Museum, Seattle WA.                                    #
 #                                                                     #
-#  Written by Sarah Autumn, 2017-2019                                 #
+#  Written by Sarah Autumn, 2017-2020                                 #
 #  sarah@connectionsmuseum.org                                        #
 #  github.com/theautumn/panel_gen                                     #
 #                                                                     #
@@ -234,8 +234,6 @@ class Switch():
     max_calls:      Maximum concurrent calls the switch can handle.
     max_nxx:        Values for trunk load. Determined by how many
                     outgoing trunks we have provisioned on the switch.
-    nxx:            List of office codes we can dial. Corresponds directly
-                    to max_nxx.
     trunk_load:	    List of max_nxx used to compute load on trunks.
     line_range:	    Range of acceptable lines to dial when calling this office.
     """
@@ -522,7 +520,6 @@ class SwitchSchema(Schema):
     is_dialing = fields.Integer()
     max_calls = fields.Integer()
     dahdi_group = fields.Str()
-    nxx = fields.List(fields.Int())
     trunk_load = fields.List(fields.Str())
     line_range = fields.List(fields.Str())
     running = fields.Boolean()
@@ -600,10 +597,10 @@ def api_start(**kwargs):
                                 if source == 'key':
                                     i.trunk_load = [.3, .7, .0, .0, .0, .0]
                                     logging.info('Its Sunday!')
-                            new_lines = make_lines(switch=i, numlines,
+                            new_lines = make_lines(switch=i, numlines=numlines,
                                         traffic_load='heavy', source='api')
                         else:
-                            new_lines = make_lines(switch=i, numlines, source='api')
+                            new_lines = make_lines(switch=i, numlines=numlines, source='api')
                     elif mode != 'demo':
                         new_lines = [Line(n, i) for n in range(i.max_calls)]
                     for l in new_lines:
@@ -641,17 +638,6 @@ def api_stop(**kwargs):
 
     global lines
 
-    # Validate switch input.
-    if switch == 'panel':
-        instance = Rainier
-    elif switch == '5xb':
-        instance = Adams
-    elif switch == '1xb':
-        instance = Lakeview
-    elif switch == 'all':
-        pass
-    else:
-        return False
     try:
         if switch == 'all':
             for l in lines:
@@ -668,13 +654,17 @@ def api_stop(**kwargs):
             system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
 
         else:
-            deadlines = [l for l in lines if l.kind == switch]
-            lines = [l for l in lines if l.kind != switch]
-            instance.running = False
-            instance.is_dialing = 0
 
-            for i in deadlines:
-                i.hangup()
+            for s in originating_switches:
+                if s.kind == switch:
+
+                    deadlines = [l for l in lines if l.kind == s.kind]
+                    lines = [l for l in lines if l.kind != s.kind]
+                    s.running = False
+                    s.is_dialing = 0
+
+                    for n in deadlines:
+                        n.hangup()
 
     except Exception as e:
         logging.exception("Exception thrown while stopping calls.")
