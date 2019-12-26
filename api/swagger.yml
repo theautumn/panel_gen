@@ -319,26 +319,6 @@ paths:
         404:        
           description: Line does not exist.
 
-  /lines/{switch}:        
-    delete:
-      operationId: lines.delete
-      tags:
-        - lines
-      summary: Delete a line from the lines list
-      description: Delete a line
-      parameters:
-        - name: switch
-          in: path
-          type: string
-          required: True
-        - name: numlines
-          in: body
-          type: integer
-          required: True
-      responses:
-        204:
-          description: Successfully deleted a line
-
   /lines/{switch}:
     post:
         operationId: lines.create
@@ -355,6 +335,32 @@ paths:
         responses:
           201:
             description: Successfully created line
+            #    delete:
+            #        operationId: lines.delete
+            #        tags:
+            #          - lines
+            #        summary: Delete a line from the lines list
+            #        description: Delete a line
+            #        responses:
+            #          204:
+            #            description: Successfully deleted a line
+            #          406:
+            #            description: Failed to delete lines
+            #        parameters:
+            #          - name: switch
+            #            in: path
+            #            description: Switch to delete lines from
+            #            type: string
+            #            required: True
+            #          - name: numlines
+            #          in: body
+            #            schema:
+            #              type: object
+            #              properties:
+            #                numlines:
+            #                  type: integer
+            #                  required: True
+
   /museum:
     get:
       operationId: museum.read_status
