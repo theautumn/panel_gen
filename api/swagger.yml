@@ -152,12 +152,12 @@ paths:
                   type: integer 
                 dahdi_group:
                   type: string
-                nxx:
-                  type: array
                 line_range:
                   type: array
                 trunk_load:
                   type: array
+                traffic_load:
+                  type: string
 
   /switches/{kind}:
     get:
@@ -189,8 +189,6 @@ paths:
                 type: integer
               dahdi_group:
                 type: string
-              nxx:
-                type: array
               line_range:
                 type: array
               trunk_load:
@@ -206,17 +204,17 @@ paths:
           - switches
         summary: Create a new instance of a switch
         description: Instantiate a switch object
+        responses:
+          201:
+            description: Successfully created switch.
+          406:
+            description: Switch was not created.
         parameters:
           - name: kind
             in: path
             description: Virtual switch to create
             type: string
             required: True
-        responses:
-          201:
-            description: Successfully created switch.
-          406:
-            description: Switch was not created.
 
     patch:
       operationId: switches.update
@@ -224,6 +222,11 @@ paths:
         - switches
       summary: Update a switch in the switches list
       description: Update an already existing switch in the switches list
+      responses:
+        200:
+          description: Successfully updated switch in switches list
+        406:
+          description: Sarah broke something. Oh no.
       parameters:
         - name: kind
           in: path
@@ -243,19 +246,12 @@ paths:
                 type: integer
               dahdi_group:
                 type: string
-              nxx:
-                type: array
               line_range:
                 type: array
               trunk_load:
                 type: array
               traffic_load:
                 type: string
-      responses:
-        200:
-          description: Successfully updated switch in switches list
-        406:
-          description: Sarah broke something. Oh no.
 
   /lines:
     get:
@@ -286,21 +282,11 @@ paths:
                 called_no:
                   type: string
 
-    delete:
-      operationId: lines.delete_all
-      tags:
-        - lines
-      summary: Deletes all active lines, and stops calls.
-      description: Deletes all lines
-      responses:
-        204:
-          description: Successful delete line operation
-
   /lines/{ident}:
     get:
       operationId: lines.read_one
       tags:
-      - lines
+        - lines
       summary: Read one line from the lines list
       description: Read one line from the lines list
       parameters:
@@ -333,6 +319,7 @@ paths:
         404:        
           description: Line does not exist.
 
+  /lines/{switch}:        
     delete:
       operationId: lines.delete
       tags:
@@ -340,9 +327,13 @@ paths:
       summary: Delete a line from the lines list
       description: Delete a line
       parameters:
-        - name: ident
+        - name: switch
           in: path
           type: string
+          required: True
+        - name: numlines
+          in: body
+          type: integer
           required: True
       responses:
         204:

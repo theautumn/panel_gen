@@ -49,35 +49,21 @@ def create(switch):
             "Line could not be created",
         )
 
-def delete(ident):
+def delete(switch, numlines):
     """
     This function deletes a line from the lines structure
-    :param key:   key of line to delete
-    :return:      200 on successful delete, 404 if not found
+    switch:     switch to delete lines from
+    numlines:   number of lines to delete
+    :return:    200 on successful delete, 404 if not found
     """
-    line = panel_gen.delete_line(ident)
+    line = panel_gen.delete_line(switch, numlines)
     if line != False:
         return make_response(
-            "Line {ident} successfully deleted".format(ident=ident), 200
+            "{numlines} successfully deleted".format(numlines=numlines), 200
         )
 
     # Otherwise, nope, line to delete not found
     else:
         abort(
-            404, "Line {ident} not found".format(ident=ident)
-        )
-
-def delete_all():
-    """
-    This function deletes all lines
-    :return:    200 on success, 406 if delete fails
-    """
-    result = panel_gen.delete_all_lines()
-    if result != False:
-        return make_response(
-            "All lines successfully deleted.", 200
-        )
-    else:
-        abort(
-            406, "Failed to delete lines."
+            404, "Failed to delete {numlines} lines".format(numlines=numlines)
         )

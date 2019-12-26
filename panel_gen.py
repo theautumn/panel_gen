@@ -21,7 +21,7 @@ import re
 import threading
 from configparser import ConfigParser
 from datetime import datetime
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, post_load
 from tabulate import tabulate
 from numpy import random
 from pycall import CallFile, Call, Application, Context
@@ -214,7 +214,6 @@ class Line():
             del lines[self.ident]
             if len(currentlines) <= 1:
                 self.switch.running = False
-
         self.timer = self.switch.newtimer()
         self.term = self.pick_next_called(term_choices)
 
@@ -228,7 +227,7 @@ class Switch():
     max_dialing:    Set based on sender capacity.
     is_dialing:     Records current number of calls in Dialing state.
     dahdi_group:    Passed to Asterisk when call is made.
-    api_volume:     String that contains "light", "heavy", or "".
+    traffic_load:   String that contains "light", "heavy", or "normal".
                     Sets the random.gamma distribution for generating
                     new call timers.
     max_calls:      Maximum concurrent calls the switch can handle.
@@ -238,13 +237,14 @@ class Switch():
     line_range:	    Range of acceptable lines to dial when calling this office.
     """
 
-    def __init__(self, kind):
-        self.kind = kind
+    def __init__(self, **kwargs):
+        self.kind = kwargs.get('kind',"")
+        kind = self.kind
         self.running = False
-        self.max_dialing = config.getint(kind,'max_dialing')
+        self.max_dialing = config.getint(kind, 'max_dialing')
         self.is_dialing = 0
         self.dahdi_group = config.get(kind, 'dahdi_group')
-        self.api_volume = ""
+        self.traffic_load = "normal"
 
         if args.d:
             self.max_calls = 1
@@ -268,7 +268,7 @@ class Switch():
         self.h_ga = config.get(kind, 'h_gamma')
 
     def __repr__(self):
-        return("{}".format(self.__class__.__name__))
+       return "<Switch(name={self.kind!r})>".format(self=self)
 
     def newtimer(self):
         """
@@ -289,13 +289,13 @@ class Switch():
             else:
                 self.timer = 15
         else:
-            if args.v == 'light' or self.api_volume == 'light':
+            if args.v == 'light' or self.traffic_load == 'light':
                 a,b = (int(x) for x in self.l_ga.split(","))
                 timer = int(round(random.gamma(a,b)))
-            elif args.v == 'heavy' or self.api_volume == 'heavy':
+            elif args.v == 'heavy' or self.traffic_load == 'heavy':
                 a,b = (int(x) for x in self.h_ga.split(","))
                 timer = int(round(random.gamma(a,b)))
-            else:
+            elif args.v == 'normal' or self.traffic_load == 'normal':
                 a,b = (int(x) for x in self.n_ga.split(","))
                 timer = int(round(random.gamma(a,b)))
         return timer
@@ -393,10 +393,10 @@ def make_switch(args):
     global Lakeview
     global Step
 
-    Rainier = Switch('panel')
-    Adams = Switch('5xb')
-    Lakeview = Switch('1xb')
-    Step = Switch('step')
+    Rainier = Switch(kind='panel')
+    Adams = Switch(kind='5xb')
+    Lakeview = Switch(kind='1xb')
+    Step = Switch(kind='step')
 
     global originating_switches
     originating_switches = []
@@ -441,7 +441,7 @@ def make_lines(**kwargs):
     source:         the origin of the call to this function
     switch:         the switch where the lines will originate on
     originating_switches:    list of originating switches passed in from args
-    traffic_load:   light, medium, or heavy
+    traffic_load:   light, normal, or heavy
     numlines:       number of lines we should create
     """
 
@@ -458,7 +458,7 @@ def make_lines(**kwargs):
     elif source == 'api':
         new_lines = [Line(n, switch) for n in range(numlines)]
         if traffic_load != '':
-            switch.api_volume = str(traffic_load)
+            switch.traffic_load = str(traffic_load)
     return new_lines
 
 def start_ui():
@@ -524,8 +524,11 @@ class SwitchSchema(Schema):
     line_range = fields.List(fields.Str())
     running = fields.Boolean()
     timer = fields.Str()
-    api_volume = fields.Str()
+    traffic_load = fields.Str()
 
+    @post_load
+    def engage_motherfucker(self, data, **kwargs):
+            return Switch(**data)
 
 def get_info():
     """ Returns info about app state. """
@@ -571,7 +574,8 @@ def api_start(**kwargs):
     mode = kwargs.get('mode', '')
     source = kwargs.get('source', '')
     switch = kwargs.get('switch', '')
-    numlines = config.getint(switch, 'demo_lines')
+    normal_lines = config.getint(switch, 'normal_lines')
+    heavy_lines = config.getint(switch, 'heavy_lines')
 
     if source == 'web':
         logging.info("App requested START on %s", switch)
@@ -586,6 +590,14 @@ def api_start(**kwargs):
                 if i.running == True:
                     logging.warning("%s is running. Can't start twice.", i)
                 elif i.running == False:
+                    # Reset the dialing counter for safety.
+                    i.is_dialing = 0                    
+
+                    if i.traffic_load == 'heavy':
+                        numlines = heavy_lines
+                    elif i.traffic_load == 'normal':
+                        numlines = normal_lines
+
                     if mode == 'demo':
                         if i == Adams:
                             # Carve out a special case for Sundays. This was requested
@@ -657,7 +669,6 @@ def api_stop(**kwargs):
 
             for s in originating_switches:
                 if s.kind == switch:
-
                     deadlines = [l for l in lines if l.kind == s.kind]
                     lines = [l for l in lines if l.kind != s.kind]
                     s.running = False
@@ -738,7 +749,7 @@ def get_line(ident):
     else:
         return result
 
-def create_line(switch):
+def create_line(**kwargs):
     # Creates a new line using default parameters.
     # lines.append uses the current number of lines in list
     # to create the ident value for the new line.
@@ -746,69 +757,53 @@ def create_line(switch):
     schema = LineSchema()
     result = []
 
-    if switch == 'panel':
-        lines.append(Line(len(lines), Rainier))
-        result.append(len(lines) - 1)
-    if switch == '5xb':
-        lines.append(Line(len(lines), Adams))
-        result.append(len(lines) - 1)
-    if switch == '1xb':
-        lines.append(Line(len(lines), Lakeview))
-        result.append(len(lines) - 1)
+    switch = kwargs.get('switch','')
+    numlines = kwargs.get('numlines','')
+
+    for i in originating_switches:
+        if switch == i or switch == i.kind:
+            for n in range(numlines):
+                lines.append(Line(len(lines), i))
+                result.append(len(lines) - 1)
 
     if result == []:
         return False
     else:
         return result
 
-def delete_all_lines():
-    # This feels like a really dirty way to do this, but here it is.
-    # Deletes all lines immediately. Lists are hard.
+def delete_line(**kwargs):
+    """ 
+    Deletes a specific line.
 
-    logging.info("API requested delete all lines.")
-    while len(lines) > 0:
-        del lines[0]
-    if len(lines) == 0:
-        return True
-    else:
-        return False
-
-def delete_line(ident):
-    # Deletes a specific line passed in via ident.
+    switch:     switch object
+    kind:       type of switch
+    numlines:   number of lines to delete
+    """
 
     global lines
-    api_ident = int(ident)
-    result = []
-    lines = [l for l in lines if l.ident != api_ident]
-    result.append(api_ident)
+    switch = kwargs.get('switch','')
+    
+    for i in originating_switches:
+        if i == switch or i.kind == kwargs.get('kind',''):
+            for n in range(kwargs.get('numlines','')):
+                lines.pop()
+
+    result = get_switch(i.kind)
+
     if result == []:
         return False
     else:
         return result
 
-def update_line(**kwargs):
-    # Updates a given line with new parameters.
-
-    schema = LineSchema()
-
-    api_ident = kwargs.get("ident", "")
-    # Pull the line ident out of the dict the API passed in.
-    for i,  o in enumerate(lines):
-        if o.ident == int(api_ident):
-            parameters = kwargs['line']
-            result = schema.load(parameters)
-            outcome = o.update(result)
-            return schema.dump(o)
-
 def get_all_switches():
-    """ Returns formatted list of all switches"""
+    """ Returns formatted list of all switches """
 
     schema = SwitchSchema()
     result = [schema.dump(n) for n in originating_switches]
     return result
 
 def get_switch(kind):
-    # Gets the parameters for a particular switch object.
+    """ Gets the parameters for a particular switch object. """
 
     schema = SwitchSchema()
     result = []
@@ -826,6 +821,7 @@ def get_switch(kind):
         return result
 
 def create_switch(kind):
+    """ Creates a switch. """
 
     if 'panel' not in originating_switches:
         if kind == 'panel':
@@ -843,34 +839,41 @@ def create_switch(kind):
         return False
 
 def update_switch(**kwargs):
-    # Not used at the moment. Broken.
+    # This is terrible and needs to be changed.
+    # Currently only works with traffic_load
+    # bugs: can change traffic load between light + normal
+    # and it will reduce lines by 2 every time. also doesnt
+    # do any kind of sanity checking :\
 
     schema = SwitchSchema()
+    result = []
 
-    # Pull the switch type out of the dict the API passed in.
-    api_switch_type = kwargs.get("kind", "")
-
-    # Enumerate our local originating_switches and see if the switch
+    # Iterate over our originating_switches and see if the switch
     # that the API asked for matches an existing switch.
-    for i, o in enumerate(originating_switches):
+    for i in originating_switches:
         # If the type of switch matches the type we're trying to edit
-        if o.kind == api_switch_type:
-            # Make sure we're editing the instance of the switch
-            if o.kind == "panel":
-                switch = Rainier
-            elif o.kind == "5xb":
-                switch = Adams
-            elif o.kind == "1xb":
-                switch = Lakeview
-    #Pull in the parameters
-    parameters = kwargs
-    # Wipe out the top parameter, because I said so
-    del parameters['kind']
-    result = schema.load(parameters)
-    logging.info(result)
-
-    return schema.dump(switch)
-
+        if i.kind == kwargs.get("kind", ""):
+            # Wipe out the top parameter, because I said so
+            del kwargs['kind']
+            current_load = i.traffic_load
+            # Lets iterate over the parameters we can work with.
+            for k,v in kwargs.items():
+                for k1 in v.items():
+                    desired_load = k1[1]
+                    if i.traffic_load != desired_load:
+                        i.traffic_load = desired_load
+                        if i.running == True:
+                            if i.traffic_load == 'heavy':
+                                create_line(switch=i, numlines=2)
+                            elif i.traffic_load == 'normal':
+                                delete_line(switch=i, numlines=2)
+                        logging.info("Traffic on %s load changed to %s", 
+                                    i.kind, i.traffic_load)
+            result.append(schema.dump(i))
+    if result != []:        
+        return result
+    else:
+        return False
 
 # +-----------------------------------------------+
 # |                                               |
