@@ -28,7 +28,7 @@ def read_one(ident):
         )
 
 
-def create(switch):
+def create(switch, numlines):
     """
     This function creates a new line in the linees structure
     based on the passed in line data
@@ -36,7 +36,7 @@ def create(switch):
     :return:        201 on success, 406 on line exists
     """
 
-    line_ident = panel_gen.create_line(switch)
+    line_ident = panel_gen.create_line(switch=switch, numlines=numlines)
     if line_ident != False:
         return make_response(
             "New line index {line_ident} successfully created".format(line_ident=line_ident), 201

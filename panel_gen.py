@@ -205,6 +205,7 @@ class Line():
         self.status = 0
         self.chan = '-'
         self.ast_status = 'on_hook'
+        self.switch.on_call -= 1
 
         # Delete the line if we are just doing a one-shot call from the API.
         if self.is_api == True:
@@ -243,6 +244,7 @@ class Switch():
         self.running = False
         self.max_dialing = config.getint(kind, 'max_dialing')
         self.is_dialing = 0
+        self.on_call = 0
         self.dahdi_group = config.get(kind, 'dahdi_group')
         self.traffic_load = "normal"
 
@@ -329,6 +331,7 @@ def on_DialBegin(event, **kwargs):
             logging.debug('Line %s is on channel %s', l.ident, l.chan)
             l.ast_status = 'Dialing'
             l.switch.is_dialing += 1
+            l.switch.on_call +=1
             logging.debug('Calling %s on DAHDI/%s from %s', l.term, l.chan, l.switch.kind)
 
 def on_DialEnd(event, **kwargs):
@@ -518,6 +521,7 @@ class SwitchSchema(Schema):
     kind = fields.Str()
     max_dialing = fields.Integer()
     is_dialing = fields.Integer()
+    on_call = fields.Integer()
     max_calls = fields.Integer()
     dahdi_group = fields.Str()
     trunk_load = fields.List(fields.Str())
@@ -676,7 +680,8 @@ def api_stop(**kwargs):
 
                     for n in deadlines:
                         n.hangup()
-
+                s.is_dialing = 0
+                s.on_call = 0
     except Exception as e:
         logging.exception("Exception thrown while stopping calls.")
         return False

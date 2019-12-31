@@ -187,6 +187,8 @@ paths:
                 type: integer
               is_dialing:
                 type: integer
+              on_call:
+                type: integer
               dahdi_group:
                 type: string
               line_range:
@@ -319,7 +321,7 @@ paths:
         404:        
           description: Line does not exist.
 
-  /lines/{switch}:
+  /lines/{switch}/{numlines}:
     post:
         operationId: lines.create
         tags:
@@ -331,6 +333,11 @@ paths:
             in: path
             description: Switch that the line will originate from
             type: string
+            required: True
+          - name: numlines
+            in: path
+            description: Number of new lines to create
+            type: integer
             required: True
         responses:
           201:
