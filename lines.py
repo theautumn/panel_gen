@@ -30,7 +30,7 @@ def read_one(ident):
 
 def create(switch, numlines):
     """
-    This function creates a new line in the linees structure
+    This function creates a new line in the lines structure
     based on the passed in line data
     :param line:  line to create in lines structure
     :return:        201 on success, 406 on line exists

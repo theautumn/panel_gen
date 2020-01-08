@@ -27,7 +27,7 @@ We have a PC with two TE110P T1 cards installed. One is for the museum's C\*NET 
 
 The T1 card connects to an Adit 600 channel bank near the Panel switch. The Adit is configured with a bunch of cards, but the important ones for us are the FXO cards in slots 4, 5, and 6. Each card supports 8 lines, so 3 cards supports a total of 24. These exit the Adit on a 25-pair cable and terminate on the IDF in the Panel switch. From the distributing frame, they are cabled to the Line Finder frame on the Panel, and the Line Link Frames on the Crossbar switches just like regular subscriber lines. (Please note that there has been some talk of the fact that hooking up a modern channel bank to an electromechanical switch can, over time, damage the delicate circuitry in the FXO cards. You may want to add some transient voltage protection. I find [these](https://www.mouser.com/ProductDetail/on-semiconductor/p6ke68a/?qs=nEYkbyTNQ5k4oguMQnTOuQ%3d%3d&countrycode=US&currencycode=USD) work very well. If you have questions, ask around on the C\*NET list @ http://www.ckts.info
 
-Currently, <code>panel_gen</code> uses [pycall](https://github.com/rdegges/pycall) to put a .call file in the Asterisk spool directory. Asterisk monitors the spool directory, and when it sees a file there, it starts a call using the parameters in the file. It then either deletes the .call file, or moves it to another directory (depending on your configuration). This program also uses [python-ami](https://github.com/ettoreleandrotognoli/python-ami) to grab AMI events. I suspect that over time, the AMI will be used more and more, and pycall will be used less. 
+Currently, <code>panel_gen</code> uses [pycall](https://github.com/rdegges/pycall) to put a .call file in the Asterisk spool directory. Asterisk monitors the spool directory, and when it sees a file there, it starts a call using the parameters in the file. It then either deletes the .call file, or moves it to another directory (depending on your configuration). This program also uses [python-ami](https://github.com/ettoreleandrotognoli/python-ami) to grab AMI events. 
 
 This application requires a context in your dialplan to pass calls into. The simple context I use is below.
 
@@ -35,10 +35,10 @@ This application requires a context in your dialplan to pass calls into. The sim
 [sarah_callsim]
 
 	exten => s,1,Wait(${waittime})
-        exten => s,n,Hangup()
+    exten => s,n,Hangup()
 ```
 
-Additionally, you must copy panel_gen.conf from ./samples/configs and into /etc/. I finally got around to moving the AMI configuration *out* of the application and into a seperate file. If you forget to do this, panel_gen/ConfigParser will give you a mean error.
+Most of the configuration elements are contained in panel_gen.conf. You must edit and copy panel_gen.conf from ./samples/configs and into /etc/. If you forget to do this, panel_gen/ConfigParser will give you a mean error.
 
 Usage
 -----
@@ -48,13 +48,13 @@ There are two ways to run panel_gen:
 * as a standalone application
 * as a systemd service
 
-Running the program as a standalone application will give you a nice curses UI, and accepts command line arguments outlined below. The application currently needs to be run with `sudo` in order to grab channel information from Asterisk. This will change when I get around to fixing it. The standalone application does not run the HTTP server, so all control must be done through passing arguments in to it.
+Running the program as a standalone application will give you a nice curses UI, and accepts command line arguments outlined below. The standalone application does not run the HTTP server, so all control must be done through passing arguments in to it.
 
 The command line arguments have been mostly tested to work, but I can't make any guarantees that they won't blow something up in the process. Run <code>python panel_gen.py --help</code> to see them.
 
 Running as a systemd service requires using the .service file in the "service/" directory. This method will cause the application to run like any other system service, and includes an HTTP/API server with all of the extra bells and whistles. This is how we normally run it at the museum. While running as a systemd service, you can connect to it with `console.py` to get a curses UI. Exiting `console.py` will have no effect on the service itself. If you want to go this route, you'll need to do the legwork to configure the service for your machine, as I've only tested this on mine.
 
-The program is capable of generating calls from, and terminating calls to, any of the switches in the museum. The switch classes determines what the rules for each switch are, and they're set up with the switch capacities and limitations baked in. This way, if you are originating or terminating on any switch, panel_gen is intelligent enough to know if it's possible to make the call it's about to make.
+The program is capable of generating calls from, and terminating calls to, any of the switches in the museum. The configuration in panel_gen.conf contains the settings for each of the switches. This way, if you are originating or terminating on any switch, panel_gen is intelligent enough to know if it's possible to make the call it's about to make.
 
 The interface is divided into three areas, which should be mostly self-explanatory. The only bit that warrants some explanation is the main table at the top:
 
@@ -106,5 +106,3 @@ There are several different arguments you can use when running the program. Wher
 Caveats
 -------
 This program is designed to control a 100 year old, motor-driven analog switch. The fact that it has so many moving parts means that what looks good on paper is not always the way it behaves in real life. This is especially true when it comes to timing and control. Asterisk has no way of knowing what the switch is doing, outside of the normal subscriber supervision (on hook/off hook). The switch may return various call progress tones back to the caller, but there is currently no easy way for those tones to be recognized and acted upon. Because of this, I've tried to make sanity a priority, so the program should rarely--if ever--do things that the switches can't handle. I've also taken steps to make sure that the program won't "desync" from what Asterisk and the electromechanical switches are actually doing in real life. This element is a constant work in progress, as I discover more and more subtle bugs.
-
-Secondly, this program is currently only compatible with Python 2.75. I've tried to convert to 3, but its just too much hassle. Sorry about that.

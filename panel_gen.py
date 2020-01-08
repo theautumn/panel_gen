@@ -102,7 +102,14 @@ class Line():
         term_choices:       List of office codes we can dial
                             set as a global in __main__
         """
-        nxx = [722,232,832,275,365,830]
+        # As of 1/8/2020, current nxx should be 722,232,832,275,365,830
+        # in that order. This is specified in the config file.
+        # Have to do some weirdness here to get the values from config,
+        # which come in as a list of strings, then convert to a list of
+        # ints.
+        nxx_config = config.get('nxx','nxx')
+        nxx_string = nxx_config.split(",")
+        nxx = list(map(int, nxx_string))
 
         if args.l:                      # If user specified a line
             term = args.l               # Set term line to user specified
@@ -129,7 +136,6 @@ class Line():
                 term_station = random.randint(Step.line_range[0], Step.line_range[1])
             else:
                 logging.error("No terminating line available for this office.")
-                assert False
 
 
             term = int(str(term_office) + str(term_station))
@@ -662,6 +668,7 @@ def api_stop(**kwargs):
             for s in originating_switches:
                 s.running = False
                 s.is_dialing = 0
+                s.on_call = 0
 
             # Can't do this unless we're running as root.
             #system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
