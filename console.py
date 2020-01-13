@@ -124,10 +124,10 @@ class Screen():
         # Output handling. make pretty things.
         table = [[n.ident, n.kind, n.chan, n.term, n.timer, n.status, n.ast_status] for n in lines]
         stdscr.erase()
-        stdscr.addstr(0, 5, " __________________________________________")
-        stdscr.addstr(1, 5, "|                                          |")
-        stdscr.addstr(2, 5, "|  Rainier Full Mechanical Call Simulator  |")
-        stdscr.addstr(3, 5, "|__________________________________________|")
+        stdscr.addstr(0, 6, " __________________________________________")
+        stdscr.addstr(1, 6, "|                                          |")
+        stdscr.addstr(2, 6, "|  Rainier Full Mechanical Call Simulator  |")
+        stdscr.addstr(3, 6, "|__________________________________________|")
         stdscr.addstr(6, 0, tabulate(table, headers=["ident", "switch", "channel", "term",
             "tick", "state", "asterisk"],
             tablefmt="pipe", stralign = "right" ))
@@ -168,11 +168,11 @@ class Screen():
         stdscr.refresh()
 
 #-->                      <--#
-#           THREADS 
+#           THREADS          #
 #-->                      <--#
 
 class ui_thread(threading.Thread):
-    # The UI thread! 
+    # The UI thread!
     # Sets up a screen, and calls various things in Screen() to
     # help with drawing.
 

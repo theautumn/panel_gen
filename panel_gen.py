@@ -205,7 +205,10 @@ class Line():
             logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
 
-        adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
+        try:
+            adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
+        except Exception:
+            logging.error('AMI failed to stop calls. Restart Asterisk, panel_gen.')
 
         logging.debug('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0
