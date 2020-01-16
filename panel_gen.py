@@ -86,7 +86,8 @@ class Line():
                     self.call()
                     self.status = 1
                 else:
-                    self.timer = int(round(random.gamma(5,5)))
+                    # Back off until some calls complete.
+                    self.timer = int(round(random.gamma(4,4)))
                     logging.warning("Exceeded sender limit: %s with %s calls " +
                         "dialing. Delaying call.",
                         self.switch.max_dialing, self.switch.is_dialing)
@@ -134,6 +135,8 @@ class Line():
                 term_station = random.choice(Adams.line_range)
             elif term_office == 275:
                 term_station = random.randint(Step.line_range[0], Step.line_range[1])
+            elif term_office == 830:
+                term_station = random.randint(ESS3.line_range[0], ESS3.line_range[1])
             else:
                 logging.error("No terminating line available for this office.")
 
@@ -240,7 +243,8 @@ class Switch():
     traffic_load:   String that contains "light", "heavy", or "normal".
                     Sets the random.gamma distribution for generating
                     new call timers.
-    max_calls:      Maximum concurrent calls the switch can handle.
+    lines_normal:   Number of lines to use in normal traffic mode.
+    lines_heavy:    Number of lines to use in heavy traffic mode.
     max_nxx:        Values for trunk load. Determined by how many
                     outgoing trunks we have provisioned on the switch.
     trunk_load:	    List of max_nxx used to compute load on trunks.
@@ -256,14 +260,8 @@ class Switch():
         self.on_call = 0
         self.dahdi_group = config.get(kind, 'dahdi_group')
         self.traffic_load = "normal"
-
-        if args.d:
-            self.max_calls = 1
-        elif args.a:
-            self.max_calls = args.a
-        else:
-            self.max_calls = 4
-
+        self.lines_normal = config.getint(kind, 'lines_normal')
+        self.lines_heavy = config.getint(kind, 'lines_heavy')
         self.max_722 = float(config[kind]['max_722'])
         self.max_232 = float(config[kind]['max_232'])
         self.max_832 = float(config[kind]['max_832'])
@@ -285,7 +283,6 @@ class Switch():
         """
         Returns timer back to Line() object. Checks to see
         if arguments have been passed in at runtime. If so,
-            args.d:         Deterministic Mode
             args.w:         User-specified wait time
             args.v:         User-specified call volume
 
@@ -294,21 +291,20 @@ class Switch():
         accordingly.
         """
 
-        if args.d:
-            if args.w:
-                self.timer = args.w
-            else:
-                self.timer = 15
+        if args.w:
+            self.timer = args.w
         else:
-            if args.v == 'light' or self.traffic_load == 'light':
-                a,b = (int(x) for x in self.l_ga.split(","))
-                timer = int(round(random.gamma(a,b)))
-            elif args.v == 'heavy' or self.traffic_load == 'heavy':
-                a,b = (int(x) for x in self.h_ga.split(","))
-                timer = int(round(random.gamma(a,b)))
-            elif args.v == 'normal' or self.traffic_load == 'normal':
-                a,b = (int(x) for x in self.n_ga.split(","))
-                timer = int(round(random.gamma(a,b)))
+            self.timer = 15
+
+        if args.v == 'light' or self.traffic_load == 'light':
+            a,b = (int(x) for x in self.l_ga.split(","))
+            timer = int(round(random.gamma(a,b)))
+        elif args.v == 'heavy' or self.traffic_load == 'heavy':
+            a,b = (int(x) for x in self.h_ga.split(","))
+            timer = int(round(random.gamma(a,b)))
+        elif args.v == 'normal' or self.traffic_load == 'normal':
+            a,b = (int(x) for x in self.n_ga.split(","))
+            timer = int(round(random.gamma(a,b)))
         return timer
 
 # +-----------------------------------------------+
@@ -369,9 +365,6 @@ def parse_args():
             'Defaults to originate a sane amount of calls from the panel switch if no args are given.')
     parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7,8,9,10],
             help='Maximum number of active lines.')
-    parser.add_argument('-d', action='store_true',
-            help='Deterministic mode. Eliminate timing randomness. Places one call at a time. '
-            'Ignores -a and -v options entirely. Use with -l.')
     parser.add_argument('-l', metavar='line', type=int,
             help='Call only a particular line. Can be used with the -d option for placing test '
             'calls to a number over and over again.')
@@ -404,11 +397,13 @@ def make_switch(args):
     global Adams
     global Lakeview
     global Step
+    global ESS3
 
     Rainier = Switch(kind='panel')
     Adams = Switch(kind='5xb')
     Lakeview = Switch(kind='1xb')
     Step = Switch(kind='step')
+    ESS3 = Switch(kind='3ess')
 
     global originating_switches
     originating_switches = []
@@ -417,6 +412,7 @@ def make_switch(args):
         originating_switches.append(Rainier)
         originating_switches.append(Adams)
         originating_switches.append(Lakeview)
+        originating_switches.append(ESS3)
 
     if __name__ == '__main__':
         for o in args.o:
@@ -426,6 +422,8 @@ def make_switch(args):
                 originating_switches.append(Adams)
             elif o == '1xb' or o == '832':
                 originating_switches.append(Lakeview)
+            elif o == 'ess' or o == '830':
+                originating_switches.append(ESS3)
             elif o == 'all':
                 originating_switches.extend((Lakeview, Adams, Rainier))
 
@@ -466,7 +464,7 @@ def make_lines(**kwargs):
     new_lines = []
 
     if source == 'main':
-        new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.max_calls)]
+        new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
     elif source == 'api':
         new_lines = [Line(n, switch) for n in range(numlines)]
         if traffic_load != '':
@@ -531,7 +529,8 @@ class SwitchSchema(Schema):
     max_dialing = fields.Integer()
     is_dialing = fields.Integer()
     on_call = fields.Integer()
-    max_calls = fields.Integer()
+    lines_normal = fields.Integer()
+    lines_heavy = fields.Integer()
     dahdi_group = fields.Str()
     trunk_load = fields.List(fields.Str())
     line_range = fields.List(fields.Str())
@@ -587,8 +586,6 @@ def api_start(**kwargs):
     mode = kwargs.get('mode', '')
     source = kwargs.get('source', '')
     switch = kwargs.get('switch', '')
-    normal_lines = config.getint(switch, 'normal_lines')
-    heavy_lines = config.getint(switch, 'heavy_lines')
 
     if source == 'web':
         logging.info("App requested START on %s", switch)
@@ -607,9 +604,9 @@ def api_start(**kwargs):
                     i.is_dialing = 0                    
 
                     if i.traffic_load == 'heavy':
-                        numlines = heavy_lines
+                        numlines = i.lines_heavy
                     elif i.traffic_load == 'normal':
-                        numlines = normal_lines
+                        numlines = i.lines_normal
 
                     if mode == 'demo':
                         if i == Adams:
@@ -627,7 +624,7 @@ def api_start(**kwargs):
                         else:
                             new_lines = make_lines(switch=i, numlines=numlines, source='api')
                     elif mode != 'demo':
-                        new_lines = [Line(n, i) for n in range(i.max_calls)]
+                        new_lines = [Line(n, i) for n in range(i.lines_normal)]
                     for l in new_lines:
                         lines.append(l)
                     i.running = True
@@ -639,6 +636,7 @@ def api_start(**kwargs):
                     result = get_info()
                     return result
                 except NameError as e:
+                    logging.error(e)
                     return False
 
 def api_stop(**kwargs):
@@ -721,6 +719,8 @@ def call_now(**kwargs):
         switch = Adams
     elif switch == '1xb':
         switch = Lakeview
+    elif switch == '3ess' or 'ess':
+        switch = ESS3
     else:
         return False
 
@@ -829,6 +829,8 @@ def get_switch(kind):
         result.append(schema.dump(Adams))
     if kind == '1xb':
         result.append(schema.dump(Lakeview))
+    if kind == '3ess':
+        result.append(schema.dump(ESS3))
 
     if result == []:
         return False
@@ -847,6 +849,9 @@ def create_switch(kind):
     if '1xb' not in originating_switches:
         if kind == '1xb':
             originating_switches.append(Lakeview)
+    if 'ESS3' not in originating_switches:
+        if kind == '3ess':
+            originating_switches.append(ESS3)
 
     if originating_switches != []:
         return originating_switches
@@ -882,7 +887,7 @@ def update_switch(**kwargs):
                                 create_line(switch=i, numlines=2)
                             elif i.traffic_load == 'normal':
                                 delete_line(switch=i, numlines=2)
-                        logging.info("Traffic on %s load changed to %s", 
+                        logging.info("Traffic on %s changed to %s", 
                                     i.kind, i.traffic_load)
             result.append(schema.dump(i))
     if result != []:        
@@ -1185,8 +1190,7 @@ if __name__ == "__main__":
 
     if args.t != []:
         logging.info('Terminating calls on %s', term_choices)
-    if args.d == True:
-        logging.info('Deterministic Mode set!')
+
     logging.info('Call volume set to %s', args.v)
 
     # Here is where we actually make the lines.

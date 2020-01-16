@@ -144,7 +144,9 @@ paths:
                   type: string
                 running:
                   type: boolean
-                max_calls:
+                lines_normal:
+                  type: integer
+                lines_heavy:
                   type: integer
                 max_dialing:
                   type: integer
@@ -181,7 +183,9 @@ paths:
                 type: string
               running:
                 type: boolean
-              max_calls:
+              lines_normal:
+                type: integer
+              lines_heavy:
                 type: integer
               max_dialing:
                 type: integer
