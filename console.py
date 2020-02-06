@@ -28,6 +28,7 @@ class Line(object):
     self.kind:          Type of switch for above objects. "panel, 1xb, 5xb"
     self.status:        0 = OnHook, 1 = OffHook
     self.term:          String containing the 7-digit terminating line.
+    self.human_term     Human readable phone number.
     self.timer:         Starts with a standard random.gamma, then gets set
                         subsequently by the call volume attribute of the switch.
     self.ident:         Integer starting with 0 that identifies the line.
@@ -35,10 +36,11 @@ class Line(object):
     self.ast_status:    Status of line according to Asterisk
     """
 
-    def __init__(self, kind, status, term, timer, ident, chan, ast_status, **kwargs):
+    def __init__(self, kind, status, term, human_term, timer, ident, chan, ast_status, **kwargs):
         self.kind = kind
         self.status = status
         self.term = term
+        self.human_term = human_term
         self.timer = timer
         self.ident = ident
         self.chan = chan
@@ -70,6 +72,7 @@ class LineSchema(Schema):
     ast_status = fields.Str()
     chan = fields.Str()
     term = fields.Str()
+    human_term = fields.Str()
     hook_state = fields.Integer()
 
     @post_load
@@ -122,7 +125,8 @@ class Screen():
 
     def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
-        table = [[n.ident, n.kind, n.chan, n.term, n.timer, n.status, n.ast_status] for n in lines]
+
+        table = [[n.ident, n.kind, n.chan, n.human_term, n.timer, n.status, n.ast_status] for n in lines]
         stdscr.erase()
         stdscr.addstr(0, 6, " __________________________________________")
         stdscr.addstr(1, 6, "|                                          |")

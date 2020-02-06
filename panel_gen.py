@@ -61,6 +61,7 @@ class Line():
 
         self.timer = int(random.gamma(3,4))
         self.ident = ident
+        self.human_term = phone_format(str(self.term)) 
         self.chan = '-'
         self.ast_status = 'on_hook'
         self.is_api = False
@@ -390,6 +391,9 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def phone_format(n):
+    return format(int(n[:-1]), ",").replace(",", "-") + n[-1]
+
 def make_switch(args):
     """ Instantiate some switches so we can work with them later."""
 
@@ -521,6 +525,7 @@ class LineSchema(Schema):
     status = fields.Int()
     chan = fields.Str()
     term = fields.Str()
+    human_term = fields.Str()
     hook_state = fields.Integer()
 
 class SwitchSchema(Schema):
@@ -601,7 +606,7 @@ def api_start(**kwargs):
                     logging.warning("%s is running. Can't start twice.", i)
                 elif i.running == False:
                     # Reset the dialing counter for safety.
-                    i.is_dialing = 0                    
+                    i.is_dialing = 0
 
                     if i.traffic_load == 'heavy':
                         numlines = i.lines_heavy
@@ -617,7 +622,7 @@ def api_start(**kwargs):
                             # Will have no impact when using web app.
                             if datetime.today().weekday() == 6:
                                 if source == 'key':
-                                    i.trunk_load = [.3, .7, .0, .0, .0, .0]
+                                    i.trunk_load = [.15, .85, .0, .0, .0, .0]
                                     logging.info('Its Sunday!')
                             new_lines = make_lines(switch=i, numlines=numlines,
                                         traffic_load='heavy', source='api')
@@ -691,7 +696,8 @@ def api_stop(**kwargs):
                 s.is_dialing = 0
                 s.on_call = 0
     except Exception as e:
-        logging.exception("Exception thrown while stopping calls.")
+        logging.warning("Exception occurred while stopping calls.")
+        logging.warning(e)
         return False
 
     return get_info()
@@ -890,7 +896,7 @@ def update_switch(**kwargs):
                         logging.info("Traffic on %s changed to %s", 
                                     i.kind, i.traffic_load)
             result.append(schema.dump(i))
-    if result != []:        
+    if result != []:
         return result
     else:
         return False
@@ -919,7 +925,7 @@ class Screen():
         self.stdscr = stdscr
 
     def getkey(self, stdscr):
-        #Handles user input.
+    #Handles user input.
 
         key = stdscr.getch()
 
@@ -982,7 +988,7 @@ class Screen():
 
     def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
-        table = [[n.kind, n.chan, n.term, n.timer,
+        table = [[n.kind, n.chan, n.human_term, n.timer,
                 n.status, n.ast_status, n.api_indicator] for n in lines]
         stdscr.erase()
         stdscr.addstr(0,5," __________________________________________")

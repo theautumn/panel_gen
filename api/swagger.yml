@@ -287,6 +287,8 @@ paths:
                   type: string
                 called_no:
                   type: string
+                called_no_hr:
+                  type: string
 
   /lines/{ident}:
     get:
@@ -321,6 +323,8 @@ paths:
               dahdi_chan:
                 type: string
               called_no:
+                type: string
+              called_no_hr:
                 type: string
         404:        
           description: Line does not exist.
