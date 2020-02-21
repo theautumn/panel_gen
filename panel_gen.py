@@ -144,6 +144,7 @@ class Line():
 
             term = int(str(term_office) + str(term_station))
         logging.debug('Terminating line selected: %s', term)
+        self.human_term = phone_format(str(term)) 
         return term
 
     def call(self, **kwargs):
@@ -293,19 +294,17 @@ class Switch():
         """
 
         if args.w:
-            self.timer = args.w
+            timer = args.w
         else:
-            self.timer = 15
-
-        if args.v == 'light' or self.traffic_load == 'light':
-            a,b = (int(x) for x in self.l_ga.split(","))
-            timer = int(round(random.gamma(a,b)))
-        elif args.v == 'heavy' or self.traffic_load == 'heavy':
-            a,b = (int(x) for x in self.h_ga.split(","))
-            timer = int(round(random.gamma(a,b)))
-        elif args.v == 'normal' or self.traffic_load == 'normal':
-            a,b = (int(x) for x in self.n_ga.split(","))
-            timer = int(round(random.gamma(a,b)))
+            if args.v == 'light' or self.traffic_load == 'light':
+                a,b = (int(x) for x in self.l_ga.split(","))
+                timer = int(round(random.gamma(a,b)))
+            elif args.v == 'heavy' or self.traffic_load == 'heavy':
+                a,b = (int(x) for x in self.h_ga.split(","))
+                timer = int(round(random.gamma(a,b)))
+            elif args.v == 'normal' or self.traffic_load == 'normal':
+                a,b = (int(x) for x in self.n_ga.split(","))
+                timer = int(round(random.gamma(a,b)))
         return timer
 
 # +-----------------------------------------------+
