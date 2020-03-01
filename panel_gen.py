@@ -25,7 +25,7 @@ from marshmallow import Schema, fields, post_load
 from tabulate import tabulate
 from numpy import random
 from pycall import CallFile, Call, Application, Context
-from asterisk.ami import AMIClient, EventListener, AMIClientAdapter
+from asterisk.ami import AMIClient, EventListener, AMIClientAdapter, AutoReconnect
 
 
 class Line():
@@ -210,10 +210,21 @@ class Line():
             logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
 
+        # This try block exists because sometimes the AMI likes to disconnect
+        # us for no reason. When this happens, calls fail to hangup properly.
+        # The hope here is that we can attempt to reconnect on the fly and
+        # hangup again. Ideally, we should never get to the second part of the
+        # block because the Python AMI module has an auto reconnect feature.
         try:
             adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
         except Exception:
-            logging.error('AMI failed to stop calls. Restart Asterisk, panel_gen.')
+            logging.error('AMI failed to stop calls. Attempting to recover.')
+            try:
+                ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
+                adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
+                logging.info('AMI connection recovered!')
+            except Exception:
+                    logging.error('AMI recovery failed. Fuck everything.')
 
         logging.debug('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0
@@ -490,6 +501,21 @@ def start_ui():
         t.start()
     except Exception as e:
         print(e)
+
+def ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET):
+    global client
+    global adapter
+    client = AMIClient(address=AMI_ADDRESS, port=int(AMI_PORT))
+    adapter = AMIClientAdapter(client)
+    #AutoReconnect(client)
+    future = client.login(username=AMI_USER, secret=AMI_SECRET)
+    if future.response.is_error():
+        raise Exception(str(future.response))
+
+    # These listeners are for the AMI so I can catch events.
+    client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
+    client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
+
 
 # +----------------------------------------------------+
 # |                                                    |
@@ -1096,10 +1122,6 @@ class work_thread(threading.Thread):
 
         logging.info('--- Started panel_gen ---')
 
-        # These listeners are for the AMI so I can catch events.
-        client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
-        client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
-
     def run(self):
 
         while not self.shutdown_flag.is_set():
@@ -1162,19 +1184,25 @@ if __name__ == "__main__":
 
     config = ConfigParser()
     config.read('/etc/panel_gen.conf')
+
+    global AMI_ADDRESS
+    global AMI_PORT
+    global AMI_USER
+    global AMI_SECRET
+
+    config = ConfigParser()
+    config.read('/etc/panel_gen.conf')
     AMI_ADDRESS = config.get('ami', 'address')
     AMI_PORT = config.get('ami', 'port')
     AMI_USER = config.get('ami', 'user')
     AMI_SECRET = config.get('ami', 'secret')
 
-
     # Connect to AMI
-    client = AMIClient(address=AMI_ADDRESS, port=int(AMI_PORT))
-    adapter = AMIClientAdapter(client)
-    future = client.login(username=AMI_USER, secret=AMI_SECRET)
-    if future.response.is_error():
-        raise Exception(str(future.response))
-
+    try:
+        ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
+    except Exception:
+        logging.warning('Failed to connect to Asterisk AMI!')
+    
     # If logfile does not exist, create it so logging can write to it.
     try:
         with open('/var/log/panel_gen/calls.log', 'a') as file:
@@ -1234,6 +1262,11 @@ if __name__ == "panel_gen":
     # The below gets run if this code is imported as a module.
     # It skips lots of setup steps.
 
+    #global AMI_ADDRESS
+    #global AMI_PORT
+    #global AMI_USER
+    #global AMI_SECRET
+
     config = ConfigParser()
     config.read('/etc/panel_gen.conf')
     AMI_ADDRESS = config.get('ami', 'address')
@@ -1242,13 +1275,16 @@ if __name__ == "panel_gen":
     AMI_SECRET = config.get('ami', 'secret')
 
     # Connect to AMI
-    client = AMIClient(address=AMI_ADDRESS, port=int(AMI_PORT))
-    adapter = AMIClientAdapter(client)
-    future = client.login(username=AMI_USER, secret=AMI_SECRET)
-    if future.response.is_error():
-        raise Exception(str(future.response))
+    try:
+        ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
+    except Exception:
+        logging.warning('Failed to connect to Asterisk AMI!')
 
-    parse_args()    # No args when running as daemon so just set defaults.
+    # We call parse_args here just to set some defaults. Otherwise
+    # note used when running as module.
+    parse_args()
+
+    # Make some switches.
     make_switch(args)
 
 
