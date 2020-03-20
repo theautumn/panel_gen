@@ -49,7 +49,7 @@ class Line():
     self.api_indicator: See above. Is set to "***" if a line is a temp API line.
     """
 
-    def __init__(self, ident, switch):
+    def __init__(self, ident, switch, **kwargs):
         self.switch = switch
         self.kind = switch.kind
         self.status = 0
@@ -64,7 +64,7 @@ class Line():
         self.human_term = phone_format(str(self.term)) 
         self.chan = '-'
         self.ast_status = 'on_hook'
-        self.is_api = False
+        self.is_api = kwargs.get('is_api', False)
         self.api_indicator = ""
 
     def __repr__(self):
@@ -141,7 +141,6 @@ class Line():
             else:
                 logging.error("No terminating line available for this office.")
 
-
             term = int(str(term_office) + str(term_station))
         logging.debug('Terminating line selected: %s', term)
         self.human_term = phone_format(str(term)) 
@@ -199,7 +198,9 @@ class Line():
 
     def hangup(self):
         """
-        Check if a call is being dialed during hangup.
+        Hangs up a call.
+
+        Checks if a call is being dialed during hangup.
         If so, we need to decrement the dialing counter.
         Then, send an AMI hangup request to Asterisk,
         set status, chan, and ast_status back to normal values,
@@ -213,8 +214,7 @@ class Line():
         # This try block exists because sometimes the AMI likes to disconnect
         # us for no reason. When this happens, calls fail to hangup properly.
         # The hope here is that we can attempt to reconnect on the fly and
-        # hangup again. Ideally, we should never get to the second part of the
-        # block because the Python AMI module has an auto reconnect feature.
+        # hangup again.
         try:
             adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
         except Exception:
@@ -224,7 +224,7 @@ class Line():
                 adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
                 logging.info('AMI connection recovered!')
             except Exception:
-                    logging.error('AMI recovery failed. Fuck everything.')
+                logging.error('AMI recovery failed.')
 
         logging.debug('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0
@@ -480,7 +480,7 @@ def make_lines(**kwargs):
     if source == 'main':
         new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
     elif source == 'api':
-        new_lines = [Line(n, switch) for n in range(numlines)]
+        new_lines = [Line(n, switch, is_api=True) for n in range(numlines)]
         if traffic_load != '':
             switch.traffic_load = str(traffic_load)
     return new_lines
@@ -536,6 +536,7 @@ class AppSchema(Schema):
     app_running = fields.Boolean()
     panel_running = fields.Boolean()
     xb5_running = fields.Boolean()
+    xb1_running = fields.Boolean()
     ui_running = fields.Boolean()
     is_paused = fields.Boolean()
     num_lines = fields.Integer()
@@ -592,6 +593,7 @@ def get_info():
         ('num_lines', len(lines)),
         ('panel_running', Rainier.running),
         ('xb5_running', Adams.running),
+        ('xb1_running', Lakeview.running),
         ])
     return schema.dump(result)
 
@@ -705,8 +707,11 @@ def api_stop(**kwargs):
             #system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
 
             # Delete all remaining files in spool.
-            system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
-
+            try:
+                system("rm /var/spool/asterisk/outgoing/*.call > /dev/null 2>&1")
+            except Exception as e:
+                logging.warning("Failed to delete remaining files in spool.")
+                logging.warning(e)
         else:
 
             for s in originating_switches:
@@ -732,14 +737,16 @@ def call_now(**kwargs):
     Immediately places a call from switch to destination. The line is
     deleted when the call timer expires.
 
-    switch:     Switch to originate call on.
-    term_line:  Destination number to call.
+    switch:             Switch to originate call on.
+    term_line:          Destination number to call.
+    one_shot_timer:     Number of seconds before hangup.
     """
 
     schema = LineSchema()
 
     switch = kwargs.get('switch','')
     term_line = kwargs.get('destination','')
+    one_shot_timer = int(kwargs.get('timer',''))
 
     logging.info('API requested one-shot call on %s', switch)
 
@@ -753,24 +760,22 @@ def call_now(**kwargs):
     elif switch == '3ess' or 'ess':
         switch = ESS3
     else:
+        logging.warning("API one-shot switch failed validation check.")
         return False
-
-    # The call timer. Can be changed, if needed.
-    on_call_time = 18
 
     # Validates line input. If sane, set up line for
     # immediate calling.
     if len(term_line) == 7:
-        lines.append(Line(len(lines), switch))
-        calling_line = len(lines) - 1
-        lines[calling_line].is_api = True
-        lines[calling_line].timer = 1
-        lines[calling_line].term = term_line
-        lines[calling_line].call(originating_switches=switch, timer=on_call_time)
-
-        result = schema.dump(lines[calling_line])
+        api_lines = make_lines(source='api', switch=switch, numlines=1) 
+        api_lines[0].term = term_line
+        api_lines[0].human_term = phone_format(str(term_line))
+        lines.append(api_lines[0])
+        api_lines[0].call(originating_switches=switch, timer=one_shot_timer)
+        api_lines[0].tick()
+        result = schema.dump(api_lines[0])
         return result
     else:
+        logging.warning("API one-shot line failed validation check.")
         return False
 
 def get_all_lines():
@@ -984,16 +989,17 @@ class Screen():
         # getkey(), which waits for another <spacebar> then resumes.
 
         y, x = self.stdscr.getmaxyx()
-        half_cols = x/2
+        half_cols = int(x/2)
         rows_size = 5
         x_start_row = y - 9
-        y_start_col = half_cols - half_cols / 2
+        y_start_col = half_cols - int(half_cols / 2)
 
+        logging.info("Paused")
         w.pause()
         self.stdscr.nodelay(0)
         pause_scr = self.stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
         pause_scr.box()
-        pause_scr.addstr(2, half_cols/2 - 5, "P A U S E D", curses.color_pair(1))
+        pause_scr.addstr(2, int(half_cols/2) - 5, "P A U S E D", curses.color_pair(1))
         pause_scr.bkgd(' ', curses.color_pair(2))
         self.stdscr.addstr(y-1,0,"Spacebar: pause/resume, ctrl + c: quit", curses.A_BOLD)
         pause_scr.refresh()
@@ -1009,6 +1015,7 @@ class Screen():
         self.stdscr.nodelay(1)
         self.stdscr.refresh()
         self.draw(self.stdscr, lines, self.y, self.x)
+        logging.info("Resumed")
 
 
     def draw(self, stdscr, lines, y, x):
@@ -1281,7 +1288,7 @@ if __name__ == "panel_gen":
         logging.warning('Failed to connect to Asterisk AMI!')
 
     # We call parse_args here just to set some defaults. Otherwise
-    # note used when running as module.
+    # not used when running as module.
     parse_args()
 
     # Make some switches.

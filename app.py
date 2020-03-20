@@ -93,6 +93,7 @@ def call(**kwargs):
     **kwargs allow the POST to be parsed for specifics
     switch:         In URI path. Can be "1xb", "5xb", "panel".
     destination:    In URI path. Called line.
+    timer:          In URI path. Number of seconds for call to be up.
 
     """
     result = panel_gen.call_now(**kwargs)

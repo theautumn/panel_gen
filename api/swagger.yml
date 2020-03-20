@@ -41,6 +41,8 @@ paths:
                   type: boolean
                 xb5_running:
                   type: boolean
+                xb1_running:
+                  type: boolean
 
   /app/start/{switch}:
     post:
@@ -115,6 +117,11 @@ paths:
         - name: destination
           in: path
           description: Destination line to call
+          type: string
+          required: True
+        - name: timer
+          in: query
+          description: Length of call before it hangs up
           type: string
           required: True
 
