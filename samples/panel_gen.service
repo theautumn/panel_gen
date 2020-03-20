@@ -1,3 +1,13 @@
+# Sample systemd service file for panel_gen
+# 
+# You will need to edit this file before installing it:
+#   User=                   Should be the user you wish to run this as
+#   WorkingDirectory=       The directory where panel_gen.py is located
+#   ExecStart=              The path to your Python3 and the path to the 
+                            panel_gen.py file. Note that I am using pipenv,
+                            so my Python path is wacky. Yours will likely
+                            be different than mine.
+
 [Unit]
 Description=Connections Museum (panel_gen) Service
 Documentation=https://www.github.com/theautumn/panel_gen
