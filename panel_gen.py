@@ -480,7 +480,7 @@ def make_lines(**kwargs):
     if source == 'main':
         new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
     elif source == 'api':
-        new_lines = [Line(n, switch, is_api=True) for n in range(numlines)]
+        new_lines = [Line(n, switch) for n in range(numlines)]
         if traffic_load != '':
             switch.traffic_load = str(traffic_load)
     return new_lines
