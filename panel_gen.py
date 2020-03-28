@@ -104,7 +104,7 @@ class Line():
         term_choices:       List of office codes we can dial
                             set as a global in __main__
         """
-        # As of 1/8/2020, current nxx should be 722,232,832,275,365,830
+        # As of 3/29/2020, current nxx should be 722,232,832,275,365,830,833
         # in that order. This is specified in the config file.
         # Have to do some weirdness here to get the values from config,
         # which come in as a list of strings, then convert to a list of
@@ -112,6 +112,11 @@ class Line():
         nxx_config = config.get('nxx','nxx')
         nxx_string = nxx_config.split(",")
         nxx = list(map(int, nxx_string))
+
+        if len(nxx) != len(self.switch.trunk_load):
+            logging.error("Check your config file! \"nxx\" is of a length %s " +
+                        "and the trunk load of %s switch is %s",
+                        len(nxx), self.switch.kind, len(self.switch.trunk_load))
 
         if args.l:                      # If user specified a line
             term = args.l               # Set term line to user specified
@@ -130,7 +135,7 @@ class Line():
 
             if term_office == 722 or term_office == 365:
                 term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
-            elif term_office == 832:
+            elif term_office == 832 or term_office == 833:
                 term_station = "%04d" % int(random.choice(Lakeview.line_range))
             elif term_office == 232:
                 term_station = random.choice(Adams.line_range)
@@ -281,8 +286,10 @@ class Switch():
         self.max_275 = float(config[kind]['max_275'])
         self.max_365 = float(config[kind]['max_365'])
         self.max_830 = float(config[kind]['max_830'])
+        self.max_833 = float(config[kind]['max_833'])
         self.trunk_load = [self.max_722, self.max_232,
-                self.max_832, self.max_275, self.max_365, self.max_830]
+                self.max_832, self.max_275, self.max_365, 
+                self.max_830, self.max_833]
         lr = config.get(kind, 'line_range')
         self.line_range = lr.split(",")
         self.l_ga = config.get(kind, 'l_gamma')
@@ -476,7 +483,6 @@ def make_lines(**kwargs):
     numlines = kwargs.get('numlines', '')
 
     new_lines = []
-
     if source == 'main':
         new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
     elif source == 'api':
@@ -649,7 +655,7 @@ def api_start(**kwargs):
                             # Will have no impact when using web app.
                             if datetime.today().weekday() == 6:
                                 if source == 'key':
-                                    i.trunk_load = [.15, .85, .0, .0, .0, .0]
+                                    i.trunk_load = [.15, .85, .0, .0, .0, .0, .0]
                                     logging.info('Its Sunday!')
                             new_lines = make_lines(switch=i, numlines=numlines,
                                         traffic_load='heavy', source='api')
