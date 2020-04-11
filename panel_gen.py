@@ -387,9 +387,9 @@ def parse_args():
             help='Call only a particular line. Can be used with the -d option for placing test '
             'calls to a number over and over again.')
     parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],
-            choices=['1xb','5xb','panel','all','722', '832', '232'],
+            choices=['1xb','1xbos','5xb','panel','all','722', '832', '232'],
             help='Originate calls from a particular switch. Takes either 3 digit NXX values '
-            'or switch name.  1xb, 5xb, panel, or all. Default is panel.')
+            'or switch name.  1xb, 1xbos, 5xb, panel, or all. Default is panel.')
     parser.add_argument('-t', metavar='switch', type=str, nargs='?', action='append', default=[],
             choices=['1xb','5xb','panel','office','step', '722', '832', '232', '365', '275'],
             help='Terminate calls only on a particular switch. Takes either 3 digit NXX values '
@@ -417,12 +417,14 @@ def make_switch(args):
     global Rainier
     global Adams
     global Lakeview
+    global Vermont
     global Step
     global ESS3
 
     Rainier = Switch(kind='panel')
     Adams = Switch(kind='5xb')
     Lakeview = Switch(kind='1xb')
+    Vermont = Switch(kind='1xb_os')
     Step = Switch(kind='step')
     ESS3 = Switch(kind='3ess')
 
@@ -433,6 +435,7 @@ def make_switch(args):
         originating_switches.append(Rainier)
         originating_switches.append(Adams)
         originating_switches.append(Lakeview)
+        originating_switches.append(Vermont)
         originating_switches.append(ESS3)
 
     if __name__ == '__main__':
@@ -443,10 +446,12 @@ def make_switch(args):
                 originating_switches.append(Adams)
             elif o == '1xb' or o == '832':
                 originating_switches.append(Lakeview)
+            elif o == '1xbos' or o == '833':
+                originating_switches.append(Vermont)
             elif o == 'ess' or o == '830':
                 originating_switches.append(ESS3)
             elif o == 'all':
-                originating_switches.extend((Lakeview, Adams, Rainier))
+                originating_switches.extend((Lakeview, Vermont, Adams, Rainier))
 
         if args.o == []:
             originating_switches.append(Rainier)
@@ -463,6 +468,8 @@ def make_switch(args):
             term_choices.append(832)
         elif t == 'office' or t == '365':
             term_choices.append(365)
+        elif t == 'step' or t == '275':
+            term_choices.append(275)
 
 
 def make_lines(**kwargs):
@@ -763,6 +770,8 @@ def call_now(**kwargs):
         switch = Adams
     elif switch == '1xb':
         switch = Lakeview
+    elif switch == '1xb_os' or '1xbos':
+        switch = Vermont
     elif switch == '3ess' or 'ess':
         switch = ESS3
     else:
@@ -871,6 +880,8 @@ def get_switch(kind):
         result.append(schema.dump(Adams))
     if kind == '1xb':
         result.append(schema.dump(Lakeview))
+    if kind == '1xbos' or '1xb_os':
+        result.append(schema.dump(Vermont))
     if kind == '3ess':
         result.append(schema.dump(ESS3))
 
@@ -891,6 +902,9 @@ def create_switch(kind):
     if '1xb' not in originating_switches:
         if kind == '1xb':
             originating_switches.append(Lakeview)
+    if '1xb_os' not in originating_switches:
+        if kind == '1xb_os' or '1xbos':
+            originating_switches.append(Vermont)
     if 'ESS3' not in originating_switches:
         if kind == '3ess':
             originating_switches.append(ESS3)
