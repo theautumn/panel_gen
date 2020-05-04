@@ -57,13 +57,13 @@ paths:
           description: Switch to originate call from.
           type: string
           required: True
-        - name: mode
-          in: query
-          description: Allows starting demo mode, which sets special parameters.
-          type: string
         - name: source
           in: query
           description: Changes response to 303 when running from web page.
+          type: string
+        - name: traffic_load
+          in: query
+          description: Allows you to set call volume and stuff.
           type: string
 
       responses:

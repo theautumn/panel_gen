@@ -30,12 +30,11 @@ def start(**kwargs):
 
     **kwargs allow the POST to be parsed for specifics
     switch:     In URI path, Can be "1xb", "5xb", "panel", "all"
-    mode:       In URI query string. Can be "demo", <empty>.
     source:     In URI query string. "web", "key"
     """
     switch = kwargs.get("switch", "")
-    mode = kwargs.get("mode", "")
     source = kwargs.get("source", "")
+    traffic_load = kwargs.get("traffic_load", "")
 
     try:
         result = panel_gen.api_start(**kwargs)

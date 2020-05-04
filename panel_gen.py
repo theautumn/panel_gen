@@ -479,23 +479,24 @@ def make_lines(**kwargs):
     source:         the origin of the call to this function
     switch:         the switch where the lines will originate on
     originating_switches:    list of originating switches passed in from args
-    traffic_load:   light, normal, or heavy
-    numlines:       number of lines we should create
+    numlines:       number of lines we should create. should be determined and
+                    passed in before this function is called
     """
 
     source = kwargs.get('source', '')
     switch = kwargs.get('switch', '')
-    traffic_load = kwargs.get('traffic_load', '')
     originating_switches = kwargs.get('originating_switches','')
     numlines = kwargs.get('numlines', '')
 
     new_lines = []
+
     if source == 'main':
+        # If we start standalone, just give us normal lines for everything.
         new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
     elif source == 'api':
+        # If this is an API call, we care about "numlines".
         new_lines = [Line(n, switch) for n in range(numlines)]
-        if traffic_load != '':
-            switch.traffic_load = str(traffic_load)
+
     return new_lines
 
 def start_ui():
@@ -621,68 +622,97 @@ def api_start(**kwargs):
     - A special case is created for Sunday. See further notes
     below.
 
-    mode:       'demo' or ''. Demo mode will start with preset params.
     source:     Used to log where the start request came from.
     switch:     Specifies which switch to start calls on.
+    traffic_load:  'normal' or 'heavy'. Impacts number of lines we start with.
 
     """
 
     global lines
-    mode = kwargs.get('mode', '')
+    global new_lines
     source = kwargs.get('source', '')
     switch = kwargs.get('switch', '')
+    traffic_load = kwargs.get('traffic_load', '')
 
+    # We need to do some sanity checking first.
     if source == 'web':
         logging.info("App requested START on %s", switch)
     elif source == 'key':
         logging.info('Key operated: START on %s', switch)
     else:
-        logging.info('I dont know why, but we are starting on %s', switch)
+        logging.warning('I dont know why, but we are starting on %s', switch)
 
     if w.is_alive == True:
         for i in originating_switches:
             if switch == i.kind:
                 if i.running == True:
-                    logging.warning("%s is running. Can't start twice.", i)
+                    logging.warning("%s is running. Can't start twice.", i.kind)
                 elif i.running == False:
+
                     # Reset the dialing counter for safety.
                     i.is_dialing = 0
 
+                    # This block handles whether or not the user passed in
+                    # a traffic load setting. If not, we'll just use whatever
+                    # we already have.
+                    if traffic_load == "normal" or traffic_load == "heavy":
+                        if traffic_load != i.traffic_load:
+                            i.traffic_load = traffic_load
+                            logging.info('Changing traffic load to %s', traffic_load)
                     if i.traffic_load == 'heavy':
                         numlines = i.lines_heavy
-                    elif i.traffic_load == 'normal':
+                    if i.traffic_load == 'normal':
                         numlines = i.lines_normal
 
-                    if mode == 'demo':
-                        if i == Adams:
-                            # Carve out a special case for Sundays. This was requested
-                            # by museum volunteers so that we can give tours of the
-                            # step and 1XB without interruption by the this program.
-                            # This will only be effective if the key is operated.
-                            # Will have no impact when using web app.
-                            if datetime.today().weekday() == 6:
-                                if source == 'key':
-                                    i.trunk_load = [.15, .85, .0, .0, .0, .0, .0]
-                                    logging.info('Its Sunday!')
-                            new_lines = make_lines(switch=i, numlines=numlines,
-                                        traffic_load='heavy', source='api')
+                    if i == Adams:
+                        # Carve out a special case for Sundays. This was requested
+                        # by museum volunteers so that we can give tours of the
+                        # step and 1XB without interruption by the this program.
+                        # This will only be effective if the key is operated.
+                        # Will have no impact when using web app.
+                        if datetime.today().weekday() == 6:
+                            if source == 'key':
+                                i.trunk_load = [.15, .85, .0, .0, .0, .0, .0]
+                                logging.info('Its Sunday!')
+                                new_lines = make_lines(switch=i, numlines=8,
+                                source='api')
+
+                            # If we start from the web interface, ignore 
+                            # those rules.
+                            else:
+                                new_lines = make_lines(switch=i, numlines=numlines, 
+                                source='api')
+
+                        # If its any other day of the week, just act normal.
                         else:
-                            new_lines = make_lines(switch=i, numlines=numlines, source='api')
-                    elif mode != 'demo':
-                        new_lines = [Line(n, i) for n in range(i.lines_normal)]
+                            new_lines = make_lines(switch=i, numlines=numlines, 
+                            source='api')
+
+                    # If we're not Adams, then also just act normal.
+                    else:
+                        new_lines = make_lines(switch=i, numlines=numlines, source='api')
                     for l in new_lines:
                         lines.append(l)
+
                     i.running = True
+                    
                     logging.info('Appending %s lines to %s', len(new_lines), switch)
 
                 try:
-                    new_lines
                     lines_created = len(new_lines)
                     result = get_info()
                     return result
                 except NameError as e:
                     logging.error(e)
                     return False
+    
+    # This else will catch if work thread isn't started for some reason.
+    # Hint: It always should be.
+    else:
+        logging.error("Work thread isn't alive. We ain't doin shit.")
+        logging.error("Returning FALSE and bailing out of api_start()")
+        return False 
+
 
 def api_stop(**kwargs):
     """
@@ -938,11 +968,15 @@ def update_switch(**kwargs):
                     desired_load = k1[1]
                     if i.traffic_load != desired_load:
                         i.traffic_load = desired_load
+
+                        # Determine how many lines we have to add or remove.
+                        numlines = i.lines_heavy - i.lines_normal
+
                         if i.running == True:
                             if i.traffic_load == 'heavy':
-                                create_line(switch=i, numlines=2)
+                                create_line(switch=i, numlines=numlines)
                             elif i.traffic_load == 'normal':
-                                delete_line(switch=i, numlines=2)
+                                delete_line(switch=i, numlines=numlines)
                         logging.info("Traffic on %s changed to %s", 
                                     i.kind, i.traffic_load)
             result.append(schema.dump(i))

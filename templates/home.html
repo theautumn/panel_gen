@@ -1,21 +1,21 @@
 {% extends 'layout.html' %}
 {% block header %}Connections Museum{% endblock %}
 {% block content %}
-    	<form method="post" action="/api/app/start/panel?mode=demo&source=web">
+    	<form method="post" action="/api/app/start/panel?source=web">
 		<input class="button-primary" type="submit", name="command", value="Panel Start">
         </form>
         <form method="post" action="/api/app/stop/panel?source=web">
         <input class="button" type="submit", name="command", value="Panel Stop">
         </form>
 	<div>
-    	<form method="post" action="/api/app/start/5xb?mode=demo&source=web">
+    	<form method="post" action="/api/app/start/5xb?traffic_load=heavy&source=web">
 		<input class="button-primary" type="submit", name="command", value="5XB Start">
         </form>
         <form method="post" action="/api/app/stop/5xb?source=web">
         <input class="button" type="submit", name="command", value="5XB Stop">
         </form>
 	<div>
-    	<form method="post" action="/api/app/start/1xb?mode=demo&source=web">
+    	<form method="post" action="/api/app/start/1xb?source=web">
 		<input class="button-primary" type="submit", name="command", value="No. 1 Start">
         </form>
         <form method="post" action="/api/app/stop/1xb?source=web">
