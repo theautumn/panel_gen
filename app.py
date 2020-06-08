@@ -59,7 +59,7 @@ def stop(**kwargs):
     redirect back to same page with no status message.
 
     **kwargs allow the POST to be parsed for specifics
-    switch:     In URI path. Can be "1xb", "5xb", "panel"
+    switch:     In URI path. Can be "1xb", "5xb", "panel", "all"
     source:     In URI query string. Can be "web", "key".
     """
     source = kwargs.get("source", "")

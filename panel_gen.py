@@ -117,6 +117,9 @@ class Line():
             logging.error("Check your config file! \"nxx\" is of a length %s " +
                         "and the trunk load of %s switch is %s",
                         len(nxx), self.switch.kind, len(self.switch.trunk_load))
+            logging.error("Also check the switch class for the presence of each " +
+                        "trunk load variable that exists in config file.")
+
 
         if args.l:                      # If user specified a line
             term = args.l               # Set term line to user specified
@@ -143,8 +146,11 @@ class Line():
                 term_station = random.randint(Step.line_range[0], Step.line_range[1])
             elif term_office == 830:
                 term_station = random.randint(ESS3.line_range[0], ESS3.line_range[1])
+            elif term_office == 524:
+                term_station = "%04d" % int(random.choice(Lakeview.line_range))
             else:
                 logging.error("No terminating line available for this office.")
+                assert False
 
             term = int(str(term_office) + str(term_station))
         logging.debug('Terminating line selected: %s', term)
@@ -287,9 +293,10 @@ class Switch():
         self.max_365 = float(config[kind]['max_365'])
         self.max_830 = float(config[kind]['max_830'])
         self.max_833 = float(config[kind]['max_833'])
+        self.max_524 = float(config[kind]['max_524'])
         self.trunk_load = [self.max_722, self.max_232,
                 self.max_832, self.max_275, self.max_365, 
-                self.max_830, self.max_833]
+                self.max_830, self.max_833, self.max_524]
         lr = config.get(kind, 'line_range')
         self.line_range = lr.split(",")
         self.l_ga = config.get(kind, 'l_gamma')
@@ -746,8 +753,9 @@ def api_stop(**kwargs):
                 s.is_dialing = 0
                 s.on_call = 0
 
-            # Can't do this unless we're running as root.
-            #system("asterisk -rx \"channel request hangup all\" > /dev/null 2>&1")
+            # I've been wanting to be a little more mean lately, and just hangup all channels
+            # when I use the FORCE button. After all. If I hit that button, I'm not kidding.
+            adapter.Hangup(Channel='/(.*?)/')
 
             # Delete all remaining files in spool.
             try:
