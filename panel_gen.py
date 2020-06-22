@@ -85,7 +85,6 @@ class Line():
             if self.status == 0:
                 if self.switch.is_dialing < self.switch.max_dialing:
                     self.call()
-                    self.status = 1
                 else:
                     # Back off until some calls complete.
                     self.timer = int(round(random.gamma(4,4)))
@@ -157,6 +156,7 @@ class Line():
         self.human_term = phone_format(str(term)) 
         return term
 
+
     def call(self, **kwargs):
         """
         Places a call. Returns nothing.
@@ -167,8 +167,13 @@ class Line():
             timer:           duration of the call
 
         """
+        nextchan = self.switch.newchannel(self.switch.channel_choices)
+        if nextchan == False:
+            self.timer = int(round(random.gamma(4,4)))
+            return
 
-        CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % self.term
 
         self.timer = self.switch.newtimer()
 
@@ -205,6 +210,7 @@ class Line():
         con = Context('sarah_callsim','s','1')
         cf = CallFile(c, con)
         cf.spool()
+        self.status = 1
 
 
     def hangup(self):
@@ -283,6 +289,7 @@ class Switch():
         self.is_dialing = 0
         self.on_call = 0
         self.dahdi_group = config.get(kind, 'dahdi_group')
+        self.channel_choices = config.get(kind, 'channels').split(",")
         self.traffic_load = "normal"
         self.lines_normal = config.getint(kind, 'lines_normal')
         self.lines_heavy = config.getint(kind, 'lines_heavy')
@@ -297,8 +304,7 @@ class Switch():
         self.trunk_load = [self.max_722, self.max_232,
                 self.max_832, self.max_275, self.max_365, 
                 self.max_830, self.max_833, self.max_524]
-        lr = config.get(kind, 'line_range')
-        self.line_range = lr.split(",")
+        self.line_range = config.get(kind, 'line_range').split(",")
         self.l_ga = config.get(kind, 'l_gamma')
         self.n_ga = config.get(kind, 'n_gamma')
         self.h_ga = config.get(kind, 'h_gamma')
@@ -331,6 +337,29 @@ class Switch():
                 a,b = (int(x) for x in self.n_ga.split(","))
                 timer = int(round(random.gamma(a,b)))
         return timer
+
+    def newchannel(self, channel_choices):
+        """
+        We can't trust Asterisk to pick a random channel, even when using 'r'.
+        Experience shows that it doesn't work, and it will pick up channels
+        already in use. Let's just do the math ourselves.
+
+        channel_choices: defined in panel_gen.conf
+        """
+        channels_inuse = [x.chan for x in lines]
+        logging.debug("In use: %s", channels_inuse)
+        logging.debug("Choices: %s", channel_choices)
+        
+        channels_avail = [y for y in channel_choices if not y in channels_inuse]
+        logging.debug("Avail:   %s", channels_avail)
+
+        if channels_avail == []:
+            logging.warning("No channels available on %s", self.kind)
+            return False
+        else:
+            nextchan = random.choice(channels_avail)
+            return nextchan
+
 
 # +-----------------------------------------------+
 # |                                               |
