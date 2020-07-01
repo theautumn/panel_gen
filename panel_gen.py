@@ -384,6 +384,9 @@ def on_DialBegin(event, **kwargs):
     DialString = DialString.findall(output)
     DB_DestChannel = DB_DestChannel.findall(output)
 
+    if len(DialString) == 0:
+        return
+    
     for l in lines:
         if DialString[0] == str(l.term) and l.ast_status == 'on_hook':
             l.chan = DB_DestChannel[0]
@@ -392,6 +395,7 @@ def on_DialBegin(event, **kwargs):
             l.switch.is_dialing += 1
             l.switch.on_call +=1
             logging.debug('Calling %s on DAHDI/%s from %s', l.term, l.chan, l.switch.kind)
+            
 
 def on_DialEnd(event, **kwargs):
     """
