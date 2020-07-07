@@ -10,7 +10,19 @@
   
   <!-- Mobile Specific Metas
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- <meta name="viewport" content="width=device-width, initial-scale=.8">a-->
+  <meta id="viewport" name='viewport'>
+
+  <script>
+    if (screen.width < 350) { 
+        document.querySelector('meta[name="viewport"]')
+            .setAttribute('content','width=device-width, initial-scale=.8');
+    } else {
+        document.querySelector('meta[name="viewport"]')
+            .setAttribute('content','width=device-width, initial-scale=1');
+    }
+  </script>
+
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="../static/touch-icon-iphone.png">
   <link rel="apple-touch-icon" sizes="180x180" href="../static/touch-icon-iphone-retina.png">
