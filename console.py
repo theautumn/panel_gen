@@ -156,7 +156,7 @@ class Screen():
             statusbar.bkgd(' ', curses.color_pair(1))
             statusbar.addstr(0, 0, "ctrl + c: quit", curses.A_BOLD)
             statusbar.addstr(0, int(x/4), "Museum status:", curses.A_BOLD)
-            if museum_up == True:
+            if museum_cstate == True:
                 statusbar.addstr(0, int(x/4+15), "ONLINE", curses.color_pair(3))
             else:
                 statusbar.addstr(0, int(x/4+15), "OFFLINE", curses.color_pair(2))
@@ -223,6 +223,7 @@ class work_thread(threading.Thread):
 
         global lines
         global server_up
+        failcount = 0
 
         while not self.shutdown_flag.is_set():
             self.is_alive = True
@@ -241,7 +242,7 @@ class work_thread(threading.Thread):
             except requests.exceptions.RequestException:
                 server_up = False
                 failcount += 1
-                if failcount == 1:
+                if failcount == 2:
                     logger.critical("Connections service not running!")
                 sleep(10)
                 continue
@@ -253,33 +254,46 @@ class museum_thread(threading.Thread):
         threading.Thread.__init__(self)
         self.shutdown_flag = threading.Event()
 
+    def poke(cstate, pstate, failcount, self):
+
+        try:
+            r = requests.get(MUSEUMSTATE, timeout=5)
+            schema = MuseumSchema()
+            result = schema.loads(r.content.decode())
+            for k, v in list(result.items()):
+                cstate = v
+            if pstate != cstate:
+                logger.warning("Museum state changed from %s to %s",
+                    pstate, cstate)
+                pstate = cstate
+                timer = 4
+            failcount = 0    
+            return cstate
+        except requests.exceptions.RequestException:
+            cstate = False
+            failcount += 1
+            if failcount == 2:
+                logger.error("Timeout reached while checking museum status")
+            timer = 40
+            return cstate
+
     def run(self):
 
-        global museum_up
+        global museum_cstate
+        global museum_pstate
+        failcount = 0
+        museum_pstate = False
+        museum_cstate = False
         timer = 40
+
+        museum_cstate = self.poke(museum_cstate, museum_pstate, failcount)
 
         while not self.shutdown_flag.is_set():
             self.is_alive = True
             timer = timer - 1
             sleep(1)
             if timer <= 0:
-                try:
-                    museum_pstate = museum_up
-                    r = requests.get(MUSEUMSTATE, timeout=5)
-                    schema = MuseumSchema()
-                    result = schema.loads(r.content.decode())
-                    museum = result
-                    for k, v in list(museum.items()):
-                        museum_up = v
-                    if museum_pstate != museum_up:
-                        logger.warning("Museum state changed from %s to %s",
-                                museum_pstate, museum_up)
-                    timer = 40
-                except requests.exceptions.RequestException:
-                    museum_up = False
-                    #logger.error("Timeout reached while checking museum status")
-                    timer = 40
-                    continue
+                museum_cstate = self.poke(museum_cstate, museum_pstate, failcount)
 
 class ServiceExit(Exception):
     pass
