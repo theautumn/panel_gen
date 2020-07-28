@@ -263,8 +263,6 @@ class museum_thread(threading.Thread):
             for k, v in list(result.items()):
                 cstate = v
             if pstate != cstate:
-                logger.warning("Museum state changed from %s to %s",
-                    pstate, cstate)
                 pstate = cstate
                 timer = 4
             failcount = 0    

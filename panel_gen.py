@@ -634,15 +634,15 @@ def get_info():
     ui_running = False
 
     try:
-        if t.started == True:
+        if t_ui.started == True:
             ui_running = True
     except Exception as e:
         pass
 
     result = dict([
         ('name', __name__),
-        ('app_running', w.is_alive),
-        ('is_paused', w.paused),
+        ('app_running', t_work.is_alive),
+        ('is_paused', t_work.paused),
         ('ui_running', ui_running),
         ('num_lines', len(lines)),
         ('panel_running', Rainier.running),
@@ -682,7 +682,7 @@ def api_start(**kwargs):
     else:
         logging.warning('I dont know why, but we are starting on %s', switch)
 
-    if w.is_alive == True:
+    if t_work.is_alive == True:
         for i in originating_switches:
             if switch == i.kind:
                 if i.running == True:
@@ -746,13 +746,6 @@ def api_start(**kwargs):
                     logging.error(e)
                     return False
     
-    # This else will catch if work thread isn't started for some reason.
-    # Hint: It always should be.
-    else:
-        logging.error("Work thread isn't alive. We ain't doin shit.")
-        logging.error("Returning FALSE and bailing out of api_start()")
-        return False 
-
 
 def api_stop(**kwargs):
     """
@@ -1055,16 +1048,19 @@ class Screen():
         key = stdscr.getch()
 
         if key == ord(' '):
-            if w.paused == False:
+            if t_work.paused == False:
                 self.pausescreen()
                 key = stdscr.getch()
                 if key == ord(' '):
                     self.resumescreen()
-            elif w.paused == True:
-                w.resume()
+            elif t_work.paused == True:
+                t_work.resume()
         # u: add a line to the first switch.
         if key == ord('u'):
-            lines.append(Line(7, originating_switches[0]))
+            try:
+                lines.append(Line(7, originating_switches[0]))
+            except Exception:
+                logging.warning("Couldn't add lines to switch.")
         # d: delete the 0th line.
         if key == ord('d'):
             if len(lines) >= 1:
@@ -1090,7 +1086,7 @@ class Screen():
         y_start_col = half_cols - int(half_cols / 2)
 
         logging.info("Paused")
-        w.pause()
+        t_work.pause()
         self.stdscr.nodelay(0)
         pause_scr = self.stdscr.subwin(rows_size, half_cols, x_start_row, y_start_col)
         pause_scr.box()
@@ -1106,7 +1102,7 @@ class Screen():
         # tried a bunch of different things. The work thread appears to
         # resume OK.
 
-        w.resume()
+        t_work.resume()
         self.stdscr.nodelay(1)
         self.stdscr.refresh()
         self.draw(self.stdscr, lines, self.y, self.x)
@@ -1259,12 +1255,12 @@ def module_shutdown():
     """
 
     try:
-        t.shutdown_flag.set()
-        t.join()
+        t_ui.shutdown_flag.set()
+        t_ui.join()
     except Exception:
         pass
-    w.shutdown_flag.set()
-    w.join()
+    t_work.shutdown_flag.set()
+    t_work.join()
 
     # Clean exit for logging
     logging.shutdown()
@@ -1299,12 +1295,6 @@ if __name__ == "__main__":
     AMI_USER = config.get('ami', 'user')
     AMI_SECRET = config.get('ami', 'secret')
 
-    # Connect to AMI
-    try:
-        ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
-    except Exception:
-        logging.warning('Failed to connect to Asterisk AMI!')
-    
     # If logfile does not exist, create it so logging can write to it.
     try:
         with open('/var/log/panel_gen/calls.log', 'a') as file:
@@ -1315,8 +1305,14 @@ if __name__ == "__main__":
         with open('/var/log/panel_gen/calls.log', 'w') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
             filename='/var/log/panel_gen/calls.log',level=logging.DEBUG,
-            datefmt='%m/%d/%Y %I:%M:%S %p')
+            datefmt='%m/%d/%Y %hh:%M:%S %p')
 
+    # Connect to AMI
+    try:
+        ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
+    except Exception:
+        logging.warning('Failed to connect to Asterisk AMI!')
+    
     # Parse any arguments the user gave us.
     parse_args()
     make_switch(args)
@@ -1332,12 +1328,12 @@ if __name__ == "__main__":
     lines = make_lines(source='main', originating_switches=originating_switches)
 
     try:
-        t = ui_thread()
-        t.daemon = True
-        t.start()
-        w = work_thread()
-        w.daemon = True
-        w.start()
+        t_ui = ui_thread()
+        t_ui.daemon = True
+        t_ui.start()
+        t_work = work_thread()
+        t_work.daemon = True
+        t_work.start()
 
         while True:
             sleep(.5)
@@ -1352,10 +1348,10 @@ if __name__ == "__main__":
     except Exception as e:
         # Exception for any other errors that I'm not explicitly handling.
 
-        t.shutdown_flag.set()
-        t.join()
-        w.shutdown_flag.set()
-        w.join()
+        t_ui.shutdown_flag.set()
+        t_ui.join()
+        t_work.shutdown_flag.set()
+        t_work.join()
 
         print(("\nOS error {0}".format(e)))
         logging.exception('**** OS Error ****')
@@ -1400,15 +1396,15 @@ if __name__ == "panel_gen":
         with open('/var/log/panel_gen/calls.log', 'w') as file:
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
             filename='/var/log/panel_gen/calls.log',level=logging.INFO,
-            datefmt='%m/%d/%Y %I:%M:%S %p')
+            datefmt='%m/%d/%Y %hh:%M:%S %p')
 
     lines = []
     logging.info('Starting panel_gen as thread from http_server')
 
     try:
-        w = work_thread()
-        w.daemon = True
-        w.start()
+        t_work = work_thread()
+        t_work.daemon = True
+        t_work.start()
 
         sleep(.5)
 
