@@ -327,15 +327,15 @@ if __name__ == "__main__":
     logger.info('Started console')
 
     try:
-        w = work_thread()
-        w.daemon = True
-        w.start()
-        w2 = museum_thread()
-        w2.daemon = True
-        w2.start()
-        t = ui_thread()
-        t.daemon = True
-        t.start()
+        t_work = work_thread()
+        t_work.daemon = True
+        t_work.start()
+        t_museum = museum_thread()
+        t_museum.daemon = True
+        t_museum.start()
+        t_ui = ui_thread()
+        t_ui.daemon = True
+        t_ui.start()
 
         while True:
             sleep(0.5)
@@ -343,23 +343,23 @@ if __name__ == "__main__":
     except (KeyboardInterrupt, ServiceExit):
         # Exception handler for console-based shutdown.
 
-        t.shutdown_flag.set()
-        t.join()
-        w.shutdown_flag.set()
-        w.join()
-        w2.shutdown_flag.set()
-        w2.join()
+        t_ui.shutdown_flag.set()
+        t_ui.join()
+        t_work.shutdown_flag.set()
+        t_work.join()
+        t_museum.shutdown_flag.set()
+        t_museum.join()
 
         print('\n')
 
     except Exception as e:
         # Exception for any other errors that I'm not explicitly handling.
         print(e)
-        t.shutdown_flag.set()
-        t.join()
-        w.shutdown_flag.set()
-        w.join()
-        w2.shutdown_flag.set()
-        w2.join()
+        t_ui.shutdown_flag.set()
+        t_ui.join()
+        t_work.shutdown_flag.set()
+        t_work.join()
+        t_museum.shutdown_flag.set()
+        t_museum.join()
 
         print(("\nOS error {0}".format(e)))
