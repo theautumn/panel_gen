@@ -712,7 +712,7 @@ def api_start(**kwargs):
                         # Will have no impact when using web app.
                         if datetime.today().weekday() == 6:
                             if source == 'key':
-                                i.trunk_load = [.15, .85, .0, .0, .0, .0, .0]
+                                i.trunk_load = [.15, .85, .0, .0, .0, .0, .0, .0]
                                 logging.info('Its Sunday!')
                                 new_lines = make_lines(switch=i, numlines=8,
                                 source='api')
