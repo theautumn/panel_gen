@@ -206,7 +206,7 @@ class Line():
         # Pass control of the call to the sarah_callsim context in
         # the dialplan. This will allow me to better interact with
         # Asterisk from here.
-        c = Call(CHANNEL, variables=vars)
+        c = Call(CHANNEL, variables=vars, callerid=str(self.term))
         con = Context('sarah_callsim','s','1')
         cf = CallFile(c, con)
         cf.spool()
@@ -727,6 +727,12 @@ def api_start(**kwargs):
                         else:
                             new_lines = make_lines(switch=i, numlines=numlines, 
                             source='api')
+                            
+                    if i == Lakeview:
+                        # Start new senders and old senders.
+
+                        new_lines = make_lines(switch=Lakeview, numlines=numlines, source='api')
+                        new_lines.append(Line(9, Vermont)) # This whole thing is a hack. 
 
                     # If we're not Adams, then also just act normal.
                     else:
