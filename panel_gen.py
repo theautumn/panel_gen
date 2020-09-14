@@ -348,8 +348,6 @@ class Switch():
         """
         channels_inuse = [x.chan for x in lines]
         logging.debug("In use: %s", channels_inuse)
-        logging.debug("Choices: %s", channel_choices)
-        
         channels_avail = [y for y in channel_choices if not y in channels_inuse]
         logging.debug("Avail:   %s", channels_avail)
 
