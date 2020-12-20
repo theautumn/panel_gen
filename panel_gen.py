@@ -137,7 +137,7 @@ class Line():
 
             if term_office == 722 or term_office == 365:
                 term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
-            elif term_office == 832 or term_office == 833:
+            elif term_office == 832 or term_office == 833 or term_office == 524:
                 term_station = "%04d" % int(random.choice(Lakeview.line_range))
             elif term_office == 232:
                 term_station = random.choice(Adams.line_range)
@@ -145,8 +145,6 @@ class Line():
                 term_station = random.randint(Step.line_range[0], Step.line_range[1])
             elif term_office == 830:
                 term_station = random.randint(ESS3.line_range[0], ESS3.line_range[1])
-            elif term_office == 524:
-                term_station = "%04d" % int(random.choice(Lakeview.line_range))
             else:
                 logging.error("No terminating line available for this office.")
                 assert False
@@ -672,7 +670,6 @@ def api_start(**kwargs):
     switch = kwargs.get('switch', '')
     traffic_load = kwargs.get('traffic_load', '')
 
-    # We need to do some sanity checking first.
     if source == 'web':
         logging.info("App requested START on %s", switch)
     elif source == 'key':
@@ -702,39 +699,31 @@ def api_start(**kwargs):
                     if i.traffic_load == 'normal':
                         numlines = i.lines_normal
 
-                    if i == Adams:
-                        # Carve out a special case for Sundays. This was requested
-                        # by museum volunteers so that we can give tours of the
-                        # step and 1XB without interruption by the this program.
-                        # This will only be effective if the key is operated.
-                        # Will have no impact when using web app.
-                        if datetime.today().weekday() == 6:
+                    if datetime.today().weekday() == 6:
+                        if i == Adams:
+                            # Carve out a special case for Sundays. This was requested
+                            # by museum volunteers so that we can give tours of the
+                            # step and 1XB without interruption by the this program.
+                            # This will only be effective if the key is operated.
+                            # Will have no impact when using web app.
                             if source == 'key':
                                 i.trunk_load = [.15, .85, .0, .0, .0, .0, .0, .0]
                                 logging.info('Its Sunday!')
                                 new_lines = make_lines(switch=i, numlines=8,
                                 source='api')
 
-                            # If we start from the web interface, ignore 
-                            # those rules.
-                            else:
-                                new_lines = make_lines(switch=i, numlines=numlines, 
-                                source='api')
-
-                        # If its any other day of the week, just act normal.
-                        else:
-                            new_lines = make_lines(switch=i, numlines=numlines, 
-                            source='api')
-                            
                     if i == Lakeview:
                         # Start new senders and old senders.
+                        # This whole thing is a hack until I can get class indication
+                        # piped through in the 1XB. 
 
                         new_lines = make_lines(switch=Lakeview, numlines=numlines, source='api')
-                        new_lines.append(Line(9, Vermont)) # This whole thing is a hack. 
+                        new_lines.extend(make_lines(switch=Vermont, numlines=2, source='api'))
 
-                    # If we're not Adams, then also just act normal.
-                    else:
+                    # Just act normal.
+                    if (datetime.today().weekday() != 6) and (i != Lakeview):    
                         new_lines = make_lines(switch=i, numlines=numlines, source='api')
+                    
                     for l in new_lines:
                         lines.append(l)
 
@@ -783,8 +772,8 @@ def api_stop(**kwargs):
                 s.is_dialing = 0
                 s.on_call = 0
 
-            # I've been wanting to be a little more mean lately, and just hangup all channels
-            # when I use the FORCE button. After all. If I hit that button, I'm not kidding.
+            # Just hangup all channels when I use the FORCE button.
+            # After all. If I hit that button, I'm not kidding.
             adapter.Hangup(Channel='/(.*?)/')
 
             # Delete all remaining files in spool.
@@ -796,6 +785,18 @@ def api_stop(**kwargs):
         else:
 
             for s in originating_switches:
+                # This next block is to stop 1XB, which is (again) a hack for
+                # both kinds of senders. We started both, and we need to stop both.
+                if s.kind == "1xb":
+                    deadlines = [l for l in lines if (l.kind == "1xb") or (l.kind == "1xb_os")]
+                    lines = [l for l in lines if (l.kind != "1xb") and (l.kind != "1xb_os")]
+                    Lakeview.running = False
+                    Vermont.running = False
+                    Lakeview.is_dialing = 0
+                    Vermont.is_dialing = 0
+                    for n in deadlines:
+                        n.hangup()
+
                 if s.kind == switch:
                     deadlines = [l for l in lines if l.kind == s.kind]
                     lines = [l for l in lines if l.kind != s.kind]
@@ -804,7 +805,6 @@ def api_stop(**kwargs):
 
                     for n in deadlines:
                         n.hangup()
-                s.is_dialing = 0
                 s.on_call = 0
     except Exception as e:
         logging.warning("Exception occurred while stopping calls.")
@@ -1363,11 +1363,6 @@ if __name__ == "__main__":
 if __name__ == "panel_gen":
     # The below gets run if this code is imported as a module.
     # It skips lots of setup steps.
-
-    #global AMI_ADDRESS
-    #global AMI_PORT
-    #global AMI_USER
-    #global AMI_SECRET
 
     config = ConfigParser()
     config.read('/etc/panel_gen.conf')
