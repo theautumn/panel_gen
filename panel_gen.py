@@ -40,11 +40,12 @@ class Line():
     self.timer:         Starts with a standard random.gamma, then gets set
                         subsequently by the call volume attribute of the switch.
     self.ident:         Integer starting with 0 that identifies the line.
+    self.human_term:    Easily readable called line number, for my dyslexic ass.
     self.chan:          DAHDI channel. We get this from asterisk.ami once call
                         is in progress. See on_DialBegin()
     self.ast_status:    Returned from AMI. Indicates status of line from
                         Asterisk's perspective.
-    self.is_api:        Used to identify an API one-shot line in the console
+    self.is_temp:        Used to identify an API one-shot line in the console
                         interface.
     self.api_indicator: See above. Is set to "***" if a line is a temp API line.
     """
@@ -64,7 +65,7 @@ class Line():
         self.human_term = phone_format(str(self.term)) 
         self.chan = '-'
         self.ast_status = 'on_hook'
-        self.is_api = kwargs.get('is_api', False)
+        self.is_temp = kwargs.get('is_temp', False)
         self.api_indicator = ""
 
     def __repr__(self):
@@ -100,11 +101,8 @@ class Line():
         Returns a string containing a 7-digit number to call.
 
         args.l:             Command line arg for called line
-        term_choices:       List of office codes we can dial
-                            set as a global in __main__
+        term_choices:       List of office codes. Comes from config file
         """
-        # As of 3/29/2020, current nxx should be 722,232,832,275,365,830,833
-        # in that order. This is specified in the config file.
         # Have to do some weirdness here to get the values from config,
         # which come in as a list of strings, then convert to a list of
         # ints.
@@ -118,7 +116,6 @@ class Line():
                         len(nxx), self.switch.kind, len(self.switch.trunk_load))
             logging.error("Also check the switch class for the presence of each " +
                         "trunk load variable that exists in config file.")
-
 
         if args.l:                      # If user specified a line
             term = args.l               # Set term line to user specified
@@ -175,7 +172,7 @@ class Line():
 
         self.timer = self.switch.newtimer()
 
-        # Wait value to pass to Asterisk dialplan if not using API to start call
+        # Wait value to pass to Asterisk if not using API to start call.
         wait = self.timer + 15
 
         # The kwargs come in from the API. The following lines handle them
@@ -193,7 +190,7 @@ class Line():
         # line is temporary. This sets up special handling so that the status
         # starts at "1", which will cause hangup() to hang up the call and
         # delete the line when the call is done.
-        if self.is_api == True:
+        if self.is_temp == True:
             self.status = 1
             self.api_indicator = "***"
 
@@ -248,7 +245,7 @@ class Line():
         self.switch.on_call -= 1
 
         # Delete the line if we are just doing a one-shot call from the API.
-        if self.is_api == True:
+        if self.is_temp == True:
             logging.info("Deleted API one-shot line.")
             currentlines = [l for l in lines if l.switch == self.switch]
 
@@ -275,8 +272,8 @@ class Switch():
     lines_heavy:    Number of lines to use in heavy traffic mode.
     max_nxx:        Values for trunk load. Determined by how many
                     outgoing trunks we have provisioned on the switch.
-    trunk_load:	    List of max_nxx used to compute load on trunks.
-    line_range:	    Range of acceptable lines to dial when calling this office.
+    trunk_load:     List of max_nxx used to compute load on trunks.
+    line_range:     Range of acceptable lines to dial when calling this office.
     """
 
     def __init__(self, **kwargs):
@@ -350,7 +347,7 @@ class Switch():
         logging.debug("Avail:   %s", channels_avail)
 
         if channels_avail == []:
-            logging.warning("No channels available on %s", self.kind)
+            logging.warning("No channels available on %s. Not placinc call.", self.kind)
             return False
         else:
             nextchan = random.choice(channels_avail)
@@ -373,12 +370,12 @@ def on_DialBegin(event, **kwargs):
     Increments the "is_dialing" counter.
     """
 
-    output = str(event)
+    event = str(event)
     DialString = re.compile('(?<=w)(\d{7})')
     DB_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
 
-    DialString = DialString.findall(output)
-    DB_DestChannel = DB_DestChannel.findall(output)
+    DialString = DialString.findall(event)
+    DB_DestChannel = DB_DestChannel.findall(event)
 
     if len(DialString) == 0:
         return
@@ -399,9 +396,9 @@ def on_DialEnd(event, **kwargs):
     Decrements the "is_dialing" counter.
 
     """
-    output = str(event)
+    event = str(event)
     DE_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
-    DE_DestChannel = DE_DestChannel.findall(output)
+    DE_DestChannel = DE_DestChannel.findall(event)
 
     for l in lines:
         if DE_DestChannel[0] == str(l.chan) and l.ast_status == 'Dialing':
@@ -543,12 +540,12 @@ def start_ui():
     :return:    Nothing
     :args:      Nothing
     """
-    global t
+    global t_ui
 
     try:
-        t = ui_thread()
-        t.daemon = True
-        t.start()
+        t_ui = ui_thread()
+        t_ui.daemon = True
+        t_ui.start()
     except Exception as e:
         print(e)
 
@@ -699,18 +696,29 @@ def api_start(**kwargs):
                     if i.traffic_load == 'normal':
                         numlines = i.lines_normal
 
-                    if datetime.today().weekday() == 6:
-                        if i == Adams:
-                            # Carve out a special case for Sundays. This was requested
-                            # by museum volunteers so that we can give tours of the
-                            # step and 1XB without interruption by the this program.
-                            # This will only be effective if the key is operated.
-                            # Will have no impact when using web app.
+                    if i == Adams:
+                        # Carve out a special case for Sundays. This was requested
+                        # by museum volunteers so that we can give tours of the
+                        # step and 1XB without interruption by the this program.
+                        # This will only be effective if the key is operated.
+                        # Will have no impact when using web app.
+                        if datetime.today().weekday() == 6:
                             if source == 'key':
                                 i.trunk_load = [.15, .85, .0, .0, .0, .0, .0, .0]
                                 logging.info('Its Sunday!')
                                 new_lines = make_lines(switch=i, numlines=8,
                                 source='api')
+
+                            # If we start from the web interface, ignore 
+                            # those rules.
+                            else:
+                                new_lines = make_lines(switch=i, numlines=numlines, 
+                                source='api')
+
+                        # If its any other day of the week, just act normal.
+                        else:
+                            new_lines = make_lines(switch=i, numlines=numlines, 
+                            source='api')
 
                     if i == Lakeview:
                         # Start new senders and old senders.
@@ -721,21 +729,20 @@ def api_start(**kwargs):
                         new_lines.extend(make_lines(switch=Vermont, numlines=2, source='api'))
 
                     # Just act normal.
-                    if (datetime.today().weekday() != 6) and (i != Lakeview):    
+                    else:
                         new_lines = make_lines(switch=i, numlines=numlines, source='api')
-                    
+
                     for l in new_lines:
                         lines.append(l)
 
                     i.running = True
-                    
-                    logging.info('Appending %s lines to %s', len(new_lines), switch)
+                    logging.info('Appended %s lines to %s', len(new_lines), switch)
 
                 try:
                     lines_created = len(new_lines)
                     result = get_info()
                     return result
-                except NameError as e:
+                except Exception as e:
                     logging.error(e)
                     return False
     
@@ -843,7 +850,7 @@ def call_now(**kwargs):
     elif switch == '3ess' or 'ess':
         switch = ESS3
     else:
-        logging.warning("API one-shot switch failed validation check.")
+        logging.warning("API one-shot switch failed validation check: switch")
         return False
 
     # Validates line input. If sane, set up line for
@@ -852,13 +859,15 @@ def call_now(**kwargs):
         api_lines = make_lines(source='api', switch=switch, numlines=1) 
         api_lines[0].term = term_line
         api_lines[0].human_term = phone_format(str(term_line))
+        api_lines[0].is_temp = True
         lines.append(api_lines[0])
         api_lines[0].call(originating_switches=switch, timer=one_shot_timer)
         api_lines[0].tick()
         result = schema.dump(api_lines[0])
+        api_lines = None
         return result
     else:
-        logging.warning("API one-shot line failed validation check.")
+        logging.warning("API one-shot line failed validation check: line")
         return False
 
 def get_all_lines():
@@ -916,7 +925,7 @@ def delete_line(**kwargs):
 
     global lines
     switch = kwargs.get('switch','')
-    
+
     for i in originating_switches:
         if i == switch or i.kind == kwargs.get('kind',''):
             for n in range(kwargs.get('numlines','')):
@@ -1225,17 +1234,19 @@ class work_thread(threading.Thread):
         logging.info('--- Started panel_gen ---')
 
     def run(self):
+        try:
+            while not self.shutdown_flag.is_set():
+                self.is_alive = True
+                with self.paused_flag:
+                    while self.paused:
+                        self.paused_flag.wait()
 
-        while not self.shutdown_flag.is_set():
-            self.is_alive = True
-            with self.paused_flag:
-                while self.paused:
-                    self.paused_flag.wait()
-
-            # The main loop that kicks everything into gear.
-                for l in lines:
-                    l.tick()
-                sleep(1)
+                # The main loop that kicks everything into gear.
+                    for l in lines:
+                        l.tick()
+                    sleep(1)
+        except Exception as e:
+            logging.exception(e)
 
     def pause(self):
         self.paused = True

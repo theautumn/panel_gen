@@ -84,8 +84,8 @@ def stop(**kwargs):
 def call(**kwargs):
     """
     POST /app/call/{switch}
-    Places a single call on {switch} that lasts for 18 seconds,
-    then hangs up and deletes the line from the switch.
+    Places a single call on {switch}, then hangs up and deletes 
+    the line from the switch.
     Success:    Returns 200 OK + JSON parseable switch status.
     Failure:    Returns 406 + Unhelpful error message.
 
