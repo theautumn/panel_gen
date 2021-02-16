@@ -44,6 +44,9 @@ class Line():
     self.human_term:    Easily readable called line number, for my dyslexic ass.
     self.chan:          DAHDI channel. We get this from asterisk.ami once call
                         is in progress. See on_DialBegin()
+    self.magictoken:    UUID generated each time a callfile is passed to
+                        Asterisk. Asterisk sends it back to us via AMI, and we
+                        match it against our call.
     self.ast_status:    Returned from AMI. Indicates status of line from
                         Asterisk's perspective.
     self.is_temp:        Used to identify an API one-shot line in the console
@@ -212,7 +215,7 @@ class Line():
         # Pass control of the call to the sarah_callsim context in
         # the dialplan. Set callerid to term line so it shows
         # something useful in the CDR. (Yes, thats dumb, but thats
-        # how it works. Set accountcode to our magic UUID for use later.
+        # how it works.) Set accountcode to our magic UUID for use later.
         c = Call(CHANNEL, variables=vars, callerid=str(self.term), 
                  account=self.magictoken)
         con = Context('sarah_callsim','s','1')
@@ -235,21 +238,6 @@ class Line():
         if self.ast_status == 'Dialing':
             logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
-
-        # This try block exists because sometimes the AMI likes to disconnect
-        # us for no reason. When this happens, calls fail to hangup properly.
-        # The hope here is that we can attempt to reconnect on the fly and
-        # hangup again.
-        try:
-            adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
-        except Exception:
-            logging.warning('AMI failed to stop calls. Attempting to recover.')
-            try:
-                ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
-                adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
-                logging.info('AMI connection recovered!')
-            except Exception:
-                logging.error('AMI recovery failed.')
 
         logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0
@@ -399,7 +387,7 @@ def on_DialBegin(event, **kwargs):
 
     if DialString == [] or DB_DestChannel == [] or AccountCode == []:
         # Fuckin bail out!
-        logging.error("BAD BAD BAD! Regex isn't matching!")
+        logging.error("***BAD BAD BAD! Regex isn't matching!***")
         return
 
     for l in lines:
