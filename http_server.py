@@ -7,23 +7,18 @@
 # Web page created with Skeleton CSS framework
 # http://www.getskeleton.com
 #
-# A note on using Flask: This is insecure. We must only make this
+# This is insecure. We must only make this
 # available from inside of our network, and we probably shouldn't be
 # letting visitors on to our private wifi anyway.
 #
 #-----------------------------------------------
 
-try:
-    from cheroot.wsgi import Server as WSGIServer, PathInfoDispatcher
-except ImportError:
-    from cherrypy.wsgiserver import CherryPyWSGIServer as WSGIServer, WSGIPathInfoDispatcher as PathInfoDispatcher
+from cheroot.wsgi import Server as WSGIServer, PathInfoDispatcher
 from flask import render_template 
 import connexion
 import logging
 import panel_gen
 
-#log = logging.getLogger('werkzeug')
-#log.setLevel(logging.ERROR)
 
 app = connexion.App(__name__, specification_dir='api/')
 app.add_api('swagger.yml')

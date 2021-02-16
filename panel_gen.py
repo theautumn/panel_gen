@@ -16,6 +16,7 @@ import signal
 import subprocess
 import argparse
 import logging
+import uuid
 import curses
 import re
 import threading
@@ -64,6 +65,7 @@ class Line():
         self.ident = ident
         self.human_term = phone_format(str(self.term)) 
         self.chan = '-'
+        self.magictoken = ""
         self.ast_status = 'on_hook'
         self.is_temp = kwargs.get('is_temp', False)
         self.api_indicator = ""
@@ -84,6 +86,8 @@ class Line():
         self.timer -= 1
         if self.timer <= 0:
             if self.status == 0:
+                logging.debug('<<---------------------------------')
+                logging.debug("In tick(). Timer 0 status 0 on %s for DAHDI %s", self.ident, self.chan)
                 if self.switch.is_dialing < self.switch.max_dialing:
                     self.call()
                 else:
@@ -169,11 +173,15 @@ class Line():
 
         #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
         CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % self.term
+        logging.debug('To Asterisk: %s on ident %s', CHANNEL, self.ident)
 
         self.timer = self.switch.newtimer()
 
         # Wait value to pass to Asterisk if not using API to start call.
         wait = self.timer + 15
+
+        # OoOOOoOOoOOOO!
+        self.magictoken = str(uuid.uuid4())
 
         # The kwargs come in from the API. The following lines handle them
         # and set up the special call case outside of the normal program flow.
@@ -194,14 +202,19 @@ class Line():
             self.status = 1
             self.api_indicator = "***"
 
-        # Set the vars to actually pass to call file
-        vars = {'waittime': wait}
+        # Set wait time for asterisk to auto hangup.
+        vars = {'WaitTime': wait}
+
+        logging.debug('About to create .call file for line %s', self.ident)
+        logging.debug('Magic Token: %s', self.magictoken)
 
         # Make the .call file amd throw it into the asterisk spool.
         # Pass control of the call to the sarah_callsim context in
-        # the dialplan. This will allow me to better interact with
-        # Asterisk from here.
-        c = Call(CHANNEL, variables=vars, callerid=str(self.term))
+        # the dialplan. Set callerid to term line so it shows
+        # something useful in the CDR. (Yes, thats dumb, but thats
+        # how it works. Set accountcode to our magic UUID for use later.
+        c = Call(CHANNEL, variables=vars, callerid=str(self.term), 
+                 account=self.magictoken)
         con = Context('sarah_callsim','s','1')
         cf = CallFile(c, con)
         cf.spool()
@@ -230,7 +243,7 @@ class Line():
         try:
             adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
         except Exception:
-            logging.error('AMI failed to stop calls. Attempting to recover.')
+            logging.warning('AMI failed to stop calls. Attempting to recover.')
             try:
                 ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
                 adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
@@ -238,7 +251,7 @@ class Line():
             except Exception:
                 logging.error('AMI recovery failed.')
 
-        logging.debug('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
+        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
         self.status = 0
         self.chan = '-'
         self.ast_status = 'on_hook'
@@ -342,15 +355,17 @@ class Switch():
         channel_choices: defined in panel_gen.conf
         """
         channels_inuse = [x.chan for x in lines]
+        logging.debug('Begin channel selection')
         logging.debug("In use: %s", channels_inuse)
         channels_avail = [y for y in channel_choices if not y in channels_inuse]
-        logging.debug("Avail:   %s", channels_avail)
+        logging.debug("Avail:  %s", channels_avail)
 
         if channels_avail == []:
-            logging.warning("No channels available on %s. Not placinc call.", self.kind)
+            logging.warning("No channels available on %s. Not placing call.", self.kind)
             return False
         else:
             nextchan = random.choice(channels_avail)
+            logging.debug("End channel selection. Selected: %s", nextchan)
             return nextchan
 
 
@@ -368,26 +383,34 @@ def on_DialBegin(event, **kwargs):
     Callback function for DialBegin AMI events. Extracts DialString
     and DestChannel and stores it to variables in each line.
     Increments the "is_dialing" counter.
+
+    Account Code is a magic number we send to Asterisk and expect
+    to get back. This is how we match events with calls in progress.
     """
 
     event = str(event)
     DialString = re.compile('(?<=w)(\d{7})')
     DB_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
+    AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
     DialString = DialString.findall(event)
     DB_DestChannel = DB_DestChannel.findall(event)
+    AccountCode = AccountCode.findall(event)
 
-    if len(DialString) == 0:
+    if DialString == [] or DB_DestChannel == [] or AccountCode == []:
+        # Fuckin bail out!
+        logging.error("BAD BAD BAD! Regex isn't matching!")
         return
-    
+
     for l in lines:
-        if DialString[0] == str(l.term) and l.ast_status == 'on_hook':
+        if AccountCode[0] == l.magictoken and l.ast_status == 'on_hook':
             l.chan = DB_DestChannel[0]
-            logging.debug('Line %s is on channel %s', l.ident, l.chan)
             l.ast_status = 'Dialing'
             l.switch.is_dialing += 1
             l.switch.on_call +=1
-            logging.debug('Calling %s on DAHDI/%s from %s', l.term, l.chan, l.switch.kind)
+            logging.debug('DialBegin %s on DAHDI/%s from %s ident %s', 
+                         l.term, l.chan, l.switch.kind, l.ident)
+            logging.debug('-------------------------------------->>')
             
 
 def on_DialEnd(event, **kwargs):
@@ -457,7 +480,6 @@ def make_switch(args):
     Rainier = Switch(kind='panel')
     Adams = Switch(kind='5xb')
     Lakeview = Switch(kind='1xb')
-    Vermont = Switch(kind='1xb_os')
     Step = Switch(kind='step')
     ESS3 = Switch(kind='3ess')
 
@@ -468,7 +490,6 @@ def make_switch(args):
         originating_switches.append(Rainier)
         originating_switches.append(Adams)
         originating_switches.append(Lakeview)
-        originating_switches.append(Vermont)
         originating_switches.append(ESS3)
 
     if __name__ == '__main__':
@@ -479,12 +500,10 @@ def make_switch(args):
                 originating_switches.append(Adams)
             elif o == '1xb' or o == '832':
                 originating_switches.append(Lakeview)
-            elif o == '1xbos' or o == '833':
-                originating_switches.append(Vermont)
             elif o == 'ess' or o == '830':
                 originating_switches.append(ESS3)
             elif o == 'all':
-                originating_switches.extend((Lakeview, Vermont, Adams, Rainier))
+                originating_switches.extend((Lakeview, Adams, Rainier))
 
         if args.o == []:
             originating_switches.append(Rainier)
@@ -524,6 +543,8 @@ def make_lines(**kwargs):
     new_lines = []
 
     if source == 'main':
+        if args.a != []:
+            numlines = args.a
         # If we start standalone, just give us normal lines for everything.
         new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
     elif source == 'api':
@@ -703,35 +724,31 @@ def api_start(**kwargs):
                         # This will only be effective if the key is operated.
                         # Will have no impact when using web app.
                         if datetime.today().weekday() == 6:
+                            logging.info('Its Sunday!')
                             if source == 'key':
+                                logging.info('5XB special Sunday mode active')
                                 i.trunk_load = [.15, .85, .0, .0, .0, .0, .0, .0]
-                                logging.info('Its Sunday!')
                                 new_lines = make_lines(switch=i, numlines=8,
                                 source='api')
 
-                            # If we start from the web interface, ignore 
+                            # Adams: If we start from the web interface, ignore 
                             # those rules.
                             else:
+                                logging.info('5XB special Sunday mode skipped')
                                 new_lines = make_lines(switch=i, numlines=numlines, 
                                 source='api')
 
-                        # If its any other day of the week, just act normal.
+                        # Adams: If its any other day of the week, just act normal.
                         else:
                             new_lines = make_lines(switch=i, numlines=numlines, 
                             source='api')
-
-                    if i == Lakeview:
-                        # Start new senders and old senders.
-                        # This whole thing is a hack until I can get class indication
-                        # piped through in the 1XB. 
-
-                        new_lines = make_lines(switch=Lakeview, numlines=numlines, source='api')
-                        new_lines.extend(make_lines(switch=Vermont, numlines=2, source='api'))
-
-                    # Just act normal.
+                    
+                    # Everyone else: Make lines.
                     else:
-                        new_lines = make_lines(switch=i, numlines=numlines, source='api')
-
+                        new_lines = make_lines(switch=i, numlines=numlines, 
+                        source='api')
+                    
+                    # Append the lines we just created.
                     for l in new_lines:
                         lines.append(l)
 
@@ -792,18 +809,6 @@ def api_stop(**kwargs):
         else:
 
             for s in originating_switches:
-                # This next block is to stop 1XB, which is (again) a hack for
-                # both kinds of senders. We started both, and we need to stop both.
-                if s.kind == "1xb":
-                    deadlines = [l for l in lines if (l.kind == "1xb") or (l.kind == "1xb_os")]
-                    lines = [l for l in lines if (l.kind != "1xb") and (l.kind != "1xb_os")]
-                    Lakeview.running = False
-                    Vermont.running = False
-                    Lakeview.is_dialing = 0
-                    Vermont.is_dialing = 0
-                    for n in deadlines:
-                        n.hangup()
-
                 if s.kind == switch:
                     deadlines = [l for l in lines if l.kind == s.kind]
                     lines = [l for l in lines if l.kind != s.kind]
@@ -845,8 +850,6 @@ def call_now(**kwargs):
         switch = Adams
     elif switch == '1xb':
         switch = Lakeview
-    elif switch == '1xb_os' or '1xbos':
-        switch = Vermont
     elif switch == '3ess' or 'ess':
         switch = ESS3
     else:
@@ -957,8 +960,6 @@ def get_switch(kind):
         result.append(schema.dump(Adams))
     if kind == '1xb':
         result.append(schema.dump(Lakeview))
-    if kind == '1xbos' or '1xb_os':
-        result.append(schema.dump(Vermont))
     if kind == '3ess':
         result.append(schema.dump(ESS3))
 
@@ -979,9 +980,6 @@ def create_switch(kind):
     if '1xb' not in originating_switches:
         if kind == '1xb':
             originating_switches.append(Lakeview)
-    if '1xb_os' not in originating_switches:
-        if kind == '1xb_os' or '1xbos':
-            originating_switches.append(Vermont)
     if 'ESS3' not in originating_switches:
         if kind == '3ess':
             originating_switches.append(ESS3)
