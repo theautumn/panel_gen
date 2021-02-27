@@ -26,7 +26,7 @@ from marshmallow import Schema, fields, post_load
 from tabulate import tabulate
 from numpy import random
 from pycall import CallFile, Call, Application, Context
-from asterisk.ami import AMIClient, EventListener, AMIClientAdapter, AutoReconnect
+from asterisk.ami import AMIClient, EventListener, AMIClientAdapter
 
 
 class Line():
@@ -90,7 +90,7 @@ class Line():
         if self.timer <= 0:
             if self.status == 0:
                 logging.debug('<<---------------------------------')
-                logging.debug("In tick(). Timer 0 status 0 on %s for DAHDI %s", self.ident, self.chan)
+                logging.debug("In tick(). Timer 0 status 0 on line %s", self.ident)
                 if self.switch.is_dialing < self.switch.max_dialing:
                     self.call()
                 else:
@@ -176,11 +176,14 @@ class Line():
 
         #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
         CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % self.term
-        logging.debug('To Asterisk: %s on ident %s', CHANNEL, self.ident)
+        logging.info('To Asterisk: %s on ident %s', CHANNEL, self.ident)
 
         self.timer = self.switch.newtimer()
 
         # Wait value to pass to Asterisk if not using API to start call.
+        # (We will actually be controlling the hangup from here, but this is
+        # kind of a safety net so asterisk dumps the call if we can't for some
+        # reason.)
         wait = self.timer + 15
 
         # OoOOOoOOoOOOO!
@@ -206,7 +209,7 @@ class Line():
             self.api_indicator = "***"
 
         # Set wait time for asterisk to auto hangup.
-        vars = {'WaitTime': wait}
+        vars = {'waittime': wait}
 
         logging.debug('About to create .call file for line %s', self.ident)
         logging.debug('Magic Token: %s', self.magictoken)
@@ -239,11 +242,9 @@ class Line():
             logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
             self.switch.is_dialing -= 1
 
+        adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
+
         logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
-        self.status = 0
-        self.chan = '-'
-        self.ast_status = 'on_hook'
-        self.switch.on_call -= 1
 
         # Delete the line if we are just doing a one-shot call from the API.
         if self.is_temp == True:
@@ -385,9 +386,11 @@ def on_DialBegin(event, **kwargs):
     DB_DestChannel = DB_DestChannel.findall(event)
     AccountCode = AccountCode.findall(event)
 
+    logging.debug('DialString: %s, DestChannel: %s, Accountcode: %s', DialString, DB_DestChannel, AccountCode)
+
     if DialString == [] or DB_DestChannel == [] or AccountCode == []:
         # Fuckin bail out!
-        logging.error("***BAD BAD BAD! Regex isn't matching!***")
+        logging.debug("***DialBegin regex isn't matching!***")
         return
 
     for l in lines:
@@ -396,9 +399,9 @@ def on_DialBegin(event, **kwargs):
             l.ast_status = 'Dialing'
             l.switch.is_dialing += 1
             l.switch.on_call +=1
-            logging.debug('DialBegin %s on DAHDI/%s from %s ident %s', 
+            logging.info('DialBegin %s on DAHDI/%s from %s ident %s', 
                          l.term, l.chan, l.switch.kind, l.ident)
-            logging.debug('-------------------------------------->>')
+            logging.info('-------------------------------------->>')
             
 
 def on_DialEnd(event, **kwargs):
@@ -416,6 +419,30 @@ def on_DialEnd(event, **kwargs):
             l.ast_status = 'Ringing'
             l.switch.is_dialing -= 1
             logging.debug('on_DialEnd with %s calls dialing', l.switch.is_dialing)
+
+
+def on_Hangup(event, **kwargs):
+    """
+    Callback for processing hangup events.
+    """
+
+    event = str(event)
+    AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+    
+    AccountCode = AccountCode.findall(event)
+
+    if AccountCode == []:
+        logging.debug("*** AccountCode didn't match on hangup***")
+        return
+
+    for l in lines:
+        if AccountCode[0] == l.magictoken and l.status == 1:
+            l.status = 0
+            l.chan = '-'
+            l.ast_status = 'on_hook'
+            l.switch.on_call -= 1
+            logging.debug('Asterisk reports hangup OK. Line %s status is %s', 
+                          l.ident, l.status)
 
 
 def parse_args():
@@ -571,6 +598,7 @@ def ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET):
     # These listeners are for the AMI so I can catch events.
     client.add_event_listener(on_DialBegin, white_list = 'DialBegin')
     client.add_event_listener(on_DialEnd, white_list = 'DialEnd')
+    client.add_event_listener(on_Hangup, white_list = 'Hangup')
 
 
 # +----------------------------------------------------+
