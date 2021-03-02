@@ -89,7 +89,6 @@ class Line():
         self.timer -= 1
         if self.timer <= 0:
             if self.status == 0:
-                logging.debug('<<---------------------------------')
                 logging.debug("In tick(). Timer 0 status 0 on line %s", self.ident)
                 if self.switch.is_dialing < self.switch.max_dialing:
                     self.call()
@@ -169,13 +168,13 @@ class Line():
             timer:           duration of the call
 
         """
-        nextchan = self.switch.newchannel(self.switch.channel_choices)
-        if nextchan == False:
-            self.timer = int(round(random.gamma(4,4)))
-            return
+       # nextchan = self.switch.newchannel(self.switch.channel_choices)
+       # if nextchan == False:
+       #     self.timer = int(round(random.gamma(4,4)))
+       #     return
 
-        #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
-        CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % self.term
+        CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        #CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % self.term
         logging.info('To Asterisk: %s on ident %s', CHANNEL, self.ident)
 
         self.timer = self.switch.newtimer()
@@ -224,7 +223,6 @@ class Line():
         con = Context('sarah_callsim','s','1')
         cf = CallFile(c, con)
         cf.spool()
-        self.status = 1
 
 
     def hangup(self):
@@ -238,13 +236,10 @@ class Line():
         set a new timer, and set the next called line.
         """
 
-        if self.ast_status == 'Dialing':
-            logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
-            self.switch.is_dialing -= 1
 
         adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
 
-        logging.info('Hung up %s on DAHDI/%s from %s', self.term, self.chan, self.switch.kind)
+        logging.info('Hung up %s on DAHDI/%s, line %s', self.term, self.chan, self.ident)
 
         # Delete the line if we are just doing a one-shot call from the API.
         if self.is_temp == True:
@@ -399,6 +394,7 @@ def on_DialBegin(event, **kwargs):
             l.ast_status = 'Dialing'
             l.switch.is_dialing += 1
             l.switch.on_call +=1
+            l.status = 1
             logging.info('DialBegin %s on DAHDI/%s from %s ident %s', 
                          l.term, l.chan, l.switch.kind, l.ident)
             logging.info('-------------------------------------->>')
@@ -412,13 +408,22 @@ def on_DialEnd(event, **kwargs):
     """
     event = str(event)
     DE_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
+    AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+    
     DE_DestChannel = DE_DestChannel.findall(event)
+    AccountCode = AccountCode.findall(event)
+
+    if DE_DestChannel == [] or AccountCode == []:
+        #Outta here
+        logging.debug("***DialEnd regex isn't matching!***")
+        return
 
     for l in lines:
-        if DE_DestChannel[0] == str(l.chan) and l.ast_status == 'Dialing':
+        if AccountCode[0] == l.magictoken  and l.ast_status == 'Dialing':
             l.ast_status = 'Ringing'
             l.switch.is_dialing -= 1
             logging.debug('on_DialEnd with %s calls dialing', l.switch.is_dialing)
+            logging.debug('Ringing %s on line %s', l.term, l.ident)
 
 
 def on_Hangup(event, **kwargs):
@@ -437,12 +442,17 @@ def on_Hangup(event, **kwargs):
 
     for l in lines:
         if AccountCode[0] == l.magictoken and l.status == 1:
+            if l.ast_status == 'Dialing':
+                l.switch.is_dialing -= 1
+                logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
+
             l.status = 0
             l.chan = '-'
             l.ast_status = 'on_hook'
             l.switch.on_call -= 1
             logging.debug('Asterisk reports hangup OK. Line %s status is %s', 
                           l.ident, l.status)
+            logging.info('<<---------------------------------')
 
 
 def parse_args():
