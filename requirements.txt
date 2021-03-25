@@ -33,7 +33,7 @@ portend==2.6
 pycall==2.3.2
 pyrsistent==0.15.6
 pytz==2019.3
-pyyaml==5.2
+pyyaml==5.4
 requests==2.22.0
 six==1.13.0
 swagger-ui-bundle==0.0.6
