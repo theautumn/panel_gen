@@ -20,6 +20,7 @@ import uuid
 import curses
 import re
 import threading
+import sys
 from configparser import ConfigParser
 from datetime import datetime
 from marshmallow import Schema, fields, post_load
@@ -209,18 +210,20 @@ class Line():
 
         # Set wait time for asterisk to auto hangup.
         vars = {'waittime': wait}
+        cid = 'panel_gen <{}>'.format(self.switch.kind)
 
         logging.debug('About to create .call file for line %s', self.ident)
         logging.debug('Magic Token: %s', self.magictoken)
 
         # Make the .call file amd throw it into the asterisk spool.
         # Pass control of the call to the sarah_callsim context in
-        # the dialplan. Set callerid to term line so it shows
-        # something useful in the CDR. (Yes, thats dumb, but thats
-        # how it works.) Set accountcode to our magic UUID for use later.
-        c = Call(CHANNEL, variables=vars, callerid=str(self.term), 
+        # the dialplan.
+        # Set callerid to term line so it shows something useful in the CDR.
+        # (Yes, thats dumb, but thats how it works.) 
+        # Set accountcode to our magic UUID for use later.
+        c = Call(CHANNEL, variables=vars, callerid=cid, 
                  account=self.magictoken)
-        con = Context('sarah_callsim','s','1')
+        con = Context('sarah_callsim',str(self.term),'1')
         cf = CallFile(c, con)
         cf.spool()
 
@@ -235,7 +238,6 @@ class Line():
         set status, chan, and ast_status back to normal values,
         set a new timer, and set the next called line.
         """
-
 
         adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
 
@@ -389,7 +391,8 @@ def on_DialBegin(event, **kwargs):
         return
 
     for l in lines:
-        if AccountCode[0] == l.magictoken and l.ast_status == 'on_hook':
+        #if AccountCode[0] == l.magictoken and l.ast_status == 'on_hook':
+        if AccountCode[0] == l.magictoken:
             l.chan = DB_DestChannel[0]
             l.ast_status = 'Dialing'
             l.switch.is_dialing += 1
@@ -398,7 +401,7 @@ def on_DialBegin(event, **kwargs):
             logging.info('DialBegin %s on DAHDI/%s from %s ident %s', 
                          l.term, l.chan, l.switch.kind, l.ident)
             logging.info('-------------------------------------->>')
-            
+
 
 def on_DialEnd(event, **kwargs):
     """
@@ -409,7 +412,7 @@ def on_DialEnd(event, **kwargs):
     event = str(event)
     DE_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
     AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
-    
+
     DE_DestChannel = DE_DestChannel.findall(event)
     AccountCode = AccountCode.findall(event)
 
@@ -419,7 +422,7 @@ def on_DialEnd(event, **kwargs):
         return
 
     for l in lines:
-        if AccountCode[0] == l.magictoken  and l.ast_status == 'Dialing':
+        if AccountCode[0] == l.magictoken:
             l.ast_status = 'Ringing'
             l.switch.is_dialing -= 1
             logging.debug('on_DialEnd with %s calls dialing', l.switch.is_dialing)
@@ -433,7 +436,7 @@ def on_Hangup(event, **kwargs):
 
     event = str(event)
     AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
-    
+
     AccountCode = AccountCode.findall(event)
 
     if AccountCode == []:
@@ -441,7 +444,7 @@ def on_Hangup(event, **kwargs):
         return
 
     for l in lines:
-        if AccountCode[0] == l.magictoken and l.status == 1:
+        if AccountCode[0] == l.magictoken:
             if l.ast_status == 'Dialing':
                 l.switch.is_dialing -= 1
                 logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
@@ -602,6 +605,7 @@ def ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET):
     adapter = AMIClientAdapter(client)
     #AutoReconnect(client)
     future = client.login(username=AMI_USER, secret=AMI_SECRET)
+    logging.info('Connected to Asterisk AMI')
     if future.response.is_error():
         raise Exception(str(future.response))
 
@@ -768,12 +772,12 @@ def api_start(**kwargs):
                         else:
                             new_lines = make_lines(switch=i, numlines=numlines, 
                             source='api')
-                    
+
                     # Everyone else: Make lines.
                     else:
                         new_lines = make_lines(switch=i, numlines=numlines, 
                         source='api')
-                    
+
                     # Append the lines we just created.
                     for l in new_lines:
                         lines.append(l)
@@ -788,7 +792,7 @@ def api_start(**kwargs):
                 except Exception as e:
                     logging.error(e)
                     return False
-    
+
 
 def api_stop(**kwargs):
     """
@@ -1349,9 +1353,10 @@ if __name__ == "__main__":
     # Connect to AMI
     try:
         ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
-    except Exception:
-        logging.warning('Failed to connect to Asterisk AMI!')
-    
+    except:
+        logging.error('AMI connection failed. This will break things.')
+        sys.exit('Failed to connect to Asterisk AMI. Is Asterisk running?')
+
     # Parse any arguments the user gave us.
     parse_args()
     make_switch(args)
@@ -1406,20 +1411,6 @@ if __name__ == "panel_gen":
     AMI_USER = config.get('ami', 'user')
     AMI_SECRET = config.get('ami', 'secret')
 
-    # Connect to AMI
-    try:
-        ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
-    except Exception:
-        logging.warning('Failed to connect to Asterisk AMI!')
-
-    # We call parse_args here just to set some defaults. Otherwise
-    # not used when running as module.
-    parse_args()
-
-    # Make some switches.
-    make_switch(args)
-
-
     # If logfile does not exist, create it so logging can write to it.
     try:
         with open('/var/log/panel_gen/calls.log', 'a') as file:
@@ -1431,6 +1422,21 @@ if __name__ == "panel_gen":
             logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
             filename='/var/log/panel_gen/calls.log',level=logging.INFO,
             datefmt='%m/%d/%Y %hh:%M:%S %p')
+
+    # Connect to AMI
+    try:
+        ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
+    except:
+        logging.error('AMI connection failed. This will break things.')
+        sys.exit('Failed to connect to Asterisk AMI. Is Asterisk running?')
+
+    # We call parse_args here just to set some defaults. Otherwise
+    # not used when running as module.
+    parse_args()
+
+    # Make some switches.
+    make_switch(args)
+
 
     lines = []
     logging.info('Starting panel_gen as thread from http_server')
