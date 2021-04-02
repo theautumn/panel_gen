@@ -176,7 +176,7 @@ class Line():
 
         CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
         #CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % self.term
-        logging.info('To Asterisk: %s on ident %s', CHANNEL, self.ident)
+        logging.debug('To Asterisk: %s on ident %s', CHANNEL, self.ident)
 
         self.timer = self.switch.newtimer()
 
@@ -299,7 +299,6 @@ class Switch():
                 self.max_832, self.max_275, self.max_365, 
                 self.max_830, self.max_833, self.max_524]
         self.line_range = config.get(kind, 'line_range').split(",")
-        self.l_ga = config.get(kind, 'l_gamma')
         self.n_ga = config.get(kind, 'n_gamma')
         self.h_ga = config.get(kind, 'h_gamma')
 
@@ -321,10 +320,7 @@ class Switch():
         if args.w:
             timer = args.w
         else:
-            if args.v == 'light' or self.traffic_load == 'light':
-                a,b = (int(x) for x in self.l_ga.split(","))
-                timer = int(round(random.gamma(a,b)))
-            elif args.v == 'heavy' or self.traffic_load == 'heavy':
+            if args.v == 'heavy' or self.traffic_load == 'heavy':
                 a,b = (int(x) for x in self.h_ga.split(","))
                 timer = int(round(random.gamma(a,b)))
             elif args.v == 'normal' or self.traffic_load == 'normal':
@@ -398,9 +394,9 @@ def on_DialBegin(event, **kwargs):
             l.switch.is_dialing += 1
             l.switch.on_call +=1
             l.status = 1
-            logging.info('DialBegin %s on DAHDI/%s from %s ident %s', 
+            logging.info('DialBegin %s on DAHDI/%s from %s ident %s ->>', 
                          l.term, l.chan, l.switch.kind, l.ident)
-            logging.info('-------------------------------------->>')
+            # logging.info('-------------------------------------->>')
 
 
 def on_DialEnd(event, **kwargs):
@@ -453,9 +449,9 @@ def on_Hangup(event, **kwargs):
             l.chan = '-'
             l.ast_status = 'on_hook'
             l.switch.on_call -= 1
-            logging.debug('Asterisk reports hangup OK. Line %s status is %s', 
+            logging.info('<<- Asterisk reports hangup OK. Line %s status is %s', 
                           l.ident, l.status)
-            logging.info('<<---------------------------------')
+            # logging.info('<<---------------------------------')
 
 
 def parse_args():
@@ -518,7 +514,7 @@ def make_switch(args):
         originating_switches.append(Rainier)
         originating_switches.append(Adams)
         originating_switches.append(Lakeview)
-        originating_switches.append(ESS3)
+        # originating_switches.append(ESS3)
 
     if __name__ == '__main__':
         for o in args.o:
