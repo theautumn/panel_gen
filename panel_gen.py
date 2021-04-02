@@ -514,7 +514,7 @@ def make_switch(args):
         originating_switches.append(Rainier)
         originating_switches.append(Adams)
         originating_switches.append(Lakeview)
-        # originating_switches.append(ESS3)
+      # originating_switches.append(ESS3)
 
     if __name__ == '__main__':
         for o in args.o:
