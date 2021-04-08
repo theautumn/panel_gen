@@ -67,7 +67,7 @@ class Line():
 
         self.timer = int(random.gamma(3,4))
         self.ident = ident
-        self.human_term = phone_format(str(self.term)) 
+        self.human_term = phone_format(self.term) 
         self.chan = '-'
         self.magictoken = ""
         self.ast_status = 'on_hook'
@@ -153,9 +153,9 @@ class Line():
                 logging.error("No terminating line available for this office.")
                 assert False
 
-            term = int(str(term_office) + str(term_station))
+            term = str(term_office) + str(term_station)
         logging.debug('Terminating line selected: %s', term)
-        self.human_term = phone_format(str(term)) 
+        self.human_term = phone_format(term) 
         return term
 
 
@@ -169,13 +169,19 @@ class Line():
             timer:           duration of the call
 
         """
-       # nextchan = self.switch.newchannel(self.switch.channel_choices)
-       # if nextchan == False:
-       #     self.timer = int(round(random.gamma(4,4)))
-       #     return
+        nextchan = self.switch.newchannel(self.switch.channel_choices)
+        if nextchan == False:
+            self.timer = int(round(random.gamma(4,4)))
+            return
 
-        CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
-        #CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % self.term
+        pred = ''       # defined here and below so i can easily
+                        # comment that out if needed
+
+        # Comment this line out to remove ANI/long distance routings
+        pred = longdistance(self.kind, nextchan, self.term)
+
+        #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
         logging.debug('To Asterisk: %s on ident %s', CHANNEL, self.ident)
 
         self.timer = self.switch.newtimer()
@@ -223,7 +229,7 @@ class Line():
         # Set accountcode to our magic UUID for use later.
         c = Call(CHANNEL, variables=vars, callerid=cid, 
                  account=self.magictoken)
-        con = Context('sarah_callsim',str(self.term),'1')
+        con = Context('sarah_callsim',pred+self.term,'1')
         cf = CallFile(c, con)
         cf.spool()
 
@@ -379,9 +385,9 @@ def on_DialBegin(event, **kwargs):
     DB_DestChannel = DB_DestChannel.findall(event)
     AccountCode = AccountCode.findall(event)
 
-    logging.debug('DialString: %s, DestChannel: %s, Accountcode: %s', DialString, DB_DestChannel, AccountCode)
+    logging.debug('DestChannel: %s, Accountcode: %s', DB_DestChannel, AccountCode)
 
-    if DialString == [] or DB_DestChannel == [] or AccountCode == []:
+    if DB_DestChannel == [] or AccountCode == []:
         # Fuckin bail out!
         logging.debug("***DialBegin regex isn't matching!***")
         return
@@ -490,6 +496,23 @@ def parse_args():
 
 def phone_format(n):
     return format(int(n[:-1]), ",").replace(",", "-") + n[-1]
+
+def longdistance(kind, chan, term):
+    """ Some lines can be long distance calls with ANI """
+    """ This will determine which calls should be. """
+
+    newsenders = ['12','13','14','16','32']
+    pd = ''
+
+    if kind == "1xb":
+        if chan in newsenders:
+            if term[0:3] == "832" or term[0:3] == "232":
+                i = random.randint(0,10)
+                if i >= 7:
+                    logging.info("ANI call being placed on %s to %s", kind, term)
+                    pd = '11'
+    return pd
+
 
 def make_switch(args):
     """ Instantiate some switches so we can work with them later."""
