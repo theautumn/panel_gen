@@ -96,6 +96,10 @@ class Line():
                         self.switch.max_dialing, self.switch.is_dialing)
             elif self.status == 1:
                 self.hangup()
+
+        # Check to make sure we're still sane :)
+        safetynet()
+
         return self.timer
 
     def pick_next_called(self, term_choices):
@@ -499,7 +503,12 @@ def safetynet():
 
     for s in originating_switches:
         if s.is_dialing < 0:
-            pass
+            reason =  "dialing counter < 0"
+            api_stop(switch=s.kind)
+            api_start(switch=s.kind)
+
+
+            logging.error("Restarted switch %s due to invalid state: %s", s.kind, reason)
 
 
 def make_switch(args):
