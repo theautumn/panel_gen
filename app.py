@@ -81,25 +81,3 @@ def stop(**kwargs):
         abort(406, "Shits all fucked up",)
         pass
 
-def call(**kwargs):
-    """
-    POST /app/call/{switch}
-    Places a single call on {switch}, then hangs up and deletes 
-    the line from the switch.
-    Success:    Returns 200 OK + JSON parseable switch status.
-    Failure:    Returns 406 + Unhelpful error message.
-
-    **kwargs allow the POST to be parsed for specifics
-    switch:         In URI path. Can be "1xb", "5xb", "panel".
-    destination:    In URI path. Called line.
-    timer:          In URI path. Number of seconds for call to be up.
-
-    """
-    result = panel_gen.call_now(**kwargs)
-    if result != False:
-        return result
-    else:
-        abort(
-            406,
-            "Call failed for some reason. This message is very unhelpful",
-        )

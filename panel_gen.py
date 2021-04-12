@@ -50,9 +50,6 @@ class Line():
                         match it against our call.
     self.ast_status:    Returned from AMI. Indicates status of line from
                         Asterisk's perspective.
-    self.is_temp:        Used to identify an API one-shot line in the console
-                        interface.
-    self.api_indicator: See above. Is set to "***" if a line is a temp API line.
     """
 
     def __init__(self, ident, switch, **kwargs):
@@ -71,8 +68,6 @@ class Line():
         self.chan = '-'
         self.magictoken = ""
         self.ast_status = 'on_hook'
-        self.is_temp = kwargs.get('is_temp', False)
-        self.api_indicator = ""
 
     def __repr__(self):
         return '<Line({self.ident!r})>'.format(self=self)
@@ -178,10 +173,10 @@ class Line():
                         # comment that out if needed
 
         # Comment this line out to remove ANI/long distance routings
-        pred = longdistance(self.kind, nextchan, self.term)
+        # pred = longdistance(self.kind, nextchan, self.term)
 
-        #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
-        CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
+        CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        #CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
         logging.debug('To Asterisk: %s on ident %s', CHANNEL, self.ident)
 
         self.timer = self.switch.newtimer()
@@ -205,14 +200,6 @@ class Line():
             if key == 'timer':
                 self.timer = value
                 wait = value
-
-        # If the line comes from the API /call/{switch}/{line} then this
-        # line is temporary. This sets up special handling so that the status
-        # starts at "1", which will cause hangup() to hang up the call and
-        # delete the line when the call is done.
-        if self.is_temp == True:
-            self.status = 1
-            self.api_indicator = "***"
 
         # Set wait time for asterisk to auto hangup.
         vars = {'waittime': wait}
@@ -249,14 +236,6 @@ class Line():
 
         logging.info('Hung up %s on DAHDI/%s, line %s', self.term, self.chan, self.ident)
 
-        # Delete the line if we are just doing a one-shot call from the API.
-        if self.is_temp == True:
-            logging.info("Deleted API one-shot line.")
-            currentlines = [l for l in lines if l.switch == self.switch]
-
-            del lines[self.ident]
-            if len(currentlines) <= 1:
-                self.switch.running = False
         self.timer = self.switch.newtimer()
         self.term = self.pick_next_called(term_choices)
 
@@ -365,6 +344,7 @@ class Switch():
 # |   getting AMI events, and parsing args.       |
 # |                                               |
 # +-----------------------------------------------+
+
 
 def on_DialBegin(event, **kwargs):
     """
@@ -501,7 +481,7 @@ def longdistance(kind, chan, term):
     """ Some lines can be long distance calls with ANI """
     """ This will determine which calls should be. """
 
-    newsenders = ['12','13','14','16','32']
+    newsenders = ['13','14','16','27','28','29','32']
     pd = ''
 
     if kind == "1xb":
@@ -512,6 +492,14 @@ def longdistance(kind, chan, term):
                     logging.info("ANI call being placed on %s to %s", kind, term)
                     pd = '11'
     return pd
+
+def safetynet():
+    """ Most of these things should never need to be done """
+    """ but its better to be fault tolerant if possible """
+
+    for s in originating_switches:
+        if s.is_dialing < 0:
+            pass
 
 
 def make_switch(args):
@@ -874,53 +862,6 @@ def api_stop(**kwargs):
 
     return get_info()
 
-def call_now(**kwargs):
-    """
-    Immediately places a call from switch to destination. The line is
-    deleted when the call timer expires.
-
-    switch:             Switch to originate call on.
-    term_line:          Destination number to call.
-    one_shot_timer:     Number of seconds before hangup.
-    """
-
-    schema = LineSchema()
-
-    switch = kwargs.get('switch','')
-    term_line = kwargs.get('destination','')
-    one_shot_timer = int(kwargs.get('timer',''))
-
-    logging.info('API requested one-shot call on %s', switch)
-
-    # Validates switch input.
-    if switch == 'panel':
-        switch = Rainier
-    elif switch == '5xb':
-        switch = Adams
-    elif switch == '1xb':
-        switch = Lakeview
-    elif switch == '3ess' or 'ess':
-        switch = ESS3
-    else:
-        logging.warning("API one-shot switch failed validation check: switch")
-        return False
-
-    # Validates line input. If sane, set up line for
-    # immediate calling.
-    if len(term_line) == 7:
-        api_lines = make_lines(source='api', switch=switch, numlines=1) 
-        api_lines[0].term = term_line
-        api_lines[0].human_term = phone_format(str(term_line))
-        api_lines[0].is_temp = True
-        lines.append(api_lines[0])
-        api_lines[0].call(originating_switches=switch, timer=one_shot_timer)
-        api_lines[0].tick()
-        result = schema.dump(api_lines[0])
-        api_lines = None
-        return result
-    else:
-        logging.warning("API one-shot line failed validation check: line")
-        return False
 
 def get_all_lines():
     """ Returns formatted list of all lines """
@@ -1313,7 +1254,7 @@ def app_shutdown(signum, frame):
 
 def module_shutdown():
     """
-    Attempts to cleanly exit panel_gen
+    Cleanly exit panel_gen
     """
 
     try:

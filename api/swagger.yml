@@ -100,37 +100,6 @@ paths:
         406:
           description: Failed to stop calls on switch.
 
-
-  /call/{switch}/{destination}:
-    post:
-      operationId: app.call
-      tags:
-        - app
-      summary: Place a call now.
-      description: Place a call immediately. Line will disappear after 18 seconds.
-      parameters:
-        - name: switch
-          in: path
-          description: Switch to originate call from
-          type: string
-          required: True
-        - name: destination
-          in: path
-          description: Destination line to call
-          type: string
-          required: True
-        - name: timer
-          in: query
-          description: Length of call before it hangs up
-          type: string
-          required: True
-
-      responses:
-        200:
-          description: Successfully placed call
-        406:
-          description: Failed to place call. Ask Sarah.
-
   /switches:
     get:
       operationId: switches.read_all
