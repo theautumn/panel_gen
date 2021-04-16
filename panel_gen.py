@@ -68,6 +68,8 @@ class Line():
         self.chan = '-'
         self.magictoken = ""
         self.ast_status = 'on_hook'
+        self.switching_delay = 0
+        self.longdistance = False
 
     def __repr__(self):
         return '<Line({self.ident!r})>'.format(self=self)
@@ -91,7 +93,7 @@ class Line():
                 else:
                     # Back off until some calls complete.
                     self.timer = int(round(random.gamma(4,4)))
-                    logging.warning("Exceeded sender limit: %s with %s calls " +
+                    logging.warning("Hit sender limit: %s with %s calls " +
                         "dialing. Delaying call.",
                         self.switch.max_dialing, self.switch.is_dialing)
             elif self.status == 1:
@@ -177,33 +179,21 @@ class Line():
                         # comment that out if needed
 
         # Comment this line out to remove ANI/long distance routings
-        # pred = longdistance(self.kind, nextchan, self.term)
+        # pred = longdistance(self, nextchan)
 
-        CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
-        #CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
+        #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
         logging.debug('To Asterisk: %s on ident %s', CHANNEL, self.ident)
 
         self.timer = self.switch.newtimer()
 
-        # Wait value to pass to Asterisk if not using API to start call.
-        # (We will actually be controlling the hangup from here, but this is
-        # kind of a safety net so asterisk dumps the call if we can't for some
-        # reason.)
+        # Wait value to pass to Asterisk.(We will actually be controlling the 
+        # hangup from here, but this is kind of a safety net so asterisk dumps 
+        # the call if we can't for some reason.)
         wait = self.timer + 15
 
         # OoOOOoOOoOOOO!
         self.magictoken = str(uuid.uuid4())
-
-        # The kwargs come in from the API. The following lines handle them
-        # and set up the special call case outside of the normal program flow.
-        for key, value in list(kwargs.items()):
-            if key == 'originating_switches':
-                switch = value
-            if key == 'line':
-                line = value
-            if key == 'timer':
-                self.timer = value
-                wait = value
 
         # Set wait time for asterisk to auto hangup.
         vars = {'waittime': wait}
@@ -215,8 +205,6 @@ class Line():
         # Make the .call file amd throw it into the asterisk spool.
         # Pass control of the call to the sarah_callsim context in
         # the dialplan.
-        # Set callerid to term line so it shows something useful in the CDR.
-        # (Yes, thats dumb, but thats how it works.) 
         # Set accountcode to our magic UUID for use later.
         c = Call(CHANNEL, variables=vars, callerid=cid, 
                  account=self.magictoken)
@@ -242,6 +230,8 @@ class Line():
 
         self.timer = self.switch.newtimer()
         self.term = self.pick_next_called(term_choices)
+        self.switching_delay = 0
+        self.longdistance = False
 
 
 class Switch():
@@ -352,8 +342,7 @@ class Switch():
 
 def on_DialBegin(event, **kwargs):
     """
-    Callback function for DialBegin AMI events. Extracts DialString
-    and DestChannel and stores it to variables in each line.
+    Callback function for DialBegin AMI events. 
     Increments the "is_dialing" counter.
 
     Account Code is a magic number we send to Asterisk and expect
@@ -361,19 +350,17 @@ def on_DialBegin(event, **kwargs):
     """
 
     event = str(event)
-    DialString = re.compile('(?<=w)(\d{7})')
+
+
     DB_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
     AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
-    DialString = DialString.findall(event)
     DB_DestChannel = DB_DestChannel.findall(event)
     AccountCode = AccountCode.findall(event)
 
-    logging.debug('DestChannel: %s, Accountcode: %s', DB_DestChannel, AccountCode)
-
     if DB_DestChannel == [] or AccountCode == []:
         # Fuckin bail out!
-        logging.debug("***DialBegin regex isn't matching!***")
+        logging.warning("***DialBegin regex isn't matching!***")
         return
 
     for l in lines:
@@ -386,7 +373,7 @@ def on_DialBegin(event, **kwargs):
             l.status = 1
             logging.info('DialBegin %s on DAHDI/%s from %s ident %s ->>', 
                          l.term, l.chan, l.switch.kind, l.ident)
-            # logging.info('-------------------------------------->>')
+
 
 
 def on_DialEnd(event, **kwargs):
@@ -396,6 +383,7 @@ def on_DialEnd(event, **kwargs):
 
     """
     event = str(event)
+
     DE_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
     AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
@@ -421,12 +409,14 @@ def on_Hangup(event, **kwargs):
     """
 
     event = str(event)
+    HU_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
     AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
     AccountCode = AccountCode.findall(event)
+    HU_DestChannel = HU_DestChannel.findall(event)
 
     if AccountCode == []:
-        logging.debug("*** AccountCode didn't match on hangup***")
+        logging.warning("*** AccountCode didn't match on hangup***")
         return
 
     for l in lines:
@@ -441,7 +431,6 @@ def on_Hangup(event, **kwargs):
             l.switch.on_call -= 1
             logging.info('<<- Asterisk reports hangup OK. Line %s status is %s', 
                           l.ident, l.status)
-            # logging.info('<<---------------------------------')
 
 
 def parse_args():
@@ -481,20 +470,25 @@ def parse_args():
 def phone_format(n):
     return format(int(n[:-1]), ",").replace(",", "-") + n[-1]
 
-def longdistance(kind, chan, term):
+def longdistance(line, chan):
     """ Some lines can be long distance calls with ANI """
     """ This will determine which calls should be. """
 
     newsenders = ['13','14','16','27','28','29','32']
     pd = ''
 
-    if kind == "1xb":
+    if line.kind == "1xb":
         if chan in newsenders:
-            if term[0:3] == "832" or term[0:3] == "232":
-                i = random.randint(0,10)
-                if i >= 7:
-                    logging.info("ANI call being placed on %s to %s", kind, term)
-                    pd = '11'
+            if line.term[0:3] == "832" or line.term[0:3] == "232":
+                if line.longdistance == False:
+                    i = random.randint(0,10)
+                    if i >= 0:
+                        logging.info("ANI call being placed on %s to %s, chan  %s", 
+                                     line.kind, line.term, chan)
+                        line.human_term = line.human_term + '*'
+                        pd = '11'
+                        line.switching_delay = 5
+                        line.longdistance = True
     return pd
 
 def safetynet():
@@ -506,9 +500,8 @@ def safetynet():
             reason =  "dialing counter < 0"
             api_stop(switch=s.kind)
             api_start(switch=s.kind)
-
-
             logging.error("Restarted switch %s due to invalid state: %s", s.kind, reason)
+
 
 
 def make_switch(args):
@@ -998,14 +991,10 @@ def update_switch(**kwargs):
     schema = SwitchSchema()
     result = []
 
-    # Iterate over our originating_switches and see if the switch
-    # that the API asked for matches an existing switch.
     for i in originating_switches:
-        # If the type of switch matches the type we're trying to edit
         if i.kind == kwargs.get("kind", ""):
             # Wipe out the top parameter, because I said so
             del kwargs['kind']
-            current_load = i.traffic_load
             # Lets iterate over the parameters we can work with.
             for k,v in kwargs.items():
                 for k1 in v.items():
@@ -1122,14 +1111,14 @@ class Screen():
     def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
         table = [[n.kind, n.chan, n.human_term, n.timer,
-                n.status, n.ast_status, n.api_indicator] for n in lines]
+                n.status, n.ast_status] for n in lines]
         stdscr.erase()
         stdscr.addstr(0,5," __________________________________________")
         stdscr.addstr(1,5,"|                                          |")
         stdscr.addstr(2,5,"|  Rainier Full Mechanical Call Simulator  |")
         stdscr.addstr(3,5,"|__________________________________________|")
         stdscr.addstr(6,0,tabulate(table, headers=["switch", "channel", "term",
-                    "tick", "state", "asterisk", "api"],
+                    "tick", "state", "asterisk"],
                     tablefmt="pipe", stralign = "right" ))
 
         # Print asterisk channels below the table so we can see what its actually doing.
