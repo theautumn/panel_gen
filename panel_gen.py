@@ -70,6 +70,7 @@ class Line():
         self.ast_status = 'on_hook'
         self.switching_delay = 0
         self.longdistance = False
+        self.pending_hangup = False
 
     def __repr__(self):
         return '<Line({self.ident!r})>'.format(self=self)
@@ -84,20 +85,21 @@ class Line():
         """
         if self.switch.running == False:
             self.switch.running = True
-        self.timer -= 1
-        if self.timer <= 0:
-            if self.status == 0:
-                logging.debug("In tick(). Timer 0 status 0 on line %s", self.ident)
-                if self.switch.is_dialing < self.switch.max_dialing:
-                    self.call()
-                else:
-                    # Back off until some calls complete.
-                    self.timer = int(round(random.gamma(4,4)))
-                    logging.warning("Hit sender limit: %s with %s calls " +
-                        "dialing. Delaying call.",
-                        self.switch.max_dialing, self.switch.is_dialing)
-            elif self.status == 1:
-                self.hangup()
+        if self.pending_hangup == False:
+            self.timer -= 1
+            if self.timer <= 0:
+                if self.status == 0:
+                    logging.debug("In tick(). Timer 0 status 0 on line %s", self.ident)
+                    if self.switch.is_dialing < self.switch.max_dialing:
+                        self.call()
+                    else:
+                        # Back off until some calls complete.
+                        self.timer = int(round(random.gamma(4,4)))
+                        logging.warning("Hit sender limit: %s with %s calls " +
+                            "dialing. Delaying call.",
+                            self.switch.max_dialing, self.switch.is_dialing)
+                elif self.status == 1:
+                    self.hangup()
 
         # Check to make sure we're still sane :)
         safetynet()
@@ -179,10 +181,10 @@ class Line():
                         # comment that out if needed
 
         # Comment this line out to remove ANI/long distance routings
-        # pred = longdistance(self, nextchan)
+        pred = longdistance(self, nextchan)
 
-        #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
-        CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
+        CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        #CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
         logging.debug('To Asterisk: %s on ident %s', CHANNEL, self.ident)
 
         self.timer = self.switch.newtimer()
@@ -225,7 +227,7 @@ class Line():
         """
 
         adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
-
+        self.pending_hangup = True
         logging.info('Hung up %s on DAHDI/%s, line %s', self.term, self.chan, self.ident)
 
         self.switching_delay = 0
@@ -398,6 +400,31 @@ def on_DialEnd(event, **kwargs):
             logging.debug('on_DialEnd with %s calls dialing', l.switch.is_dialing)
             logging.debug('Ringing %s on line %s', l.term, l.ident)
 
+            line = l
+            break
+
+    def doDialEnd():
+        logging.info("DialEnd event timer done on %s", line.term)
+        if line.ast_status == 'Dialing':
+            line.ast_status = 'Ringing'
+            line.switch.is_dialing -= 1
+            logging.debug('Ringing %s on line %s', line.term, line.ident)
+        elif line.ast_status == 'on_hook':
+            pass # xxx this might be problems
+        logging.debug('on_DialEnd with %s calls dialing', line.switch.is_dialing)
+
+#    doDialEnd()
+    logging.info("boutta eneuquque event")
+    enqueue_event(line.switching_delay, doDialEnd)
+
+def enqueue_event(delay, callback):
+    eventtimer = threading.Timer(delay, callback)
+    logging.info("enqueue 0")
+    eventtimer.start()
+    logging.info("enqueue 1")
+    logging.info("Started event timer delay %s", delay)
+    logging.info("enqueue 2")
+
 
 def on_Hangup(event, **kwargs):
     """
@@ -411,6 +438,8 @@ def on_Hangup(event, **kwargs):
     AccountCode = AccountCode.findall(event)
     HU_DestChannel = HU_DestChannel.findall(event)
 
+    logging.info("Hangup AMI event get %s", AccountCode[0])
+
     if AccountCode == []:
         logging.warning("*** AccountCode didn't match on hangup***")
         return
@@ -421,14 +450,25 @@ def on_Hangup(event, **kwargs):
                 l.switch.is_dialing -= 1
                 logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
 
-            l.status = 0
-            l.chan = '-'
-            l.ast_status = 'on_hook'
-            l.switch.on_call -= 1
-            l.timer = self.switch.newtimer()
-            l.term = self.pick_next_called(term_choices)
-            logging.info('<<- Asterisk reports hangup OK. Line %s status is %s', 
-                          l.ident, l.status)
+            try:
+                l.status = 0
+                #logging.info("status %s", l.status)
+                l.chan = '-'
+                #logging.info("chan %s", l.chan)
+                l.ast_status = 'on_hook'
+                #logging.info("ast_status %s", l.ast_status)
+                l.switch.on_call -= 1
+                #logging.info("on_call %s", l.switch.on_call)
+                l.timer = l.switch.newtimer()
+                #logging.info("new timer %s", l.timer)
+                l.term = l.pick_next_called(term_choices)
+                #logging.info("new term %s", l.term)
+                l.pending_hangup = False
+                #logging.info("pending hangup %s", l.pending_hangup)
+                logging.info('<<- Asterisk reports hangup OK. Line %s status is %s',
+                              l.ident, l.status)
+            except Exception as e:
+                logging.info(e)
 
 
 def parse_args():
@@ -465,8 +505,10 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+
 def phone_format(n):
     return format(int(n[:-1]), ",").replace(",", "-") + n[-1]
+
 
 def longdistance(line, chan):
     """ Some lines can be long distance calls with ANI """
