@@ -187,7 +187,7 @@ class Line():
 
         self.timer = self.switch.newtimer()
 
-        # Wait value to pass to Asterisk.(We will actually be controlling the 
+        # Wait value to pass to Asterisk. (We will actually be controlling the 
         # hangup from here, but this is kind of a safety net so asterisk dumps 
         # the call if we can't for some reason.)
         wait = self.timer + 15
@@ -228,8 +228,6 @@ class Line():
 
         logging.info('Hung up %s on DAHDI/%s, line %s', self.term, self.chan, self.ident)
 
-        self.timer = self.switch.newtimer()
-        self.term = self.pick_next_called(term_choices)
         self.switching_delay = 0
         self.longdistance = False
 
@@ -351,7 +349,6 @@ def on_DialBegin(event, **kwargs):
 
     event = str(event)
 
-
     DB_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
     AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
@@ -375,7 +372,6 @@ def on_DialBegin(event, **kwargs):
                          l.term, l.chan, l.switch.kind, l.ident)
 
 
-
 def on_DialEnd(event, **kwargs):
     """
     Callback function for DialEnd AMI events. Sets state to "Ringing".
@@ -392,7 +388,7 @@ def on_DialEnd(event, **kwargs):
 
     if DE_DestChannel == [] or AccountCode == []:
         #Outta here
-        logging.debug("***DialEnd regex isn't matching!***")
+        logging.warning("***DialEnd regex isn't matching!***")
         return
 
     for l in lines:
@@ -429,6 +425,8 @@ def on_Hangup(event, **kwargs):
             l.chan = '-'
             l.ast_status = 'on_hook'
             l.switch.on_call -= 1
+            l.timer = self.switch.newtimer()
+            l.term = self.pick_next_called(term_choices)
             logging.info('<<- Asterisk reports hangup OK. Line %s status is %s', 
                           l.ident, l.status)
 
