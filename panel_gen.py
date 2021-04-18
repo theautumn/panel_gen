@@ -78,28 +78,29 @@ class Line():
     def tick(self):
         """
         Decrement line timer by 1 every second until it reaches 0.
-        Manages the self.status state machine by placing calls or hanging up,
-        depending on line.status.
+        Manages the line's state machine by placing calls or hanging up,
+        depending on status.
 
         Returns the new value of self.timer
         """
         if self.switch.running == False:
             self.switch.running = True
-        if self.pending_hangup == False:
-            self.timer -= 1
-            if self.timer <= 0:
-                if self.status == 0:
-                    logging.debug("In tick(). Timer 0 status 0 on line %s", self.ident)
-                    if self.switch.is_dialing < self.switch.max_dialing:
-                        self.call()
-                    else:
-                        # Back off until some calls complete.
-                        self.timer = int(round(random.gamma(4,4)))
-                        logging.warning("Hit sender limit: %s with %s calls " +
-                            "dialing. Delaying call.",
-                            self.switch.max_dialing, self.switch.is_dialing)
-                elif self.status == 1:
-                    self.hangup()
+      #  if self.pending_hangup == False:
+        self.timer -= 1
+        if self.timer <= 0:
+            if self.ast_status == "on_hook":
+                logging.debug("In tick(). Timer 0 status 0 on line %s", self.ident)
+                if self.switch.is_dialing < self.switch.max_dialing:
+                    self.call()
+                else:
+                    # Back off until some calls complete.
+                    self.timer = int(round(random.gamma(4,4)))
+                    logging.warning("Hit sender limit: %s with %s calls " +
+                        "dialing. Delaying call.",
+                        self.switch.max_dialing, self.switch.is_dialing)
+            elif self.ast_status == "Dialing" or self.ast_status == "Ringing":
+                logging.debug("1: In tick(). Timer 0 status 1 on ", self.term)
+                self.hangup()
 
         # Check to make sure we're still sane :)
         safetynet()
@@ -181,7 +182,8 @@ class Line():
                         # comment that out if needed
 
         # Comment this line out to remove ANI/long distance routings
-        pred = longdistance(self, nextchan)
+        if self.switch.ld_capable == True:
+            pred = longdistance(self, nextchan)
 
         CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
         #CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
@@ -228,11 +230,12 @@ class Line():
 
         adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
         self.pending_hangup = True
-        logging.info('Hung up %s on DAHDI/%s, line %s', self.term, self.chan, self.ident)
+        logging.debug('2: Asked Asterisk to hangup %s on DAHDI/%s, line %s',
+                     self.term, self.chan, self.ident)
 
         self.switching_delay = 0
         self.longdistance = False
-
+        logging.debug("Pending hangup: %s", self.pending_hangup)
 
 class Switch():
     """
@@ -263,6 +266,7 @@ class Switch():
         self.on_call = 0
         self.dahdi_group = config.get(kind, 'dahdi_group')
         self.channel_choices = config.get(kind, 'channels').split(",")
+        self.ld_capable = config.getboolean(kind, 'long_distance')
         self.traffic_load = "normal"
         self.lines_normal = config.getint(kind, 'lines_normal')
         self.lines_heavy = config.getint(kind, 'lines_heavy')
@@ -348,30 +352,32 @@ def on_DialBegin(event, **kwargs):
     Account Code is a magic number we send to Asterisk and expect
     to get back. This is how we match events with calls in progress.
     """
+    try:
+        event = str(event)
 
-    event = str(event)
+        DB_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
+        AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
-    DB_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
-    AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+        DB_DestChannel = DB_DestChannel.findall(event)
+        AccountCode = AccountCode.findall(event)
 
-    DB_DestChannel = DB_DestChannel.findall(event)
-    AccountCode = AccountCode.findall(event)
+        if DB_DestChannel == [] or AccountCode == []:
+            # Fuckin bail out!
+            logging.warning("***DialBegin regex isn't matching!***")
+            return
 
-    if DB_DestChannel == [] or AccountCode == []:
-        # Fuckin bail out!
-        logging.warning("***DialBegin regex isn't matching!***")
-        return
-
-    for l in lines:
-        #if AccountCode[0] == l.magictoken and l.ast_status == 'on_hook':
-        if AccountCode[0] == l.magictoken:
-            l.chan = DB_DestChannel[0]
-            l.ast_status = 'Dialing'
-            l.switch.is_dialing += 1
-            l.switch.on_call +=1
-            l.status = 1
-            logging.info('DialBegin %s on DAHDI/%s from %s ident %s ->>', 
-                         l.term, l.chan, l.switch.kind, l.ident)
+        for l in lines:
+            #if AccountCode[0] == l.magictoken and l.ast_status == 'on_hook':
+            if AccountCode[0] == l.magictoken:
+                l.chan = DB_DestChannel[0]
+                l.ast_status = 'Dialing'
+                l.switch.is_dialing += 1
+                l.switch.on_call +=1
+                l.status = 1
+                logging.info('DialBegin %s on DAHDI/%s from %s ident %s ->>', 
+                             l.term, l.chan, l.switch.kind, l.ident)
+    except Exception as e:
+        logging.exception(e)
 
 
 def on_DialEnd(event, **kwargs):
@@ -380,50 +386,55 @@ def on_DialEnd(event, **kwargs):
     Decrements the "is_dialing" counter.
 
     """
-    event = str(event)
+    try:
+        event = str(event)
 
-    DE_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
-    AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+        DE_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
+        AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
-    DE_DestChannel = DE_DestChannel.findall(event)
-    AccountCode = AccountCode.findall(event)
+        DE_DestChannel = DE_DestChannel.findall(event)
+        AccountCode = AccountCode.findall(event)
 
-    if DE_DestChannel == [] or AccountCode == []:
-        #Outta here
-        logging.warning("***DialEnd regex isn't matching!***")
-        return
+        if DE_DestChannel == [] or AccountCode == []:
+            #Outta here
+            logging.warning("***DialEnd regex isn't matching!***")
+            return
 
-    for l in lines:
-        if AccountCode[0] == l.magictoken:
-            l.ast_status = 'Ringing'
-            l.switch.is_dialing -= 1
-            logging.debug('on_DialEnd with %s calls dialing', l.switch.is_dialing)
-            logging.debug('Ringing %s on line %s', l.term, l.ident)
+        for l in lines:
+            if AccountCode[0] == l.magictoken:
+                logging.debug('FROM ASTERISK: DialEnd for line %s', l.term)
+                line = l
+                break
 
-            line = l
-            break
+        def doDialEnd():
+            try:
+                logging.debug("C: DialEnd bookkeeping starting on %s. Pending hangup is %s", 
+                             line.term, line.pending_hangup)
+                if line.pending_hangup == False:
+                    if line.ast_status == 'Dialing':
+                        line.ast_status = 'Ringing'
+                        line.switch.is_dialing -= 1
+                        logging.debug('Ringing %s on line %s', line.term, line.ident)
+                    elif line.ast_status == 'on_hook':
+                        pass # xxx this might be problems
+                    logging.debug('on_DialEnd with %s calls dialing', line.switch.is_dialing)
+            except Exception as e:
+                logging.exception(e)
 
-    def doDialEnd():
-        logging.info("DialEnd event timer done on %s", line.term)
-        if line.ast_status == 'Dialing':
-            line.ast_status = 'Ringing'
-            line.switch.is_dialing -= 1
-            logging.debug('Ringing %s on line %s', line.term, line.ident)
-        elif line.ast_status == 'on_hook':
-            pass # xxx this might be problems
-        logging.debug('on_DialEnd with %s calls dialing', line.switch.is_dialing)
+        if len(lines) > 0:
+            enqueue_event(line.switching_delay, doDialEnd)
+            logging.debug("B: Event enqueued  delay %s.", line.switching_delay)
 
-#    doDialEnd()
-    logging.info("boutta eneuquque event")
-    enqueue_event(line.switching_delay, doDialEnd)
+    except Exception as e:
+        logging.exception(e)
 
 def enqueue_event(delay, callback):
-    eventtimer = threading.Timer(delay, callback)
-    logging.info("enqueue 0")
-    eventtimer.start()
-    logging.info("enqueue 1")
-    logging.info("Started event timer delay %s", delay)
-    logging.info("enqueue 2")
+    try:
+        eventtimer = threading.Timer(delay, callback)
+        eventtimer.start()
+        logging.debug("A: Started event timer delay %s", delay)
+    except Exception as e:
+        logging.exception(e)
 
 
 def on_Hangup(event, **kwargs):
@@ -431,44 +442,37 @@ def on_Hangup(event, **kwargs):
     Callback for processing hangup events.
     """
 
-    event = str(event)
-    HU_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
-    AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+    try:
+        event = str(event)
+        HU_DestChannel = re.compile('(?<=DestChannel\'\:\s.{7})([^-]*)')
+        AccountCode = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
-    AccountCode = AccountCode.findall(event)
-    HU_DestChannel = HU_DestChannel.findall(event)
+        AccountCode = AccountCode.findall(event)
+        HU_DestChannel = HU_DestChannel.findall(event)
 
-    logging.info("Hangup AMI event get %s", AccountCode[0])
+        logging.debug("3: FROM ASTERISK: Hangup event for %s", AccountCode[0])
 
-    if AccountCode == []:
-        logging.warning("*** AccountCode didn't match on hangup***")
-        return
+        if AccountCode == []:
+            logging.warning("*** AccountCode didn't match on hangup***")
+            return
 
-    for l in lines:
-        if AccountCode[0] == l.magictoken:
-            if l.ast_status == 'Dialing':
-                l.switch.is_dialing -= 1
-                logging.debug('Hangup while dialing %s on DAHDI %s', self.term, self.chan)
+        for l in lines:
+            if AccountCode[0] == l.magictoken:
+                if l.ast_status == 'Dialing':
+                    l.switch.is_dialing -= 1
+                    logging.debug('Hangup while dialing %s on DAHDI %s', l.term, l.chan)
 
-            try:
                 l.status = 0
-                #logging.info("status %s", l.status)
                 l.chan = '-'
-                #logging.info("chan %s", l.chan)
                 l.ast_status = 'on_hook'
-                #logging.info("ast_status %s", l.ast_status)
                 l.switch.on_call -= 1
-                #logging.info("on_call %s", l.switch.on_call)
                 l.timer = l.switch.newtimer()
-                #logging.info("new timer %s", l.timer)
                 l.term = l.pick_next_called(term_choices)
-                #logging.info("new term %s", l.term)
                 l.pending_hangup = False
-                #logging.info("pending hangup %s", l.pending_hangup)
                 logging.info('<<- Asterisk reports hangup OK. Line %s status is %s',
                               l.ident, l.status)
-            except Exception as e:
-                logging.info(e)
+    except Exception as e:
+        logging.exception(e)
 
 
 def parse_args():
@@ -522,7 +526,7 @@ def longdistance(line, chan):
             if line.term[0:3] == "832" or line.term[0:3] == "232":
                 if line.longdistance == False:
                     i = random.randint(0,10)
-                    if i >= 0:
+                    if i >= 5:
                         logging.info("ANI call being placed on %s to %s, chan  %s", 
                                      line.kind, line.term, chan)
                         line.human_term = line.human_term + '*'
@@ -538,9 +542,15 @@ def safetynet():
     for s in originating_switches:
         if s.is_dialing < 0:
             reason =  "dialing counter < 0"
-            api_stop(switch=s.kind)
-            api_start(switch=s.kind)
-            logging.error("Restarted switch %s due to invalid state: %s", s.kind, reason)
+            doRestartSwitch(reason, s.kind)
+        if s.is_dialing > s.max_dialing + 1:
+            reason = "exceeded max dialing"
+            doRestartSwitch(reason, s.kind)
+
+    def doRestartSwitch(reason, kind):
+        api_stop(switch=s.kind)
+        api_start(switch=s.kind)
+        logging.error("Restarted switch %s due to invalid state: %s", kind, reason)
 
 
 
@@ -839,7 +849,7 @@ def api_start(**kwargs):
                     result = get_info()
                     return result
                 except Exception as e:
-                    logging.error(e)
+                    logging.execption(e)
                     return False
 
 
@@ -897,6 +907,7 @@ def api_stop(**kwargs):
                     for n in deadlines:
                         n.hangup()
                 s.on_call = 0
+
     except Exception as e:
         logging.warning("Exception occurred while stopping calls.")
         logging.warning(e)
@@ -1205,7 +1216,7 @@ class ui_thread(threading.Thread):
         try:
             curses.wrapper(self.ui_main)
         except Exception as e:
-            logging.error(e)
+            logging.exception(e)
 
     def ui_main(self, stdscr):
 
@@ -1303,10 +1314,7 @@ def module_shutdown():
     t_work.shutdown_flag.set()
     t_work.join()
 
-    # Clean exit for logging
     logging.shutdown()
-
-    # Log out of AMI
     client.logoff()
 
     print("\n\nShutdown requested. Hanging up Asterisk channels, and cleaning up /var/spool/")
