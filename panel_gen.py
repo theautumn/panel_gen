@@ -185,8 +185,8 @@ class Line():
         if self.switch.ld_capable == True:
             pred = longdistance(self, nextchan)
 
-        CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
-        #CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
+        #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
         logging.debug('To Asterisk: %s on ident %s', CHANNEL, self.ident)
 
         self.timer = self.switch.newtimer()
@@ -450,8 +450,6 @@ def on_Hangup(event, **kwargs):
         AccountCode = AccountCode.findall(event)
         HU_DestChannel = HU_DestChannel.findall(event)
 
-        logging.debug("3: FROM ASTERISK: Hangup event for %s", AccountCode[0])
-
         if AccountCode == []:
             logging.warning("*** AccountCode didn't match on hangup***")
             return
@@ -539,6 +537,11 @@ def safetynet():
     """ Most of these things should never need to be done """
     """ but its better to be fault tolerant if possible """
 
+    def doRestartSwitch(reason, kind):
+        api_stop(switch=s.kind)
+        api_start(switch=s.kind)
+        logging.error("Restarted switch %s due to invalid state: %s", kind, reason)
+
     for s in originating_switches:
         if s.is_dialing < 0:
             reason =  "dialing counter < 0"
@@ -547,10 +550,6 @@ def safetynet():
             reason = "exceeded max dialing"
             doRestartSwitch(reason, s.kind)
 
-    def doRestartSwitch(reason, kind):
-        api_stop(switch=s.kind)
-        api_start(switch=s.kind)
-        logging.error("Restarted switch %s due to invalid state: %s", kind, reason)
 
 
 
