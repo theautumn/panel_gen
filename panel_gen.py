@@ -62,18 +62,21 @@ class Line():
         else:
             self.term = self.pick_next_called(term_choices)
 
-        self.timer = int(random.gamma(3,4))
+        self.timer = random.gamma(3,4)
         self.ident = ident
         self.human_term = phone_format(self.term) 
         self.chan = '-'
         self.magictoken = ""
         self.ast_status = 'on_hook'
+        self.ami_tmr = 0
         self.switching_delay = 0
         self.longdistance = False
+        self.pending_call = False
+        self.pending_dialend = False
         self.pending_hangup = False
 
     def __repr__(self):
-        return '<Line({self.ident!r})>'.format(self=self)
+        return 'Line('+ repr(self.ident) + ', ' + repr(self.term) +')'
 
     def tick(self):
         """
@@ -83,27 +86,29 @@ class Line():
 
         Returns the new value of self.timer
         """
-        if self.switch.running == False:
-            self.switch.running = True
-      #  if self.pending_hangup == False:
-        self.timer -= 1
-        if self.timer <= 0:
-            if self.ast_status == "on_hook":
-                logging.debug("In tick(). Timer 0 status 0 on line %s", self.ident)
-                if self.switch.is_dialing < self.switch.max_dialing:
-                    self.call()
-                else:
-                    # Back off until some calls complete.
-                    self.timer = int(round(random.gamma(4,4)))
-                    logging.warning("Hit sender limit: %s with %s calls " +
-                        "dialing. Delaying call.",
-                        self.switch.max_dialing, self.switch.is_dialing)
-            elif self.ast_status == "Dialing" or self.ast_status == "Ringing":
-                logging.debug("1: In tick(). Timer 0 status 1 on ", self.term)
-                self.hangup()
+        try:
+            if self.switch.running == False:
+                self.switch.running = True
+            self.timer -= 0.10
+            self.ami_tmr -= 0.10
+            if self.timer <= 0:
+                if self.ast_status == "on_hook":
+                    if self.switch.is_dialing < self.switch.max_dialing:
+                        self.call()
+                    else:
+                        # Back off until some calls complete.
+                        self.timer = random.gamma(4,4)
+                        logging.warning("Hit sender limit: %s with %s calls " +
+                            "dialing. Delaying call.",
+                            self.switch.max_dialing, self.switch.is_dialing)
+                elif self.ast_status == "Dialing" or self.ast_status == "Ringing":
+                    self.hangup()
 
-        # Check to make sure we're still sane :)
-        safetynet()
+            # Check to make sure we're still sane :)
+            safetynet()
+
+        except Exception as e:
+            logging.exception(e)
 
         return self.timer
 
@@ -175,7 +180,7 @@ class Line():
         """
         nextchan = self.switch.newchannel(self.switch.channel_choices)
         if nextchan == False:
-            self.timer = int(round(random.gamma(4,4)))
+            self.timer = random.gamma(4,4)
             return
 
         pred = ''       # defined here and below so i can easily
@@ -194,7 +199,7 @@ class Line():
         # Wait value to pass to Asterisk. (We will actually be controlling the 
         # hangup from here, but this is kind of a safety net so asterisk dumps 
         # the call if we can't for some reason.)
-        wait = self.timer + 15
+        wait = int(self.timer) + 5
 
         # OoOOOoOOoOOOO!
         self.magictoken = str(uuid.uuid4())
@@ -202,6 +207,9 @@ class Line():
         # Set wait time for asterisk to auto hangup.
         vars = {'waittime': wait}
         cid = 'panel_gen <{}>'.format(self.switch.kind)
+
+        self.ami_tmr = 4
+        self.pending_call = True
 
         logging.debug('About to create .call file for line %s', self.ident)
         logging.debug('Magic Token: %s', self.magictoken)
@@ -230,6 +238,7 @@ class Line():
 
         adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
         self.pending_hangup = True
+        self.ami_tmr = 2
         logging.debug('2: Asked Asterisk to hangup %s on DAHDI/%s, line %s',
                      self.term, self.chan, self.ident)
 
@@ -305,10 +314,10 @@ class Switch():
         else:
             if args.v == 'heavy' or self.traffic_load == 'heavy':
                 a,b = (int(x) for x in self.h_ga.split(","))
-                timer = int(round(random.gamma(a,b)))
+                timer = random.gamma(a,b)
             elif args.v == 'normal' or self.traffic_load == 'normal':
                 a,b = (int(x) for x in self.n_ga.split(","))
-                timer = int(round(random.gamma(a,b)))
+                timer = random.gamma(a,b)
         return timer
 
     def newchannel(self, channel_choices):
@@ -363,7 +372,7 @@ def on_DialBegin(event, **kwargs):
 
         if DB_DestChannel == [] or AccountCode == []:
             # Fuckin bail out!
-            logging.warning("***DialBegin regex isn't matching!***")
+            logging.debug("***DialBegin regex isn't matching!***")
             return
 
         for l in lines:
@@ -373,7 +382,10 @@ def on_DialBegin(event, **kwargs):
                 l.ast_status = 'Dialing'
                 l.switch.is_dialing += 1
                 l.switch.on_call +=1
-                l.status = 1
+                l.status = 1 
+                l.pending_call = False
+                l.pending_dialend = True
+                l.ami_tmr = 18
                 logging.info('DialBegin %s on DAHDI/%s from %s ident %s ->>', 
                              l.term, l.chan, l.switch.kind, l.ident)
     except Exception as e:
@@ -397,12 +409,13 @@ def on_DialEnd(event, **kwargs):
 
         if DE_DestChannel == [] or AccountCode == []:
             #Outta here
-            logging.warning("***DialEnd regex isn't matching!***")
+            logging.debug("***DialEnd regex isn't matching!***")
             return
 
         for l in lines:
             if AccountCode[0] == l.magictoken:
                 logging.debug('FROM ASTERISK: DialEnd for line %s', l.term)
+                l.pending_dialend = False
                 line = l
                 break
 
@@ -451,7 +464,7 @@ def on_Hangup(event, **kwargs):
         HU_DestChannel = HU_DestChannel.findall(event)
 
         if AccountCode == []:
-            logging.warning("*** AccountCode didn't match on hangup***")
+            logging.debug("*** AccountCode didn't match on hangup***")
             return
 
         for l in lines:
@@ -529,7 +542,7 @@ def longdistance(line, chan):
                                      line.kind, line.term, chan)
                         line.human_term = line.human_term + '*'
                         pd = '11'
-                        line.switching_delay = 5
+                        line.switching_delay = 6
                         line.longdistance = True
     return pd
 
@@ -542,17 +555,48 @@ def safetynet():
         api_start(switch=s.kind)
         logging.error("Restarted switch %s due to invalid state: %s", kind, reason)
 
+    def errorhandle(reason, status):
+
+        logging.error("Failed to get AMI notification %s within allotted time on %s", 
+                      status, l)
+        logging.error("Channel: %s", l.chan)
+        logging.error("Status: %s", l.status)
+        logging.error("Asterisk: %s", l.ast_status)
+        logging.error("Tick: %s", int(l.timer))
+        logging.error("Term: %s", l.human_term)
+        logging.error("Channel: %s", l.chan)
+
+    reason = ''    
+
     for s in originating_switches:
         if s.is_dialing < 0:
             reason =  "dialing counter < 0"
             doRestartSwitch(reason, s.kind)
-        if s.is_dialing > s.max_dialing + 1:
+
+        if s.is_dialing > s.max_dialing:
             reason = "exceeded max dialing"
             doRestartSwitch(reason, s.kind)
 
+    for l in lines:
+        if l.pending_call == True:
+            status = "DialBegin"
+            if l.ami_tmr <= 0:
+                l.pending_call = False
+                errorhandle(reason, status)
 
+        if l.pending_dialend == True:
+            status = "DialEnd"
+            if l.ami_tmr <= 0:
+                l.pending_dialend = False       
+                errorhandle(reason, status)
 
+        if l.pending_hangup == True:
+            status = "Hangup"
+            if l.ami_tmr <= 0:
+                l.pending_hangup = False
+                errorhandle(reason, status)
 
+                
 def make_switch(args):
     """ Instantiate some switches so we can work with them later."""
 
@@ -1160,7 +1204,7 @@ class Screen():
 
     def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
-        table = [[n.kind, n.chan, n.human_term, n.timer,
+        table = [[n.kind, n.chan, n.human_term, int(n.timer),
                 n.status, n.ast_status] for n in lines]
         stdscr.erase()
         stdscr.addstr(0,5," __________________________________________")
@@ -1280,7 +1324,7 @@ class work_thread(threading.Thread):
                 # The main loop that kicks everything into gear.
                     for l in lines:
                         l.tick()
-                    sleep(1)
+                    sleep(0.1)
         except Exception as e:
             logging.exception(e)
 
@@ -1385,7 +1429,7 @@ if __name__ == "__main__":
         t_work.start()
 
         while True:
-            sleep(.5)
+            sleep(1)
 
     except (KeyboardInterrupt, ServiceExit):
         # Exception handler for console-based shutdown.

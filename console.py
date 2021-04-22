@@ -170,7 +170,7 @@ class Screen():
         x_start_row = y - 1
         y_start_col = 0
 
-        table = [[n.ident, n.kind, n.chan, n.human_term, n.timer, n.status, n.ast_status] for n in lines]
+        table = [[n.ident, n.kind, n.chan, n.human_term, int(n.timer), n.status, n.ast_status] for n in lines]
         try: 
             stdscr.addstr(1, 6, " __________________________________________")
             stdscr.addstr(2, 6, "|                                          |")
