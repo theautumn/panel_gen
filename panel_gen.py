@@ -34,22 +34,27 @@ class Line():
     """
     This class defines Line objects.
 
-    self.switch:        Set to an instantiated switch object. Usually Rainier,
+    switch:             Set to an instantiated switch object. Usually Rainier,
                         Adams, or Lakeview
-    self.kind:          Type of switch for above objects. "panel, 1xb, 5xb"
-    self.status:        0 = OnHook, 1 = OffHook
-    self.term:          String containing the 7-digit terminating line.
-    self.timer:         Starts with a standard random.gamma, then gets set
+    kind:               Type of switch for above objects. "panel, 1xb, 5xb"
+    status:             0 = OnHook, 1 = OffHook
+    term:               String containing the 7-digit terminating line.
+    timer:              Starts with a standard random.gamma, then gets set
                         subsequently by the call volume attribute of the switch.
-    self.ident:         Integer starting with 0 that identifies the line.
-    self.human_term:    Easily readable called line number, for my dyslexic ass.
-    self.chan:          DAHDI channel. We get this from asterisk.ami once call
-                        is in progress. See on_DialBegin()
-    self.magictoken:    UUID generated each time a callfile is passed to
+    ident:              Integer starting with 0 that identifies the line.
+    human_term:         Easily readable called line number, for my dyslexic ass.
+    chan:               DAHDI channel the call is being placed on.
+    magictoken:         UUID generated each time a callfile is passed to
                         Asterisk. Asterisk sends it back to us via AMI, and we
                         match it against our call.
-    self.ast_status:    Returned from AMI. Indicates status of line from
+    ast_status:         Returned from AMI. Indicates status of line from
                         Asterisk's perspective.
+    ami_tmr:            Set when we ask Asterisk to do something. Number of seconds to wait
+                        before we expect an AMI event response.
+    switching_delay:    Set when a call is made that requires extra time in the dialing
+                        state, such as a call via ANI trunks.
+    pending_*           Set to true if this line is pending action by Asterisk.
+                        Set to false when Asterisk confirms it took action.
     """
 
     def __init__(self, ident, switch, **kwargs):
@@ -80,7 +85,7 @@ class Line():
 
     def tick(self):
         """
-        Decrement line timer by 1 every second until it reaches 0.
+        Decrement line timer.
         Manages the line's state machine by placing calls or hanging up,
         depending on status.
 
@@ -119,17 +124,11 @@ class Line():
         args.l:             Command line arg for called line
         term_choices:       List of office codes. Comes from config file
         """
-        # Have to do some weirdness here to get the values from config,
-        # which come in as a list of strings, then convert to a list of
-        # ints.
-        nxx_config = config.get('nxx','nxx')
-        nxx_string = nxx_config.split(",")
-        nxx = list(map(int, nxx_string))
 
-        if len(nxx) != len(self.switch.trunk_load):
+        if len(NXX) != len(self.switch.trunk_load):
             logging.error("Check your config file! \"nxx\" is of a length %s " +
                         "and the trunk load of %s switch is %s",
-                        len(nxx), self.switch.kind, len(self.switch.trunk_load))
+                        len(NXX), self.switch.kind, len(self.switch.trunk_load))
             logging.error("Also check the switch class for the presence of each " +
                         "trunk load variable that exists in config file.")
 
@@ -137,21 +136,18 @@ class Line():
             term = args.l               # Set term line to user specified
         else:
             if term_choices == []:
-                term_office = random.choice(nxx, p=self.switch.trunk_load)
+                term_office = random.choice(NXX, p=self.switch.trunk_load)
             else:
                 term_office = random.choice(term_choices)
 
             # Choose a sane number that appears on the line link or final
             # frame of the switches that we're actually calling. If something's
             # wrong, then assert false, so it will get caught.
-            # Some number wackiness going on here because when we pull from
-            # config, the values are always str() so we have to int() them if
-            # we are calling thru Lakeview. This is so we can prepend a '0'.
 
             if term_office == 722 or term_office == 365:
                 term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
             elif term_office == 832 or term_office == 833 or term_office == 524:
-                term_station = "%04d" % int(random.choice(Lakeview.line_range))
+                term_station = random.choice(Lakeview.line_range)
             elif term_office == 232:
                 term_station = random.choice(Adams.line_range)
             elif term_office == 275:
@@ -183,11 +179,9 @@ class Line():
             self.timer = random.gamma(4,4)
             return
 
-        pred = ''       # defined here and below so i can easily
-                        # comment that out if needed
+        pred = ''
 
-        # Comment this line out to remove ANI/long distance routings
-        if self.switch.ld_capable == True:
+        if self.switch.ld_capable == True:          # Set in config.
             pred = longdistance(self, nextchan)
 
         #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
@@ -295,7 +289,7 @@ class Switch():
         self.h_ga = config.get(kind, 'h_gamma')
 
     def __repr__(self):
-       return "<Switch(name={self.kind!r})>".format(self=self)
+        return 'Switch('+ repr(self.kind) + ')'
 
     def newtimer(self):
         """
@@ -322,16 +316,15 @@ class Switch():
 
     def newchannel(self, channel_choices):
         """
-        We can't trust Asterisk to pick a random channel, even when using 'r'.
-        Experience shows that it doesn't work, and it will pick up channels
-        already in use. Let's just do the math ourselves.
+        We can either ask Asterisk to pick a channel, or
+        we can do it ourselves. That decision is made in call()
 
         channel_choices: defined in panel_gen.conf
         """
-        channels_inuse = [x.chan for x in lines]
+        channels_inuse = [l.chan for l in lines]
         logging.debug('Begin channel selection')
         logging.debug("In use: %s", channels_inuse)
-        channels_avail = [y for y in channel_choices if not y in channels_inuse]
+        channels_avail = [c for c in channel_choices if not c in channels_inuse]
         logging.debug("Avail:  %s", channels_avail)
 
         if channels_avail == []:
@@ -345,18 +338,13 @@ class Switch():
 
 # +-----------------------------------------------+
 # |                                               |
-# | # <----- BEGIN BOOKKEEPING STUFF -----> #     |
-# |   This is uncategorized bookkeeping for       |
-# |   the rest of the program. Includes           |
-# |   getting AMI events, and parsing args.       |
+# |      <----- BEGIN AMI NONSENSE ----->         |
 # |                                               |
 # +-----------------------------------------------+
-
 
 def on_DialBegin(event, **kwargs):
     """
     Callback function for DialBegin AMI events. 
-    Increments the "is_dialing" counter.
 
     Account Code is a magic number we send to Asterisk and expect
     to get back. This is how we match events with calls in progress.
@@ -394,10 +382,10 @@ def on_DialBegin(event, **kwargs):
 
 def on_DialEnd(event, **kwargs):
     """
-    Callback function for DialEnd AMI events. Sets state to "Ringing".
-    Decrements the "is_dialing" counter.
+    Callback function for DialEnd AMI events.
 
     """
+
     try:
         event = str(event)
 
@@ -435,8 +423,9 @@ def on_DialEnd(event, **kwargs):
                 logging.exception(e)
 
         if len(lines) > 0:
-            enqueue_event(line.switching_delay, doDialEnd)
-            logging.debug("B: Event enqueued  delay %s.", line.switching_delay)
+            if line:
+                enqueue_event(line.switching_delay, doDialEnd)
+                logging.info("B: Event enqueued  delay %s.", line.switching_delay)
 
     except Exception as e:
         logging.exception(e)
@@ -526,8 +515,7 @@ def phone_format(n):
 
 
 def longdistance(line, chan):
-    """ Some lines can be long distance calls with ANI """
-    """ This will determine which calls should be. """
+    # Some lines can be long distance calls with ANI
 
     newsenders = ['13','14','16','27','28','29','32']
     pd = ''
@@ -547,8 +535,8 @@ def longdistance(line, chan):
     return pd
 
 def safetynet():
-    """ Most of these things should never need to be done """
-    """ but its better to be fault tolerant if possible """
+    # Most of these things should never need to be done
+    # but its better to be fault tolerant if possible
 
     def doRestartSwitch(reason, kind):
         api_stop(switch=s.kind)
@@ -598,7 +586,7 @@ def safetynet():
 
                 
 def make_switch(args):
-    """ Instantiate some switches so we can work with them later."""
+    # Instantiate some switches so we can work with them later.
 
     global Rainier
     global Adams
@@ -705,7 +693,6 @@ def ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET):
     global adapter
     client = AMIClient(address=AMI_ADDRESS, port=int(AMI_PORT))
     adapter = AMIClientAdapter(client)
-    #AutoReconnect(client)
     future = client.login(username=AMI_USER, secret=AMI_SECRET)
     logging.info('Connected to Asterisk AMI')
     if future.response.is_error():
@@ -1112,12 +1099,10 @@ def update_switch(**kwargs):
     else:
         return False
 
+
 # +-----------------------------------------------+
 # |                                               |
-# |  Below is the class for the screen. These     |
-# |  methods are called by the UI thread when     |
-# |  it needs to interact with the user, either   |
-# |  by getting keys, or drawing things.          |
+# |      <----- BEGIN SCREEN/UI STUFF ----->      |
 # |                                               |
 # +-----------------------------------------------+
 
@@ -1190,10 +1175,6 @@ class Screen():
 
     def resumescreen(self):
         # This should erase the paused window and refresh the screen.
-        # It erases the window ok, but drawing doesn't resume unless the user
-        # hits a key in the console window. I don't know why, and I've
-        # tried a bunch of different things. The work thread appears to
-        # resume OK.
 
         t_work.resume()
         self.stdscr.nodelay(1)
@@ -1204,6 +1185,7 @@ class Screen():
 
     def draw(self, stdscr, lines, y, x):
         # Output handling. make pretty things.
+
         table = [[n.kind, n.chan, n.human_term, int(n.timer),
                 n.status, n.ast_status] for n in lines]
         stdscr.erase()
@@ -1240,9 +1222,11 @@ class Screen():
         stdscr.refresh()
 
 
-#-->                      <--#
-# Work and UI threads are below
-#-->                      <--#
+# +-----------------------------------------------+
+# |                                               |
+# |      <----- BEGIN THREADING CODE ----->       |
+# |                                               |
+# +-----------------------------------------------+
 
 class ui_thread(threading.Thread):
     # The UI thread! Besides handling pause and resume, this also
@@ -1299,8 +1283,7 @@ class ui_thread(threading.Thread):
 class work_thread(threading.Thread):
     # Does all the work! Can be paused and resumed. Handles all of
     # the exciting things, but most important is calling tick()
-    # once per second. This evaluates the timers and makes call processing
-    # decisions.
+    # which evaluates the timers and makes call processing decisions.
 
     def __init__(self):
 
@@ -1321,7 +1304,7 @@ class work_thread(threading.Thread):
                     while self.paused:
                         self.paused_flag.wait()
 
-                # The main loop that kicks everything into gear.
+                # The main program loop.
                     for l in lines:
                         l.tick()
                     sleep(0.1)
@@ -1365,8 +1348,8 @@ def module_shutdown():
 
 if __name__ == "__main__":
     # Init a bunch of things if we're running as a standalone app.
-
     # Set up signal handlers so we can shutdown cleanly later.
+
     signal.signal(signal.SIGTERM, app_shutdown)
     signal.signal(signal.SIGINT, app_shutdown)
 
@@ -1386,6 +1369,8 @@ if __name__ == "__main__":
     AMI_PORT = config.get('ami', 'port')
     AMI_USER = config.get('ami', 'user')
     AMI_SECRET = config.get('ami', 'secret')
+
+    NXX = list(map(int,config.get('nxx', 'nxx').split(",")))    # Gross!
 
     # If logfile does not exist, create it so logging can write to it.
     try:
@@ -1459,6 +1444,8 @@ if __name__ == "panel_gen":
     AMI_PORT = config.get('ami', 'port')
     AMI_USER = config.get('ami', 'user')
     AMI_SECRET = config.get('ami', 'secret')
+
+    NXX = list(map(int,config.get('nxx', 'nxx').split(",")))    # Gross!
 
     # If logfile does not exist, create it so logging can write to it.
     try:
