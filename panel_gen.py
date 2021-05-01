@@ -61,12 +61,7 @@ class Line():
         self.switch = switch
         self.kind = switch.kind
         self.status = 0
-
-        if args.l:
-            self.term = args.l
-        else:
-            self.term = self.pick_next_called(term_choices)
-
+        self.term = self.pick_next_called(term_choices)
         self.timer = random.gamma(3,4)
         self.ident = ident
         self.human_term = phone_format(self.term) 
@@ -121,10 +116,8 @@ class Line():
         """
         Returns a string containing a 7-digit number to call.
 
-        args.l:             Command line arg for called line
         term_choices:       List of office codes. Comes from config file
         """
-
         if len(NXX) != len(self.switch.trunk_load):
             logging.error("Check your config file! \"nxx\" is of a length %s " +
                         "and the trunk load of %s switch is %s",
@@ -132,33 +125,30 @@ class Line():
             logging.error("Also check the switch class for the presence of each " +
                         "trunk load variable that exists in config file.")
 
-        if args.l:                      # If user specified a line
-            term = args.l               # Set term line to user specified
+        if term_choices == []:
+            term_office = random.choice(NXX, p=self.switch.trunk_load)
         else:
-            if term_choices == []:
-                term_office = random.choice(NXX, p=self.switch.trunk_load)
-            else:
-                term_office = random.choice(term_choices)
+            term_office = random.choice(term_choices)
 
-            # Choose a sane number that appears on the line link or final
-            # frame of the switches that we're actually calling. If something's
-            # wrong, then assert false, so it will get caught.
+        # Choose a sane number that appears on the line link or final
+        # frame of the switches that we're actually calling. If something's
+        # wrong, then assert false, so it will get caught.
 
-            if term_office == 722 or term_office == 365:
-                term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
-            elif term_office == 832 or term_office == 833 or term_office == 524:
-                term_station = random.choice(Lakeview.line_range)
-            elif term_office == 232:
-                term_station = random.choice(Adams.line_range)
-            elif term_office == 275:
-                term_station = random.randint(Step.line_range[0], Step.line_range[1])
-            elif term_office == 830:
-                term_station = random.randint(ESS3.line_range[0], ESS3.line_range[1])
-            else:
-                logging.error("No terminating line available for this office.")
-                assert False
+        if term_office == 722 or term_office == 365:
+            term_station = random.randint(Rainier.line_range[0], Rainier.line_range[1])
+        elif term_office == 832 or term_office == 833 or term_office == 524:
+            term_station = random.choice(Lakeview.line_range)
+        elif term_office == 232:
+            term_station = random.choice(Adams.line_range)
+        elif term_office == 275:
+            term_station = random.randint(Step.line_range[0], Step.line_range[1])
+        elif term_office == 830:
+            term_station = random.randint(ESS3.line_range[0], ESS3.line_range[1])
+        else:
+            logging.error("No terminating line available for this office.")
+            assert False
 
-            term = str(term_office) + str(term_station)
+        term = str(term_office) + str(term_station)
         logging.debug('Terminating line selected: %s', term)
         self.human_term = phone_format(term) 
         return term
@@ -214,7 +204,7 @@ class Line():
         # Set accountcode to our magic UUID for use later.
         c = Call(CHANNEL, variables=vars, callerid=cid, 
                  account=self.magictoken)
-        con = Context('sarah_callsim',pred+self.term,'1')
+        con = Context('sarah_callsim', pred+self.term, '1')
         cf = CallFile(c, con)
         cf.spool()
 
@@ -239,6 +229,7 @@ class Line():
         self.switching_delay = 0
         self.longdistance = False
         logging.debug("Pending hangup: %s", self.pending_hangup)
+
 
 class Switch():
     """
@@ -294,24 +285,15 @@ class Switch():
     def newtimer(self):
         """
         Returns timer back to Line() object. Checks to see
-        if arguments have been passed in at runtime. If so,
-            args.w:         User-specified wait time
-            args.v:         User-specified call volume
-
-        If no args have been passed in (the more likely situation)
-        Then see if running as __main__ or as a module and act
+        if running as __main__ or as a module and act
         accordingly.
         """
-
-        if args.w:
-            timer = args.w
-        else:
-            if args.v == 'heavy' or self.traffic_load == 'heavy':
-                a,b = (int(x) for x in self.h_ga.split(","))
-                timer = random.gamma(a,b)
-            elif args.v == 'normal' or self.traffic_load == 'normal':
-                a,b = (int(x) for x in self.n_ga.split(","))
-                timer = random.gamma(a,b)
+        if self.traffic_load == 'heavy':
+            a,b = (int(x) for x in self.h_ga.split(","))
+            timer = random.gamma(a,b)
+        elif self.traffic_load == 'normal':
+            a,b = (int(x) for x in self.n_ga.split(","))
+            timer = random.gamma(a,b)
         return timer
 
     def newchannel(self, channel_choices):
@@ -425,7 +407,7 @@ def on_DialEnd(event, **kwargs):
         if len(lines) > 0:
             if line:
                 enqueue_event(line.switching_delay, doDialEnd)
-                logging.info("B: Event enqueued  delay %s.", line.switching_delay)
+                logging.debug("B: Event enqueued  delay %s.", line.switching_delay)
 
     except Exception as e:
         logging.exception(e)
@@ -484,9 +466,6 @@ def parse_args():
             'Defaults to originate a sane amount of calls from the panel switch if no args are given.')
     parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7,8,9,10],
             help='Maximum number of active lines.')
-    parser.add_argument('-l', metavar='line', type=int,
-            help='Call only a particular line. Can be used with the -d option for placing test '
-            'calls to a number over and over again.')
     parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],
             choices=['1xb','1xbos','5xb','panel','all','722', '832', '232'],
             help='Originate calls from a particular switch. Takes either 3 digit NXX values '
@@ -498,10 +477,6 @@ def parse_args():
     parser.add_argument('-v', metavar='volume', type=str, default='normal',
             help='Call volume is a proprietary blend of frequency and randomness. Can be light, '
             'normal, or heavy. Default is normal, which is good for average load.')
-    parser.add_argument('-w', metavar='seconds', type=int, help='Use with -d option to specify '
-            'wait time between calls.')
-    parser.add_argument('-z', metavar='seconds', type=int,
-            help='Use with -d option to specify call duration.')
     parser.add_argument('-log', metavar='loglevel', type=str, default='INFO',
             help='Set log level to WARNING, INFO, DEBUG.')
 
@@ -587,11 +562,11 @@ def safetynet():
                 
 def make_switch(args):
     # Instantiate some switches so we can work with them later.
+    # Behave differently if we're running as __main__ or __panel_gen__
 
     global Rainier
     global Adams
     global Lakeview
-    global Vermont
     global Step
     global ESS3
 
@@ -608,7 +583,6 @@ def make_switch(args):
         originating_switches.append(Rainier)
         originating_switches.append(Adams)
         originating_switches.append(Lakeview)
-      # originating_switches.append(ESS3)
 
     if __name__ == '__main__':
         for o in args.o:
@@ -626,20 +600,20 @@ def make_switch(args):
         if args.o == []:
             originating_switches.append(Rainier)
 
-    global term_choices
-    term_choices = []
+        global term_choices
+        term_choices = []
 
-    for t in args.t:
-        if t == 'panel' or t == '722':
-            term_choices.append(722)
-        elif t == '5xb' or t == '232':
-            term_choices.append(232)
-        elif t == '1xb' or t == '832':
-            term_choices.append(832)
-        elif t == 'office' or t == '365':
-            term_choices.append(365)
-        elif t == 'step' or t == '275':
-            term_choices.append(275)
+        for t in args.t:
+            if t == 'panel' or t == '722':
+                term_choices.append(722)
+            elif t == '5xb' or t == '232':
+                term_choices.append(232)
+            elif t == '1xb' or t == '832':
+                term_choices.append(832)
+            elif t == 'office' or t == '365':
+                term_choices.append(365)
+            elif t == 'step' or t == '275':
+                term_choices.append(275)
 
 
 def make_lines(**kwargs):
@@ -661,12 +635,8 @@ def make_lines(**kwargs):
     new_lines = []
 
     if source == 'main':
-        if args.a != []:
-            numlines = args.a
-        # If we start standalone, just give us normal lines for everything.
         new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
     elif source == 'api':
-        # If this is an API call, we care about "numlines".
         new_lines = [Line(n, switch) for n in range(numlines)]
 
     return new_lines
