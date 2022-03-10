@@ -64,7 +64,7 @@ class Line():
         self.term = self.pick_next_called(term_choices)
         self.timer = random.gamma(3,4)
         self.ident = ident
-        self.human_term = phone_format(self.term) 
+        self.human_term = phone_format(self.term)
         self.chan = '-'
         self.magictoken = ""
         self.ast_status = 'on_hook'
@@ -150,7 +150,7 @@ class Line():
 
         term = str(term_office) + str(term_station)
         logging.debug('Terminating line selected: %s', term)
-        self.human_term = phone_format(term) 
+        self.human_term = phone_format(term)
         return term
 
 
@@ -180,10 +180,10 @@ class Line():
 
         self.timer = self.switch.newtimer()
 
-        # Wait value to pass to Asterisk. (We will actually be controlling the 
-        # hangup from here, but this is kind of a safety net so asterisk dumps 
+        # Wait value to pass to Asterisk. (We will actually be controlling the
+        # hangup from here, but this is kind of a safety net so asterisk dumps
         # the call if we can't for some reason.)
-        wait = int(self.timer) + 5
+        wait = int(self.timer) + 7
 
         # OoOOOoOOoOOOO!
         self.magictoken = str(uuid.uuid4())
@@ -202,7 +202,7 @@ class Line():
         # Pass control of the call to the sarah_callsim context in
         # the dialplan.
         # Set accountcode to our magic UUID for use later.
-        c = Call(CHANNEL, variables=vars, callerid=cid, 
+        c = Call(CHANNEL, variables=vars, callerid=cid,
                  account=self.magictoken)
         con = Context('sarah_callsim', pred+self.term, '1')
         cf = CallFile(c, con)
@@ -213,16 +213,14 @@ class Line():
         """
         Hangs up a call.
 
-        Checks if a call is being dialed during hangup.
-        If so, we need to decrement the dialing counter.
-        Then, send an AMI hangup request to Asterisk,
-        set status, chan, and ast_status back to normal values,
-        set a new timer, and set the next called line.
+        Send an AMI hangup request to Asterisk,
+        Set a timer to wait for Asterisk's response.
+        Response is handled in on_Hangup()
         """
 
         adapter.Hangup(Channel='DAHDI/{}-1'.format(self.chan))
         self.pending_hangup = True
-        self.ami_tmr = 2
+        self.ami_tmr = 3
         logging.debug('2: Asked Asterisk to hangup %s on DAHDI/%s, line %s',
                      self.term, self.chan, self.ident)
 
@@ -273,7 +271,7 @@ class Switch():
         self.max_833 = float(config[kind]['max_833'])
         self.max_524 = float(config[kind]['max_524'])
         self.trunk_load = [self.max_722, self.max_232,
-                self.max_832, self.max_275, self.max_365, 
+                self.max_832, self.max_275, self.max_365,
                 self.max_830, self.max_833, self.max_524]
         self.line_range = config.get(kind, 'line_range').split(",")
         self.n_ga = config.get(kind, 'n_gamma')
@@ -326,7 +324,7 @@ class Switch():
 
 def on_DialBegin(event, **kwargs):
     """
-    Callback function for DialBegin AMI events. 
+    Callback function for DialBegin AMI events.
 
     Account Code is a magic number we send to Asterisk and expect
     to get back. This is how we match events with calls in progress.
@@ -346,17 +344,16 @@ def on_DialBegin(event, **kwargs):
             return
 
         for l in lines:
-            #if AccountCode[0] == l.magictoken and l.ast_status == 'on_hook':
             if AccountCode[0] == l.magictoken:
                 l.chan = DB_DestChannel[0]
                 l.ast_status = 'Dialing'
                 l.switch.is_dialing += 1
                 l.switch.on_call +=1
-                l.status = 1 
+                l.status = 1
                 l.pending_call = False
                 l.pending_dialend = True
                 l.ami_tmr = 18
-                logging.info('DialBegin %s on DAHDI/%s from %s ident %s ->>', 
+                logging.info('DialBegin %s on DAHDI/%s from %s ident %s ->>',
                              l.term, l.chan, l.switch.kind, l.ident)
     except Exception as e:
         logging.exception(e)
@@ -391,7 +388,7 @@ def on_DialEnd(event, **kwargs):
 
         def doDialEnd():
             try:
-                logging.debug("C: DialEnd bookkeeping starting on %s. Pending hangup is %s", 
+                logging.debug("C: DialEnd bookkeeping starting on %s. Pending hangup is %s",
                              line.term, line.pending_hangup)
                 if line.pending_hangup == False:
                     if line.ast_status == 'Dialing':
@@ -399,6 +396,7 @@ def on_DialEnd(event, **kwargs):
                         line.switch.is_dialing -= 1
                         logging.debug('Ringing %s on line %s', line.term, line.ident)
                     elif line.ast_status == 'on_hook':
+                        logging.error('How did we get to DialEnd from on_hook?')
                         pass # xxx this might be problems
                     logging.debug('on_DialEnd with %s calls dialing', line.switch.is_dialing)
             except Exception as e:
@@ -501,12 +499,24 @@ def longdistance(line, chan):
                 if line.longdistance == False:
                     i = random.randint(0,10)
                     if i >= 5:
-                        logging.info("ANI call being placed on %s to %s, chan  %s", 
+                        logging.info("ANI call being placed on %s to %s, chan %s",
                                      line.kind, line.term, chan)
                         line.human_term = line.human_term + '*'
                         pd = '11'
                         line.switching_delay = 6
                         line.longdistance = True
+
+    if line.kind == "5xb":
+        if line.term[0:3] == "832" or line.term[0:3] == "232":
+            i=random.randint(0,10)
+            if i >= 5:
+                logging.info("ANI call being placed on %s to %s, chan %s",
+                line.kind, line.term, chan)
+                line.human_term = line.human_term + '*'
+                pd = '1'
+                line.switching_delay = 6
+                line.longdistance = True
+
     return pd
 
 def safetynet():
@@ -520,16 +530,14 @@ def safetynet():
 
     def errorhandle(reason, status):
 
-        logging.error("Failed to get AMI notification %s within allotted time on %s", 
+        logging.error("Failed to get AMI %s within allotted time on %s",
                       status, l)
         logging.error("Channel: %s", l.chan)
         logging.error("Status: %s", l.status)
         logging.error("Asterisk: %s", l.ast_status)
-        logging.error("Tick: %s", int(l.timer))
         logging.error("Term: %s", l.human_term)
-        logging.error("Channel: %s", l.chan)
 
-    reason = ''    
+    reason = ''
 
     for s in originating_switches:
         if s.is_dialing < 0:
@@ -550,16 +558,22 @@ def safetynet():
         if l.pending_dialend == True:
             status = "DialEnd"
             if l.ami_tmr <= 0:
-                l.pending_dialend = False       
+                l.pending_dialend = False
                 errorhandle(reason, status)
 
         if l.pending_hangup == True:
             status = "Hangup"
             if l.ami_tmr <= 0:
                 l.pending_hangup = False
-                errorhandle(reason, status)
+                # This pass prevents silly threading confusion where
+                # asterisk will report a hangup before we realize that we've
+                # asked for one ;P
+                if l.chan == '-':
+                    pass
+                else:
+                    errorhandle(reason, status)
 
-                
+
 def make_switch(args):
     # Instantiate some switches so we can work with them later.
     # Behave differently if we're running as __main__ or __panel_gen__
@@ -600,20 +614,20 @@ def make_switch(args):
         if args.o == []:
             originating_switches.append(Rainier)
 
-        global term_choices
-        term_choices = []
+    global term_choices
+    term_choices = []
 
-        for t in args.t:
-            if t == 'panel' or t == '722':
-                term_choices.append(722)
-            elif t == '5xb' or t == '232':
-                term_choices.append(232)
-            elif t == '1xb' or t == '832':
-                term_choices.append(832)
-            elif t == 'office' or t == '365':
-                term_choices.append(365)
-            elif t == 'step' or t == '275':
-                term_choices.append(275)
+    for t in args.t:
+        if t == 'panel' or t == '722':
+            term_choices.append(722)
+        elif t == '5xb' or t == '232':
+            term_choices.append(232)
+        elif t == '1xb' or t == '832':
+            term_choices.append(832)
+        elif t == 'office' or t == '365':
+            term_choices.append(365)
+        elif t == 'step' or t == '275':
+            term_choices.append(275)
 
 
 def make_lines(**kwargs):
@@ -626,18 +640,19 @@ def make_lines(**kwargs):
     numlines:       number of lines we should create. should be determined and
                     passed in before this function is called
     """
+    try:
+        source = kwargs.get('source', '')
+        switch = kwargs.get('switch', '')
+        originating_switches = kwargs.get('originating_switches','')
+        numlines = kwargs.get('numlines', '')
 
-    source = kwargs.get('source', '')
-    switch = kwargs.get('switch', '')
-    originating_switches = kwargs.get('originating_switches','')
-    numlines = kwargs.get('numlines', '')
-
-    new_lines = []
-
-    if source == 'main':
-        new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
-    elif source == 'api':
-        new_lines = [Line(n, switch) for n in range(numlines)]
+        new_lines = []
+        if source == 'main':
+            new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
+        elif source == 'api':
+            new_lines = [Line(n, switch) for n in range(numlines)]
+    except Exception as e:
+        logging.exception(e)
 
     return new_lines
 
@@ -777,80 +792,79 @@ def api_start(**kwargs):
     switch = kwargs.get('switch', '')
     traffic_load = kwargs.get('traffic_load', '')
 
-    if source == 'web':
-        logging.info("App requested START on %s", switch)
-    elif source == 'key':
-        logging.info('Key operated: START on %s', switch)
-    else:
-        logging.warning('I dont know why, but we are starting on %s', switch)
+    try:
+        if source == 'web':
+            logging.info("App requested START on %s", switch)
+        elif source == 'key':
+            logging.info('Key operated: START on %s', switch)
+        else:
+            logging.warning('I dont know why, but we are starting on %s', switch)
 
-    if t_work.is_alive == True:
-        for i in originating_switches:
-            if switch == i.kind:
-                if i.running == True:
-                    logging.warning("%s is running. Can't start twice.", i.kind)
-                elif i.running == False:
+        if t_work.is_alive == True:
+            for i in originating_switches:
+                if switch == i.kind:
+                    if i.running == True:
+                        logging.warning("%s is running. Can't start twice.", i.kind)
+                    elif i.running == False:
 
-                    # Reset the dialing counter for safety.
-                    i.is_dialing = 0
+                        # Reset the dialing counter for safety.
+                        i.is_dialing = 0
 
-                    # This block handles whether or not the user passed in
-                    # a traffic load setting. If not, we'll just use whatever
-                    # we already have.
-                    if traffic_load == "normal" or traffic_load == "heavy":
-                        if traffic_load != i.traffic_load:
-                            i.traffic_load = traffic_load
-                            logging.info('Changing traffic load to %s', traffic_load)
-                    if i.traffic_load == 'heavy':
-                        numlines = i.lines_heavy
-                    if i.traffic_load == 'normal':
-                        numlines = i.lines_normal
+                        # This block handles whether or not the user passed in
+                        # a traffic load setting. If not, we'll just use whatever
+                        # we already have.
+                        if traffic_load == "normal" or traffic_load == "heavy":
+                            if traffic_load != i.traffic_load:
+                                i.traffic_load = traffic_load
+                                logging.info('Changing traffic load to %s', traffic_load)
+                        if i.traffic_load == 'heavy':
+                            numlines = i.lines_heavy
+                        if i.traffic_load == 'normal':
+                            numlines = i.lines_normal
+                        if i == Adams:
+                            # Carve out a special case for Sundays. This was requested
+                            # by museum volunteers so that we can give tours of the
+                            # step and 1XB without interruption by the this program.
+                            # This will only be effective if the key is operated.
+                            # Will have no impact when using web app.
+                            if datetime.today().weekday() == 6:
+                                logging.info('Its Sunday!')
+                                if source == 'key':
+                                    logging.info('5XB special Sunday mode active')
+                                    i.trunk_load = [.15, .85, .0, .0, .0, .0, .0, .0]
+                                    new_lines = make_lines(switch=i, numlines=numlines,
+                                    source='api')
 
-                    if i == Adams:
-                        # Carve out a special case for Sundays. This was requested
-                        # by museum volunteers so that we can give tours of the
-                        # step and 1XB without interruption by the this program.
-                        # This will only be effective if the key is operated.
-                        # Will have no impact when using web app.
-                        if datetime.today().weekday() == 6:
-                            logging.info('Its Sunday!')
-                            if source == 'key':
-                                logging.info('5XB special Sunday mode active')
-                                i.trunk_load = [.15, .85, .0, .0, .0, .0, .0, .0]
-                                new_lines = make_lines(switch=i, numlines=8,
-                                source='api')
+                                # Adams: If we start from the web interface, ignore
+                                # those rules.
+                                else:
+                                    logging.info('5XB special Sunday mode skipped')
+                                    new_lines = make_lines(switch=i, numlines=numlines,
+                                    source='api')
 
-                            # Adams: If we start from the web interface, ignore 
-                            # those rules.
+                            # Adams: If its any other day of the week, just act normal.
                             else:
-                                logging.info('5XB special Sunday mode skipped')
-                                new_lines = make_lines(switch=i, numlines=numlines, 
+                                new_lines = make_lines(switch=i, numlines=numlines,
                                 source='api')
 
-                        # Adams: If its any other day of the week, just act normal.
+                        # Everyone else: Make lines.
                         else:
-                            new_lines = make_lines(switch=i, numlines=numlines, 
+                            new_lines = make_lines(switch=i, numlines=numlines,
                             source='api')
 
-                    # Everyone else: Make lines.
-                    else:
-                        new_lines = make_lines(switch=i, numlines=numlines, 
-                        source='api')
+                        # Append the lines we just created.
+                        for l in new_lines:
+                            lines.append(l)
 
-                    # Append the lines we just created.
-                    for l in new_lines:
-                        lines.append(l)
+                        i.running = True
+                        logging.info('Appended %s lines to %s', len(new_lines), switch)
 
-                    i.running = True
-                    logging.info('Appended %s lines to %s', len(new_lines), switch)
-
-                try:
                     lines_created = len(new_lines)
                     result = get_info()
                     return result
-                except Exception as e:
-                    logging.execption(e)
-                    return False
+    except Exception as e:
+        logging.execption(e)
+        return False
 
 
 def api_stop(**kwargs):
@@ -909,8 +923,7 @@ def api_stop(**kwargs):
                 s.on_call = 0
 
     except Exception as e:
-        logging.warning("Exception occurred while stopping calls.")
-        logging.warning(e)
+        logging.exception(e)
         return False
 
     return get_info()
@@ -961,7 +974,7 @@ def create_line(**kwargs):
         return result
 
 def delete_line(**kwargs):
-    """ 
+    """
     Deletes a specific line.
 
     switch:     switch object
@@ -1061,7 +1074,7 @@ def update_switch(**kwargs):
                                 create_line(switch=i, numlines=numlines)
                             elif i.traffic_load == 'normal':
                                 delete_line(switch=i, numlines=numlines)
-                        logging.info("Traffic on %s changed to %s", 
+                        logging.info("Traffic on %s changed to %s",
                                     i.kind, i.traffic_load)
             result.append(schema.dump(i))
     if result != []:
