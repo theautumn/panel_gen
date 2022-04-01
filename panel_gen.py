@@ -498,7 +498,7 @@ def longdistance(line, chan):
             if line.term[0:3] == "832" or line.term[0:3] == "232":
                 if line.longdistance == False:
                     i = random.randint(0,10)
-                    if i >= 5:
+                    if i >= 7:
                         logging.info("ANI call being placed on %s to %s, chan %s",
                                      line.kind, line.term, chan)
                         line.human_term = line.human_term + '*'
@@ -507,15 +507,17 @@ def longdistance(line, chan):
                         line.longdistance = True
 
     if line.kind == "5xb":
+        too_many = sum(1 for l in lines if l.longdistance == True and l.kind =="5xb")
         if line.term[0:3] == "832" or line.term[0:3] == "232":
             i=random.randint(0,10)
             if i >= 5:
-                logging.info("ANI call being placed on %s to %s, chan %s",
-                line.kind, line.term, chan)
-                line.human_term = line.human_term + '*'
-                pd = '1'
-                line.switching_delay = 6
-                line.longdistance = True
+                if too_many < 2:
+                    logging.info("ANI call being placed on %s to %s, chan %s",
+                        line.kind, line.term, chan)
+                    line.human_term = line.human_term + '*'
+                    pd = '1'
+                    line.switching_delay = 6
+                    line.longdistance = True
 
     return pd
 
@@ -831,7 +833,7 @@ def api_start(**kwargs):
                                 logging.info('Its Sunday!')
                                 if source == 'key':
                                     logging.info('5XB special Sunday mode active')
-                                    i.trunk_load = [.15, .85, .0, .0, .0, .0, .0, .0]
+                                    i.trunk_load = [.15, .75, .1, .0, .0, .0, .0, .0]
                                     new_lines = make_lines(switch=i, numlines=numlines,
                                     source='api')
 
