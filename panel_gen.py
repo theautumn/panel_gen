@@ -462,7 +462,7 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description='Generate calls to electromechanical switches. '
             'Defaults to originate a sane amount of calls from the panel switch if no args are given.')
-    parser.add_argument('-a', metavar='lines', type=int, choices=[1,2,3,4,5,6,7,8,9,10],
+    parser.add_argument('-a', metavar='lines', type=int, default=[], choices=[1,2,3,4,5,6,7,8,9,10],
             help='Maximum number of active lines.')
     parser.add_argument('-o', metavar='switch', type=str, nargs='?', action='append', default=[],
             choices=['1xb','1xbos','5xb','panel','all','722', '832', '232'],
@@ -516,7 +516,7 @@ def longdistance(line, chan):
                         line.kind, line.term, chan)
                     line.human_term = line.human_term + '*'
                     pd = '1'
-                    line.switching_delay = 6
+                    line.switching_delay = 4
                     line.longdistance = True
 
     return pd
@@ -650,7 +650,11 @@ def make_lines(**kwargs):
 
         new_lines = []
         if source == 'main':
-            new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
+            if args.a == []:
+                new_lines = [Line(n, switch) for switch in originating_switches for n in range(switch.lines_normal)]
+            else:
+                new_lines = [Line(n, switch) for switch in originating_switches for n in range(args.a)]
+
         elif source == 'api':
             new_lines = [Line(n, switch) for n in range(numlines)]
     except Exception as e:
@@ -833,7 +837,7 @@ def api_start(**kwargs):
                                 logging.info('Its Sunday!')
                                 if source == 'key':
                                     logging.info('5XB special Sunday mode active')
-                                    i.trunk_load = [.15, .75, .1, .0, .0, .0, .0, .0]
+                                    i.trunk_load = [.1, .80, .1, .0, .0, .0, .0, .0]
                                     new_lines = make_lines(switch=i, numlines=numlines,
                                     source='api')
 
@@ -1388,7 +1392,8 @@ if __name__ == "__main__":
     logging.info('Call volume set to %s', args.v)
 
     # Here is where we actually make the lines.
-    lines = make_lines(source='main', originating_switches=originating_switches)
+    lines = make_lines(source='main', originating_switches=originating_switches,
+                       numlines = args.a)
 
     try:
         t_ui = ui_thread()
