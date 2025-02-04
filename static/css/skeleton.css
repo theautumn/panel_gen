@@ -166,7 +166,7 @@ a:hover {
 
 /* Buttons
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
-.button,
+.button
 button,
 input[type="submit"],
 input[type="reset"],
@@ -258,6 +258,7 @@ input[type="url"],
 input[type="password"],
 textarea,
 select {
+  color: #000;
   height: 38px;
   padding: 6px 10px; /* The 6px vertically centers text on FF, ignored by Webkit */
   background-color: #fff;
@@ -388,6 +389,9 @@ form {
   box-sizing: border-box; }
 .u-max-full-width {
   max-width: 100%;
+  box-sizing: border-box; }
+.u-half-width {
+  width: 50%;
   box-sizing: border-box; }
 .u-pull-right {
   float: right; }

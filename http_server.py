@@ -14,9 +14,10 @@
 #-----------------------------------------------
 
 from cheroot.wsgi import Server as WSGIServer, PathInfoDispatcher
-from flask import render_template 
+from flask import render_template, request
 import connexion
 import logging
+import subprocess
 import panel_gen
 
 
@@ -31,6 +32,17 @@ app.add_api('swagger.yml')
 @app.route('/', methods=['GET'])
 def home():
     return render_template('home.html')
+
+@app.route('/rc', methods=['POST', 'GET'])
+def rc():
+    if request.method == 'GET':
+        return render_template('rc.html')
+    if request.method == 'POST':
+        num_to_dial = request.form['phonenumber']
+        ast_channel = request.form['channelnumber']
+        panel_gen.test_call(num_to_dial, ast_channel)
+        return render_template('rc.html')
+
 
 d = PathInfoDispatcher({'/': app})
 server = WSGIServer(('0.0.0.0', 5000), d)

@@ -22,7 +22,8 @@ def read_status():
         status = False
     else:
        abort(406, "Failed to return ping result", )
-    
+
     result = {"status" : status }
 
     return result
+

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #---------------------------------------------------------------------#
 #                                                                     #
 #  A call generator thing for the telephone switches at the           #
@@ -174,9 +174,9 @@ class Line():
         if self.switch.ld_capable == True:          # Set in config.
             pred = longdistance(self, nextchan)
 
-        #CHANNEL = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
-        CHANNEL = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
-        logging.debug('To Asterisk: %s on ident %s', CHANNEL, self.ident)
+        #channel = 'DAHDI/{}'.format(self.switch.dahdi_group) + '/wwww%s' % self.term
+        channel = 'DAHDI/{}'.format(nextchan) + '/wwww%s' % pred+self.term
+        logging.debug('To Asterisk: %s on ident %s', channel, self.ident)
 
         self.timer = self.switch.newtimer()
 
@@ -202,11 +202,12 @@ class Line():
         # Pass control of the call to the sarah_callsim context in
         # the dialplan.
         # Set accountcode to our magic UUID for use later.
-        c = Call(CHANNEL, variables=vars, callerid=cid,
+        c = Call(channel, variables=vars, callerid=cid,
                  account=self.magictoken)
         con = Context('sarah_callsim', pred+self.term, '1')
         cf = CallFile(c, con)
         cf.spool()
+
 
 
     def hangup(self):
@@ -353,8 +354,8 @@ def on_DialBegin(event, **kwargs):
                 l.pending_call = False
                 l.pending_dialend = True
                 l.ami_tmr = 18
-                logging.info('DialBegin %s on DAHDI/%s from %s ident %s ->>',
-                             l.term, l.chan, l.switch.kind, l.ident)
+       #         logging.info('DialBegin %s on DAHDI/%s from %s ident %s ->>',
+       #                      l.term, l.chan, l.switch.kind, l.ident)
     except Exception as e:
         logging.exception(e)
 
@@ -397,6 +398,10 @@ def on_DialEnd(event, **kwargs):
                         logging.debug('Ringing %s on line %s', line.term, line.ident)
                     elif line.ast_status == 'on_hook':
                         logging.error('How did we get to DialEnd from on_hook?')
+                        # This might break everything lets see XXXXXXXXXX
+                        # It did -- Matt
+                        # line.ast_status = 'Ringing':
+                        # logging.error('Set status to Ringing on line %s', line.ident)
                         pass # xxx this might be problems
                     logging.debug('on_DialEnd with %s calls dialing', line.switch.is_dialing)
             except Exception as e:
@@ -449,8 +454,8 @@ def on_Hangup(event, **kwargs):
                 l.timer = l.switch.newtimer()
                 l.term = l.pick_next_called(term_choices)
                 l.pending_hangup = False
-                logging.info('<<- Asterisk reports hangup OK. Line %s status is %s',
-                              l.ident, l.status)
+      #          logging.info('<<- Asterisk reports hangup OK. Line %s status is %s',
+      #                        l.ident, l.status)
     except Exception as e:
         logging.exception(e)
 
@@ -916,7 +921,6 @@ def api_stop(**kwargs):
                 logging.warning("Failed to delete remaining files in spool.")
                 logging.warning(e)
         else:
-
             for s in originating_switches:
                 if s.kind == switch:
                     deadlines = [l for l in lines if l.kind == s.kind]
@@ -926,7 +930,7 @@ def api_stop(**kwargs):
 
                     for n in deadlines:
                         n.hangup()
-                s.on_call = 0
+                    s.on_call = 0
 
     except Exception as e:
         logging.exception(e)
@@ -1087,6 +1091,22 @@ def update_switch(**kwargs):
         return result
     else:
         return False
+
+
+def test_call(num_to_dial, ast_channel):
+    """
+    Helper function for web-based remote control
+    """
+
+    channel = 'DAHDI/{}'.format(ast_channel) + '/wwww%s' % num_to_dial
+    logging.info(channel)
+    vars = {'waittime':10}
+
+    c = Call(channel, variables=vars, callerid='test')
+    con = Context('sarah_callsim', num_to_dial, '1')
+    cf = CallFile(c, con)
+    cf.spool()
+
 
 
 # +-----------------------------------------------+
@@ -1377,8 +1397,9 @@ if __name__ == "__main__":
     try:
         ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
     except:
-        logging.error('AMI connection failed. This will break things.')
-        sys.exit('Failed to connect to Asterisk AMI. Is Asterisk running?')
+      #  logging.error('AMI connection failed. This will break things.')
+      #  sys.exit('Failed to connect to Asterisk AMI. Is Asterisk running?')
+      logging.error("all that junk", exc_info=True)
 
     # Parse any arguments the user gave us.
     parse_args()
@@ -1453,8 +1474,9 @@ if __name__ == "panel_gen":
     try:
         ami_connect(AMI_ADDRESS, AMI_PORT, AMI_USER, AMI_SECRET)
     except:
-        logging.error('AMI connection failed. This will break things.')
-        sys.exit('Failed to connect to Asterisk AMI. Is Asterisk running?')
+        #logging.error('AMI connection failed. This will break things.')
+        #sys.exit('Failed to connect to Asterisk AMI. Is Asterisk running?')
+        logging.error("all that junk", exc_info=True)
 
     # We call parse_args here just to set some defaults. Otherwise
     # not used when running as module.
