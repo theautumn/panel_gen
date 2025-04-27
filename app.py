@@ -8,13 +8,13 @@ def read_status():
     Success:    Returns 200 OK + app status messages
     Failure:    Returns 406 Failed to get info
     """
-    result = panel_gen.get_info() 
+    result = panel_gen.get_info()
     if result != False:
        return result
     else:
        abort(
-            406,
-            "Failed to get info. Probably an issue with panel_gen",
+            500,
+            "Failed to get status. Probably an issue with panel_gen",
         )
 
 def start(**kwargs):
@@ -42,11 +42,11 @@ def start(**kwargs):
         if source == "web":
             return 'See Other', 303, {'Location': '/'}
         else:
-            return result 
+            return result
 
     except Exception as e:
         abort(
-            406,
+            500,
             "Failed to create new lines. Check api_start()"
         )
 
@@ -63,21 +63,21 @@ def stop(**kwargs):
     source:     In URI query string. Can be "web", "key".
     """
     source = kwargs.get("source", "")
-    
-    try:    
+
+    try:
         result = panel_gen.api_stop(**kwargs)
 
         if result != False:
             if source == "web":
                 return 'See Other', 303, {'Location': '/'}
             else:
-                return result 
+                return result
         elif result == False:
             abort(
-                406,
-                "Failed to stop switch. Ask Sarah to fix this.",
+                500,
+                "Failed to stop switch. Check api_stop()",
             )
     except:
-        abort(406, "Shits all fucked up",)
+        abort(500, "Shits all fucked up",)
         pass
 

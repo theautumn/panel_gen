@@ -98,7 +98,7 @@ class Line():
                     else:
                         # Back off until some calls complete.
                         self.timer = random.gamma(4,4)
-                        logging.warning("Hit sender limit: %s with %s calls " +
+                        logging.debug("Hit sender limit: %s with %s calls " +
                             "dialing. Delaying call.",
                             self.switch.max_dialing, self.switch.is_dialing)
                 elif self.ast_status == "Dialing" or self.ast_status == "Ringing":
@@ -354,8 +354,8 @@ def on_DialBegin(event, **kwargs):
                 l.pending_call = False
                 l.pending_dialend = True
                 l.ami_tmr = 18
-       #         logging.info('DialBegin %s on DAHDI/%s from %s ident %s ->>',
-       #                      l.term, l.chan, l.switch.kind, l.ident)
+                logging.debug('DialBegin %s on DAHDI/%s from %s ident %s ->>',
+                             l.term, l.chan, l.switch.kind, l.ident)
     except Exception as e:
         logging.exception(e)
 
@@ -454,8 +454,8 @@ def on_Hangup(event, **kwargs):
                 l.timer = l.switch.newtimer()
                 l.term = l.pick_next_called(term_choices)
                 l.pending_hangup = False
-      #          logging.info('<<- Asterisk reports hangup OK. Line %s status is %s',
-      #                        l.ident, l.status)
+                logging.debug('<<- Asterisk reports hangup OK. Line %s status is %s',
+                              l.ident, l.status)
     except Exception as e:
         logging.exception(e)
 
@@ -495,7 +495,7 @@ def phone_format(n):
 def longdistance(line, chan):
     # Some lines can be long distance calls with ANI
 
-    newsenders = ['13','14','16','27','28','29','32']
+    newsenders = ['13','14','16','27','28','29','32','45','46','47']
     pd = ''
 
     if line.kind == "1xb":
