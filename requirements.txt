@@ -3,7 +3,7 @@ argparse==1.4.0
 ascii_graph==1.5.1
 asterisk-ami==0.1.5
 attrs==19.3.0
-certifi==2019.11.28
+certifi==2022.12.7
 chardet==3.0.4
 cheroot==8.2.1
 cherrypy==18.5.0
